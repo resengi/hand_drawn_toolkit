@@ -3,7 +3,7 @@ name: hand_drawn_toolkit
 description: A lightweight Flutter package for rendering hand-drawn, sketchy lines,
   borders, and containers.
 
-version: 0.1.1
+version: 0.1.2
 
 homepage: https://github.com/resengi/hand_drawn_toolkit
 repository: https://github.com/resengi/hand_drawn_toolkit
