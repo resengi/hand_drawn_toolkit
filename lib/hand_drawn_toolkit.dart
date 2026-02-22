@@ -23,7 +23,7 @@
 /// )
 /// ```
 ///
-/// See the [README](https://github.com/your-org/hand_drawn_toolkit) for full
+/// See the [README](https://github.com/resengi/hand_drawn_toolkit) for full
 /// documentation and examples.
 library;
 

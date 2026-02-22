@@ -1,9 +1,7 @@
 name: hand_drawn_toolkit
 
-description: >-
-  A lightweight Flutter package for rendering hand-drawn, sketchy lines,
-  borders, and containers. Deterministic seed-based generation ensures
-  consistent visuals across rebuilds while maintaining an organic, human feel.
+description: A lightweight Flutter package for rendering hand-drawn, sketchy lines,
+  borders, and containers.
 
 version: 0.1.1
 
