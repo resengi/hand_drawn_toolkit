@@ -5,7 +5,7 @@ description: >-
   borders, and containers. Deterministic seed-based generation ensures
   consistent visuals across rebuilds while maintaining an organic, human feel.
 
-version: 0.1.0
+version: 0.1.1
 
 homepage: https://github.com/resengi/hand_drawn_toolkit
 repository: https://github.com/resengi/hand_drawn_toolkit
