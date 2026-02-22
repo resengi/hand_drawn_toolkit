@@ -1,0 +1,21 @@
+name: hand_drawn_toolkit_example
+description: Example app demonstrating the hand_drawn_toolkit package.
+publish_to: none
+
+environment:
+  sdk: ^3.10.1
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  hand_drawn_toolkit:
+    path: ../
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
