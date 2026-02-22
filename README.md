@@ -25,7 +25,7 @@ Add the package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  hand_drawn_toolkit: ^0.1.0
+  hand_drawn_toolkit: ^0.1.2
 ```
 
 Then run:
@@ -239,10 +239,6 @@ ListView.builder(
 **Keep segment count reasonable** — 20–30 segments is the sweet spot for most use cases. Going above 50 adds computation without visible improvement at typical widget sizes.
 
 **Leverage caching** — the painter only recomputes when parameters or size change, so avoid recreating `HandDrawnLinePainter` instances unnecessarily in build methods. The convenience widgets (`HandDrawnContainer`, `HandDrawnDivider`) handle this correctly by default.
-
-## Package Architecture
-
-For a detailed breakdown of every file, class, and design decision in this package, see [architecture.md](architecture.md).
 
 ## License
 
