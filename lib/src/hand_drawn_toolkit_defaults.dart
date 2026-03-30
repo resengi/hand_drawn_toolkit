@@ -33,10 +33,12 @@ abstract final class HandDrawnDefaults {
   /// or hot-reloads.
   static const int seed = 42;
 
-  // ── Widget defaults ──────────────────────────────────────────────────────
+  // ── Container defaults ─────────────────────────────────────────────────
 
   /// Default inner padding for [HandDrawnContainer].
   static const double containerPadding = 20.0;
+
+  // ── Divider defaults ───────────────────────────────────────────────────
 
   /// Default thickness for [HandDrawnDivider].
   static const double dividerThickness = 1.5;
@@ -46,4 +48,53 @@ abstract final class HandDrawnDefaults {
 
   /// Default segment count for [HandDrawnDivider].
   static const int dividerSegments = 30;
+
+  // ── StatusSquare defaults ──────────────────────────────────────────────
+
+  /// Default side length for [HandDrawnStatusSquare] in logical pixels.
+  static const double statusSquareSize = 14.0;
+
+  /// Default border stroke width for [HandDrawnStatusSquare].
+  static const double statusSquareStrokeWidth = 1.5;
+
+  /// Default stroke width for the check / dash indicator drawn on top of
+  /// the filled square.
+  static const double statusSquareIndicatorStrokeWidth = 2.0;
+
+  /// Default padding around the painted square that enlarges the tap target
+  /// when [HandDrawnStatusSquare.onTap] is non-null.
+  static const double statusSquareTapPadding = 6.0;
+
+  /// Default irregularity for [HandDrawnStatusSquare]. Subtler than the
+  /// container default because the square is small.
+  static const double statusSquareIrregularity = 1.0;
+
+  /// Default segment count for [HandDrawnStatusSquare]. Fewer segments than
+  /// the container default for a chunkier feel at small sizes.
+  static const int statusSquareSegments = 6;
+
+  // ── TextField defaults ─────────────────────────────────────────────────
+
+  /// Default font size for [HandDrawnTextField] when no custom [TextStyle]
+  /// is provided.
+  static const double textFieldFontSize = 16.0;
+
+  /// Default corner radius of the [HandDrawnTextField] background container.
+  static const double textFieldBorderRadius = 8.0;
+
+  /// Default thickness of the [HandDrawnDivider] underline inside
+  /// [HandDrawnTextField].
+  static const double textFieldDividerThickness = 1.0;
+
+  // ── Notebook defaults ──────────────────────────────────────────────────
+
+  /// Default stroke width for [HandDrawnNotebook] ruled lines.
+  static const double notebookStrokeWidth = 1.0;
+
+  /// Default irregularity for [HandDrawnNotebook] ruled lines. Subtle
+  /// wobble appropriate for full-width horizontal strokes.
+  static const double notebookIrregularity = 1.0;
+
+  /// Default segment count for [HandDrawnNotebook] ruled lines.
+  static const int notebookSegments = 30;
 }

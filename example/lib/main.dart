@@ -7,6 +7,10 @@ const _inkLight = Color(0xFF6B6B6B);
 const _accent = Color(0xFF4A7C6F);
 const _cardFill = Color(0xFFFAF7F2);
 
+// ── Notebook grid ─────────────────────────────────────────────────────────
+const _notebookFontSize = 15.0;
+const _notebookLineHeight = 28.0;
+
 void main() => runApp(const MyJournalApp());
 
 const _months = [
@@ -46,8 +50,27 @@ class MyJournalApp extends StatelessWidget {
   }
 }
 
-class JournalPage extends StatelessWidget {
+class JournalPage extends StatefulWidget {
   const JournalPage({super.key});
+
+  @override
+  State<JournalPage> createState() => _JournalPageState();
+}
+
+class _JournalPageState extends State<JournalPage> {
+  // ── Status square demo state ───────────────────────────────────────────
+  final List<_TaskItem> _tasks = [
+    const _TaskItem('Read a chapter of a good book'),
+    const _TaskItem('Sketch something from observation'),
+    const _TaskItem('Take a 20-minute walk', status: _TaskStatus.completed),
+    const _TaskItem('Write morning pages', status: _TaskStatus.skipped),
+  ];
+
+  void _cycleStatus(int index) {
+    setState(() {
+      _tasks[index] = _tasks[index].cycled();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +81,7 @@ class JournalPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Page title with hand-drawn underline ──────────────────
+              // ── Page title with hand-drawn underline ────────────────
               const Text(
                 'Hand Drawn Toolkit',
                 style: TextStyle(
@@ -85,7 +108,7 @@ class JournalPage extends StatelessWidget {
 
               const SizedBox(height: 12),
 
-              // ── Date ─────────────────────────────────────────────────
+              // ── Date ───────────────────────────────────────────────
               Text(
                 _formatDate(DateTime.now()),
                 style: const TextStyle(
@@ -99,7 +122,7 @@ class JournalPage extends StatelessWidget {
               const HandDrawnDivider(color: _inkLight, seed: 42),
               const SizedBox(height: 24),
 
-              // ── Journal entry card ───────────────────────────────────
+              // ── Journal entry card ─────────────────────────────────
               const HandDrawnContainer(
                 backgroundColor: _cardFill,
                 strokeColor: _ink,
@@ -124,7 +147,7 @@ class JournalPage extends StatelessWidget {
 
               const SizedBox(height: 28),
 
-              // ── "Key Components" heading ──────────────────────────────
+              // ── "Key Components" heading ──────────────────────────
               const Text(
                 'Key Components',
                 style: TextStyle(
@@ -135,7 +158,7 @@ class JournalPage extends StatelessWidget {
               ),
               const SizedBox(height: 14),
 
-              // ── Component items with unique seeds ────────────────────
+              // ── Component items with unique seeds ──────────────────
               const _GoalItem(
                 seed: 9,
                 text:
@@ -160,7 +183,7 @@ class JournalPage extends StatelessWidget {
 
               const SizedBox(height: 28),
 
-              // ── Indented divider ─────────────────────────────────────
+              // ── Indented divider ───────────────────────────────────
               const HandDrawnDivider(
                 color: _inkLight,
                 indent: 32,
@@ -169,7 +192,266 @@ class JournalPage extends StatelessWidget {
               ),
               const SizedBox(height: 28),
 
-              // ── "Tip" callout ───────────────────────────────────────
+              // ── Status square demo ─────────────────────────────────
+              const Text(
+                'Status Square',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: _ink,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'HandDrawnStatusSquare is a tappable indicator with a '
+                'hand-drawn border. Tap each square below to cycle '
+                'through empty, checked, and dashed states.',
+                style: TextStyle(fontSize: 14, height: 1.55, color: _inkLight),
+              ),
+              const SizedBox(height: 16),
+
+              HandDrawnContainer(
+                backgroundColor: _cardFill,
+                strokeColor: _ink,
+                strokeWidth: 1.4,
+                irregularity: 2.5,
+                seed: 77,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: HandDrawnNotebook(
+                  lineHeight: _notebookLineHeight,
+                  lineColor: const Color(0xFFB0AAA0),
+                  irregularity: 2.0,
+                  uniformLines: false,
+                  seed: 50,
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < _tasks.length; i++)
+                        _TaskRow(
+                          task: _tasks[i],
+                          seed: i * 13 + 5,
+                          onTap: () => _cycleStatus(i),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
+              const HandDrawnDivider(
+                color: _inkLight,
+                indent: 32,
+                endIndent: 32,
+                seed: 55,
+              ),
+              const SizedBox(height: 28),
+
+              // ── Text field demo ────────────────────────────────────
+              const Text(
+                'Text Field',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: _ink,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'HandDrawnTextField pairs a standard TextField with a '
+                'hand-drawn divider underline. Colors, font size, and '
+                'padding are fully configurable.',
+                style: TextStyle(fontSize: 14, height: 1.55, color: _inkLight),
+              ),
+              const SizedBox(height: 16),
+
+              const HandDrawnTextField(
+                hintText: 'Title your entry…',
+                backgroundColor: _cardFill,
+                textColor: _ink,
+                hintColor: _inkLight,
+                dividerColor: Color(0xFFD8D3CB),
+                fontSize: 16,
+                seed: 33,
+              ),
+              const SizedBox(height: 12),
+              const HandDrawnTextField(
+                hintText: 'Write your thoughts…',
+                maxLines: 4,
+                backgroundColor: _cardFill,
+                textColor: _ink,
+                hintColor: _inkLight,
+                dividerColor: Color(0xFFD8D3CB),
+                fontSize: 14,
+                seed: 34,
+              ),
+
+              const SizedBox(height: 28),
+
+              const HandDrawnDivider(
+                color: _inkLight,
+                indent: 32,
+                endIndent: 32,
+                seed: 65,
+              ),
+              const SizedBox(height: 28),
+
+              // ── Notebook demo ──────────────────────────────────────
+              const Text(
+                'Notebook',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: _ink,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'HandDrawnNotebook draws ruled lines behind content. '
+                'NotebookRow snaps children to the line grid. Toggle '
+                'uniform lines to see identical vs unique wobble per '
+                'line.',
+                style: TextStyle(fontSize: 14, height: 1.55, color: _inkLight),
+              ),
+              const SizedBox(height: 16),
+
+              // Uniform lines (all identical wobble)
+              const Text(
+                'Uniform lines',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: _inkLight,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const HandDrawnContainer(
+                backgroundColor: _cardFill,
+                strokeColor: _ink,
+                strokeWidth: 1.4,
+                irregularity: 2.5,
+                seed: 88,
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: HandDrawnNotebook(
+                  lineHeight: _notebookLineHeight,
+                  lineColor: Color(0xFFB0AAA0),
+                  irregularity: 2.5,
+                  seed: 10,
+                  child: Column(
+                    children: [
+                      NotebookRow(
+                        lineHeight: _notebookLineHeight,
+                        child: Text(
+                          'First line on the grid',
+                          style: TextStyle(
+                            fontSize: _notebookFontSize,
+                            height: _notebookLineHeight / _notebookFontSize,
+                            color: _ink,
+                          ),
+                        ),
+                      ),
+                      NotebookRow(
+                        lineHeight: _notebookLineHeight,
+                        child: Text(
+                          'Second line sits neatly',
+                          style: TextStyle(
+                            fontSize: _notebookFontSize,
+                            height: _notebookLineHeight / _notebookFontSize,
+                            color: _ink,
+                          ),
+                        ),
+                      ),
+                      NotebookRow(
+                        lineHeight: _notebookLineHeight,
+                        child: Text(
+                          'Third line, same wobble',
+                          style: TextStyle(
+                            fontSize: _notebookFontSize,
+                            height: _notebookLineHeight / _notebookFontSize,
+                            color: _ink,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Unique lines (each line has its own wobble)
+              const Text(
+                'Unique lines',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: _inkLight,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const HandDrawnContainer(
+                backgroundColor: _cardFill,
+                strokeColor: _ink,
+                strokeWidth: 1.4,
+                irregularity: 2.5,
+                seed: 89,
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: HandDrawnNotebook(
+                  lineHeight: _notebookLineHeight,
+                  lineColor: Color(0xFFB0AAA0),
+                  irregularity: 2.5,
+                  uniformLines: false,
+                  seed: 10,
+                  child: Column(
+                    children: [
+                      NotebookRow(
+                        lineHeight: _notebookLineHeight,
+                        child: Text(
+                          'First line on the grid',
+                          style: TextStyle(
+                            fontSize: _notebookFontSize,
+                            height: _notebookLineHeight / _notebookFontSize,
+                            color: _ink,
+                          ),
+                        ),
+                      ),
+                      NotebookRow(
+                        lineHeight: _notebookLineHeight,
+                        child: Text(
+                          'Second line, different wobble',
+                          style: TextStyle(
+                            fontSize: _notebookFontSize,
+                            height: _notebookLineHeight / _notebookFontSize,
+                            color: _ink,
+                          ),
+                        ),
+                      ),
+                      NotebookRow(
+                        lineHeight: _notebookLineHeight,
+                        child: Text(
+                          'Third line, also unique',
+                          style: TextStyle(
+                            fontSize: _notebookFontSize,
+                            height: _notebookLineHeight / _notebookFontSize,
+                            color: _ink,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
+              const HandDrawnDivider(
+                color: _inkLight,
+                indent: 32,
+                endIndent: 32,
+                seed: 70,
+              ),
+              const SizedBox(height: 28),
+
+              // ── "Tip" callout ──────────────────────────────────────
               const HandDrawnContainer(
                 backgroundColor: Color(0xFFF0F6F4),
                 strokeColor: _accent,
@@ -203,7 +485,7 @@ class JournalPage extends StatelessWidget {
 
               const SizedBox(height: 28),
 
-              // ── Custom path section ──────────────────────────────────
+              // ── Custom path section ────────────────────────────────
               const Text(
                 'Custom Paths',
                 style: TextStyle(
@@ -250,6 +532,80 @@ class JournalPage extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Status square demo helpers ──────────────────────────────────────────
+
+enum _TaskStatus { pending, completed, skipped }
+
+class _TaskItem {
+  const _TaskItem(this.label, {this.status = _TaskStatus.pending});
+
+  final String label;
+  final _TaskStatus status;
+
+  _TaskItem cycled() {
+    final next = switch (status) {
+      _TaskStatus.pending => _TaskStatus.completed,
+      _TaskStatus.completed => _TaskStatus.skipped,
+      _TaskStatus.skipped => _TaskStatus.pending,
+    };
+    return _TaskItem(label, status: next);
+  }
+
+  Color get color => switch (status) {
+    _TaskStatus.pending => _ink,
+    _TaskStatus.completed => _accent,
+    _TaskStatus.skipped => _inkLight,
+  };
+
+  bool get isFilled => status != _TaskStatus.pending;
+
+  StatusIndicator get indicator => switch (status) {
+    _TaskStatus.pending => StatusIndicator.none,
+    _TaskStatus.completed => StatusIndicator.check,
+    _TaskStatus.skipped => StatusIndicator.dash,
+  };
+}
+
+class _TaskRow extends StatelessWidget {
+  const _TaskRow({required this.task, required this.seed, required this.onTap});
+
+  final _TaskItem task;
+  final int seed;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return NotebookRow(
+      lineHeight: _notebookLineHeight,
+      child: Row(
+        children: [
+          HandDrawnStatusSquare(
+            color: task.color,
+            isFilled: task.isFilled,
+            indicator: task.indicator,
+            size: 18,
+            seed: seed,
+            onTap: onTap,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              task.label,
+              style: TextStyle(
+                fontSize: _notebookFontSize,
+                height: _notebookLineHeight / _notebookFontSize,
+                color: _ink,
+                decoration: task.isFilled ? TextDecoration.lineThrough : null,
+                decorationColor: _inkLight,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
