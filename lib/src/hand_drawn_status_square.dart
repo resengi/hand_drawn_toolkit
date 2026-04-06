@@ -34,7 +34,7 @@ class HandDrawnStatusSquare extends StatelessWidget {
     required this.color,
     this.isFilled = false,
     this.indicator = StatusIndicator.none,
-    this.indicatorColor = Colors.white,
+    this.indicatorColor = HandDrawnDefaults.statusSquareIndicatorColor,
     this.size = HandDrawnDefaults.statusSquareSize,
     this.scaleFactor = 1.0,
     this.onTap,
@@ -46,7 +46,11 @@ class HandDrawnStatusSquare extends StatelessWidget {
     this.indicatorStrokeWidth =
         HandDrawnDefaults.statusSquareIndicatorStrokeWidth,
     super.key,
-  });
+  }) : assert(size > 0),
+       assert(scaleFactor > 0),
+       assert(tapPadding >= 0),
+       assert(strokeWidth > 0),
+       assert(indicatorStrokeWidth > 0);
 
   /// The color used for both the border stroke and the fill (when
   /// [isFilled] is true).

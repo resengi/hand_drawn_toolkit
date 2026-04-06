@@ -250,5 +250,30 @@ void main() {
     test('negative returns zero', () {
       expect(rowsForHeight(-5.0, 32.0), 0);
     });
+
+    test('throws ArgumentError when rowHeight is zero', () {
+      expect(() => rowsForHeight(100.0, 0.0), throwsA(isA<ArgumentError>()));
+    });
+
+    test('throws ArgumentError when rowHeight is negative', () {
+      expect(() => rowsForHeight(100.0, -10.0), throwsA(isA<ArgumentError>()));
+    });
+  });
+
+  group('snapHeightToRows validation', () {
+    test('throws ArgumentError when rowHeight is zero', () {
+      expect(() => snapHeightToRows(100.0, 0.0), throwsA(isA<ArgumentError>()));
+    });
+
+    test('throws ArgumentError when rowHeight is negative', () {
+      expect(
+        () => snapHeightToRows(100.0, -10.0),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('accepts valid rowHeight', () {
+      expect(() => snapHeightToRows(100.0, 32.0), returnsNormally);
+    });
   });
 }

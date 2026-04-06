@@ -4,6 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
 
+/// Shared default [buildPath] callback for test factories.
+///
+/// A top-level function has stable identity equality in Dart, unlike an
+/// anonymous closure created per invocation. This avoids false positives in
+/// `shouldRepaint` comparisons.
+Path _defaultBuildPath(Size size, HandDrawnHelpers h) => h.rectBorder(size);
+
 void main() {
   group('HandDrawnLinePainter', () {
     HandDrawnLinePainter createPainter({
@@ -20,7 +27,7 @@ void main() {
         irregularity: irregularity,
         seed: seed,
         segments: segments,
-        buildPath: buildPath ?? (size, h) => h.rectBorder(size),
+        buildPath: buildPath ?? _defaultBuildPath,
       );
     }
 

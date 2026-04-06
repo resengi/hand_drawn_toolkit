@@ -352,4 +352,40 @@ void main() {
       });
     });
   });
+
+  // ── TextField passthroughs (Step 3.2) ───────────────────────────────
+
+  group('HandDrawnTextField passthroughs', () {
+    testWidgets('enabled: false produces disabled TextField', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(body: HandDrawnTextField(enabled: false)),
+        ),
+      );
+      final tf = tester.widget<TextField>(find.byType(TextField));
+      expect(tf.enabled, isFalse);
+    });
+
+    testWidgets('readOnly: true produces read-only TextField', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(body: HandDrawnTextField(readOnly: true)),
+        ),
+      );
+      final tf = tester.widget<TextField>(find.byType(TextField));
+      expect(tf.readOnly, isTrue);
+    });
+
+    testWidgets('keyboardType is forwarded', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: HandDrawnTextField(keyboardType: TextInputType.number),
+          ),
+        ),
+      );
+      final tf = tester.widget<TextField>(find.byType(TextField));
+      expect(tf.keyboardType, TextInputType.number);
+    });
+  });
 }

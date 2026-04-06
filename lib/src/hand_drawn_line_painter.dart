@@ -82,7 +82,9 @@ class HandDrawnLinePainter extends CustomPainter {
     this.irregularity = HandDrawnDefaults.irregularity,
     this.seed = HandDrawnDefaults.seed,
     this.segments = HandDrawnDefaults.segments,
-  });
+  }) : assert(strokeWidth > 0),
+       assert(segments > 0),
+       assert(irregularity >= 0);
 
   /// The color of the hand-drawn stroke.
   final Color color;
@@ -142,7 +144,8 @@ class HandDrawnLinePainter extends CustomPainter {
         old.strokeWidth != strokeWidth ||
         old.irregularity != irregularity ||
         old.seed != seed ||
-        old.segments != segments;
+        old.segments != segments ||
+        old.buildPath != buildPath;
     if (paramsChanged) {
       _cachedPath = null;
     }

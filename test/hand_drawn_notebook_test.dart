@@ -156,5 +156,27 @@ void main() {
         expect(HandDrawnDefaults.notebookSegments, 30);
       });
     });
+
+    group('lineHeight validation', () {
+      test('rejects lineHeight of zero', () {
+        // The assert fires in the const widget constructor (debug mode),
+        // before any widget tree processing.
+        expect(
+          () => HandDrawnNotebook(lineHeight: 0, child: const Text('test')),
+          throwsA(isA<AssertionError>()),
+        );
+      });
+
+      testWidgets('accepts positive lineHeight', (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: HandDrawnNotebook(lineHeight: 28.0, child: Text('test')),
+            ),
+          ),
+        );
+        expect(tester.takeException(), isNull);
+      });
+    });
   });
 }

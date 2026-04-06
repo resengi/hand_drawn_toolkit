@@ -38,7 +38,7 @@ class HandDrawnDivider extends StatelessWidget {
   const HandDrawnDivider({
     super.key,
     this.direction = Axis.horizontal,
-    this.color = Colors.black54,
+    this.color = HandDrawnDefaults.dividerColor,
     this.thickness = HandDrawnDefaults.dividerThickness,
     this.irregularity = HandDrawnDefaults.dividerIrregularity,
     this.segments = HandDrawnDefaults.dividerSegments,
@@ -47,7 +47,14 @@ class HandDrawnDivider extends StatelessWidget {
     this.height,
     this.indent = 0.0,
     this.endIndent = 0.0,
-  });
+  }) : assert(thickness > 0),
+       assert(segments > 0),
+       assert(indent >= 0),
+       assert(endIndent >= 0),
+       assert(
+         direction == Axis.horizontal || height != null,
+         'height is required when direction is Axis.vertical',
+       );
 
   /// Whether this divider runs horizontally or vertically.
   final Axis direction;

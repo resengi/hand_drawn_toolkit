@@ -40,15 +40,15 @@ class HandDrawnContainer extends StatelessWidget {
   const HandDrawnContainer({
     required this.child,
     super.key,
-    this.backgroundColor = Colors.white,
-    this.strokeColor = Colors.black87,
+    this.backgroundColor = HandDrawnDefaults.containerBackgroundColor,
+    this.strokeColor = HandDrawnDefaults.containerStrokeColor,
     this.strokeWidth = HandDrawnDefaults.strokeWidth,
     this.irregularity = HandDrawnDefaults.irregularity,
     this.padding = const EdgeInsets.all(HandDrawnDefaults.containerPadding),
     this.borderOpacity = HandDrawnDefaults.borderOpacity,
     this.segments = HandDrawnDefaults.segments,
     this.seed = HandDrawnDefaults.seed,
-  });
+  }) : assert(borderOpacity >= 0 && borderOpacity <= 1);
 
   /// The widget below this container in the tree.
   final Widget child;
@@ -95,7 +95,13 @@ class HandDrawnContainer extends StatelessWidget {
         irregularity: irregularity,
         segments: segments,
         seed: seed,
-        buildPath: (size, h) => h.rectBorder(size),
+        buildPath: (size, h) {
+          final inset = (strokeWidth / 2).ceilToDouble();
+          final path = h.rectBorder(
+            Size(size.width - inset * 2, size.height - inset * 2),
+          );
+          return path.shift(Offset(inset, inset));
+        },
       ),
       child: Container(color: backgroundColor, padding: padding, child: child),
     );

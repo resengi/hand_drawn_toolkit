@@ -33,7 +33,18 @@ class HandDrawnHelpers {
     required this.seed,
     required this.segments,
     required this.irregularity,
-  }) : _rand = math.Random(seed);
+  }) : _rand = math.Random(seed) {
+    if (segments <= 0) {
+      throw ArgumentError.value(segments, 'segments', 'must be positive');
+    }
+    if (irregularity < 0) {
+      throw ArgumentError.value(
+        irregularity,
+        'irregularity',
+        'must be non-negative',
+      );
+    }
+  }
 
   /// The random seed used for deterministic path generation.
   final int seed;
@@ -45,6 +56,19 @@ class HandDrawnHelpers {
   final double irregularity;
 
   final math.Random _rand;
+
+  /// Applies a 3-point moving average to [raw] offsets, preserving the
+  /// first and last values. This produces organic, pen-like wobble.
+  ///
+  /// This is the shared smoothing algorithm used by both the core helpers
+  /// and the chart painters to ensure visual consistency across the package.
+  static List<double> smooth(List<double> raw) {
+    final smoothed = List<double>.from(raw);
+    for (int i = 1; i < raw.length - 1; i++) {
+      smoothed[i] = (raw[i - 1] + raw[i] + raw[i + 1]) / 3.0;
+    }
+    return smoothed;
+  }
 
   /// Generates smoothed random offsets for a polyline with `segments + 1`
   /// points.
@@ -61,12 +85,7 @@ class HandDrawnHelpers {
     for (int i = 1; i < segments; i++) {
       raw[i] = (_rand.nextDouble() - 0.5) * irregularity;
     }
-    // 3-point moving average for organic smoothing.
-    final smooth = List<double>.from(raw);
-    for (int i = 1; i < segments; i++) {
-      smooth[i] = (raw[i - 1] + raw[i] + raw[i + 1]) / 3.0;
-    }
-    return smooth;
+    return smooth(raw);
   }
 
   /// Builds a horizontal hand-drawn line across [size].width, centered
