@@ -49,6 +49,43 @@ class HandDrawnTableRow {
   final bool highlight;
 }
 
+/// Configuration for hand-drawn dividers between table rows or columns.
+///
+/// Pass as [HandDrawnTable.rowDividers] or [HandDrawnTable.columnDividers].
+/// Null means no dividers; non-null enables dividers with the given style.
+///
+/// When [uniform] is true (the default), all dividers share the same [seed]
+/// and wobble pattern. When false, each divider gets a unique seed
+/// (`seed + 1`, `seed + 2`, …) for distinct wobble on every line.
+class TableDividerStyle {
+  const TableDividerStyle({
+    this.seed = HandDrawnDefaults.seed,
+    this.irregularity = HandDrawnDefaults.dividerIrregularity,
+    this.uniform = true,
+  });
+
+  /// Random seed for deterministic wobble.
+  final int seed;
+
+  /// Wobble magnitude for the dividers.
+  final double irregularity;
+
+  /// When true, all dividers share the same wobble pattern. When false,
+  /// each divider gets a unique seed for distinct character.
+  final bool uniform;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TableDividerStyle &&
+          seed == other.seed &&
+          irregularity == other.irregularity &&
+          uniform == other.uniform;
+
+  @override
+  int get hashCode => Object.hash(seed, irregularity, uniform);
+}
+
 /// A generic hand-drawn table widget.
 ///
 /// Renders column headers and row data inside a [HandDrawnContainer] with
@@ -86,12 +123,18 @@ class HandDrawnTable extends StatelessWidget {
     this.titleStyle,
     this.emptyStyle,
     this.emptyMessage = 'No data',
-    this.showRowDividers = false,
+    this.rowDividers,
+    this.columnDividers,
     this.padding = const EdgeInsets.all(defaultTablePadding),
     this.rowPadding = tableRowVerticalPadding,
     this.titleBottomPadding = tableTitleBottomPadding,
     this.textOverflow = TextOverflow.ellipsis,
     this.horizontalScroll = false,
+    this.seed = HandDrawnDefaults.seed,
+    this.irregularity = HandDrawnDefaults.irregularity,
+    this.strokeWidth = HandDrawnDefaults.strokeWidth,
+    this.strokeColor = HandDrawnDefaults.containerStrokeColor,
+    this.backgroundColor = HandDrawnDefaults.containerBackgroundColor,
     super.key,
   });
 
@@ -126,8 +169,13 @@ class HandDrawnTable extends StatelessWidget {
   /// Message shown when [rows] is empty.
   final String emptyMessage;
 
-  /// When true, a [HandDrawnDivider] is drawn between each data row.
-  final bool showRowDividers;
+  /// Row divider configuration. Null (default) disables row dividers.
+  /// Provide a [TableDividerStyle] to enable dividers between data rows.
+  final TableDividerStyle? rowDividers;
+
+  /// Column divider configuration. Null (default) disables column dividers.
+  /// Provide a [TableDividerStyle] to enable vertical dividers between columns.
+  final TableDividerStyle? columnDividers;
 
   /// Inner padding of the table container.
   final EdgeInsets padding;
@@ -146,6 +194,21 @@ class HandDrawnTable extends StatelessWidget {
   /// All columns must specify an explicit [HandDrawnTableColumn.width] when
   /// this is enabled; flex-only columns are not supported in scroll mode.
   final bool horizontalScroll;
+
+  /// Random seed for the outer container border.
+  final int seed;
+
+  /// Wobble magnitude for the outer container border.
+  final double irregularity;
+
+  /// Stroke width for the outer container border.
+  final double strokeWidth;
+
+  /// Stroke color for the outer container border.
+  final Color strokeColor;
+
+  /// Background fill color for the outer container.
+  final Color backgroundColor;
 
   TextStyle get _headerStyle =>
       headerStyle ??
@@ -219,26 +282,125 @@ class HandDrawnTable extends StatelessWidget {
           Center(child: Text(emptyMessage, style: _emptyStyle))
         else ...[
           _buildRow([for (final col in columns) col.header], _headerStyle),
-          const HandDrawnDivider(),
+          _buildHeaderDivider(),
           for (int i = 0; i < rows.length; i++) ...[
             _buildDataRow(rows[i]),
-            if (showRowDividers && i < rows.length - 1)
-              HandDrawnDivider(seed: HandDrawnDefaults.seed + i),
+            if (rowDividers != null && i < rows.length - 1) _buildRowDivider(i),
           ],
         ],
       ],
     );
 
-    return HandDrawnContainer(
-      padding: padding,
-      child: horizontalScroll
+    // Wrap content with column divider overlay when enabled.
+    Widget body;
+    if (columnDividers != null && rows.isNotEmpty) {
+      if (horizontalScroll) {
+        // All columns have explicit widths — positions are known.
+        body = SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: totalWidth,
+            child: _columnDividerStack(content, _columnBoundaries(totalWidth)),
+          ),
+        );
+      } else {
+        // May have flex columns — resolve width at layout time.
+        body = LayoutBuilder(
+          builder: (context, constraints) {
+            return _columnDividerStack(
+              content,
+              _columnBoundaries(constraints.maxWidth),
+            );
+          },
+        );
+      }
+    } else {
+      body = horizontalScroll
           ? SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: SizedBox(width: totalWidth, child: content),
             )
-          : content,
+          : content;
+    }
+
+    return HandDrawnContainer(
+      padding: padding,
+      seed: seed,
+      irregularity: irregularity,
+      strokeWidth: strokeWidth,
+      strokeColor: strokeColor,
+      backgroundColor: backgroundColor,
+      child: body,
     );
   }
+
+  // ── Divider builders ──────────────────────────────────────────────────
+
+  HandDrawnDivider _buildHeaderDivider() {
+    if (rowDividers == null) return const HandDrawnDivider();
+    return HandDrawnDivider(
+      seed: rowDividers!.seed,
+      irregularity: rowDividers!.irregularity,
+    );
+  }
+
+  HandDrawnDivider _buildRowDivider(int index) {
+    final config = rowDividers!;
+    return HandDrawnDivider(
+      seed: config.uniform ? config.seed : config.seed + index + 1,
+      irregularity: config.irregularity,
+    );
+  }
+
+  // ── Column divider overlay ────────────────────────────────────────────
+
+  Widget _columnDividerStack(Widget content, List<double> boundaries) {
+    final config = columnDividers!;
+    return IntrinsicHeight(
+      child: Stack(
+        children: [
+          content,
+          for (int i = 0; i < boundaries.length; i++)
+            Positioned(
+              left: boundaries[i],
+              top: 0,
+              bottom: 0,
+              child: HandDrawnDivider(
+                direction: Axis.vertical,
+                height: double.infinity,
+                seed: config.uniform ? config.seed : config.seed + i + 1,
+                irregularity: config.irregularity,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  List<double> _columnBoundaries(double availableWidth) {
+    double fixedTotal = 0;
+    int totalFlex = 0;
+    for (final col in columns) {
+      if (col.width != null) {
+        fixedTotal += col.width!;
+      } else {
+        totalFlex += col.flex;
+      }
+    }
+    final flexSpace = availableWidth - fixedTotal;
+
+    final boundaries = <double>[];
+    double x = 0;
+    for (int i = 0; i < columns.length - 1; i++) {
+      x +=
+          columns[i].width ??
+          (totalFlex > 0 ? flexSpace * columns[i].flex / totalFlex : 0);
+      boundaries.add(x);
+    }
+    return boundaries;
+  }
+
+  // ── Row builders ──────────────────────────────────────────────────────
 
   Widget _buildDataRow(HandDrawnTableRow row) {
     final style =
@@ -262,40 +424,36 @@ class HandDrawnTable extends StatelessWidget {
   }
 
   Widget _buildRow(List<String> cells, TextStyle style) {
+    final hasColumnDividers = columnDividers != null;
+    final children = <Widget>[];
+    for (int i = 0; i < columns.length; i++) {
+      Widget cell = Align(
+        alignment: columns[i].alignment,
+        child: Text(
+          cells[i],
+          style: style,
+          maxLines: 1,
+          softWrap: false,
+          overflow: textOverflow,
+        ),
+      );
+      if (hasColumnDividers) {
+        cell = Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: tableColumnDividerCellPadding,
+          ),
+          child: cell,
+        );
+      }
+      children.add(
+        columns[i].width != null
+            ? SizedBox(width: columns[i].width, child: cell)
+            : Expanded(flex: columns[i].flex, child: cell),
+      );
+    }
     return Padding(
       padding: EdgeInsets.symmetric(vertical: rowPadding),
-      child: Row(
-        children: [
-          for (int i = 0; i < columns.length; i++)
-            columns[i].width != null
-                ? SizedBox(
-                    width: columns[i].width,
-                    child: Align(
-                      alignment: columns[i].alignment,
-                      child: Text(
-                        cells[i],
-                        style: style,
-                        maxLines: 1,
-                        softWrap: false,
-                        overflow: textOverflow,
-                      ),
-                    ),
-                  )
-                : Expanded(
-                    flex: columns[i].flex,
-                    child: Align(
-                      alignment: columns[i].alignment,
-                      child: Text(
-                        cells[i],
-                        style: style,
-                        maxLines: 1,
-                        softWrap: false,
-                        overflow: textOverflow,
-                      ),
-                    ),
-                  ),
-        ],
-      ),
+      child: Row(children: children),
     );
   }
 }

@@ -212,6 +212,7 @@ const double defaultTableHeaderFontSize = 11.0;
 const double defaultTableCellFontSize = 13.0;
 const double defaultTableTitleFontSize = 14.0;
 const double defaultTablePadding = 12.0;
+const double tableColumnDividerCellPadding = 4.0;
 
 const Color tableHeaderColor = Color(0xFF888888);
 const Color tableCellColor = Color(0xFF444444);

@@ -337,6 +337,64 @@ void main() {
       const b = BarSegment(category: 'x', value: 20, color: Color(0xFF000000));
       expect(a, isNot(equals(b)));
     });
+
+    test('equal when fillColor and fillAlpha both null', () {
+      const a = BarSegment(category: 'x', value: 10, color: Color(0xFF000000));
+      const b = BarSegment(category: 'x', value: 10, color: Color(0xFF000000));
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test('equal when fillColor and fillAlpha match', () {
+      const a = BarSegment(
+        category: 'x',
+        value: 10,
+        color: Color(0xFF000000),
+        fillColor: Color(0xFFFF0000),
+        fillAlpha: 0.5,
+      );
+      const b = BarSegment(
+        category: 'x',
+        value: 10,
+        color: Color(0xFF000000),
+        fillColor: Color(0xFFFF0000),
+        fillAlpha: 0.5,
+      );
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test('not equal when fillColor differs', () {
+      const a = BarSegment(
+        category: 'x',
+        value: 10,
+        color: Color(0xFF000000),
+        fillColor: Color(0xFFFF0000),
+      );
+      const b = BarSegment(
+        category: 'x',
+        value: 10,
+        color: Color(0xFF000000),
+        fillColor: Color(0xFF00FF00),
+      );
+      expect(a, isNot(equals(b)));
+    });
+
+    test('not equal when fillAlpha differs', () {
+      const a = BarSegment(
+        category: 'x',
+        value: 10,
+        color: Color(0xFF000000),
+        fillAlpha: 0.3,
+      );
+      const b = BarSegment(
+        category: 'x',
+        value: 10,
+        color: Color(0xFF000000),
+        fillAlpha: 0.8,
+      );
+      expect(a, isNot(equals(b)));
+    });
   });
 
   group('BarGroup equality', () {

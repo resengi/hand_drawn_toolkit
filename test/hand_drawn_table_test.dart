@@ -156,7 +156,7 @@ void main() {
           const HandDrawnTable(
             columns: _columns,
             rows: _rows,
-            showRowDividers: true,
+            rowDividers: TableDividerStyle(),
           ),
         ),
       );
@@ -173,12 +173,127 @@ void main() {
           const HandDrawnTable(
             columns: _columns,
             rows: singleRow,
-            showRowDividers: true,
+            rowDividers: TableDividerStyle(),
           ),
         ),
       );
       // Only header divider, no row divider for a single row.
       expect(find.byType(HandDrawnDivider), findsOneWidget);
+    });
+
+    testWidgets('non-uniform row dividers have distinct seeds', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const HandDrawnTable(
+            columns: _columns,
+            rows: _rows,
+            rowDividers: TableDividerStyle(seed: 10, uniform: false),
+          ),
+        ),
+      );
+      final dividers = tester
+          .widgetList<HandDrawnDivider>(find.byType(HandDrawnDivider))
+          .toList();
+      // Header divider + 2 row dividers = 3 total.
+      expect(dividers.length, 3);
+      // Header uses base seed; row dividers use seed + 1, seed + 2.
+      expect(dividers[0].seed, 10); // header
+      expect(dividers[1].seed, 11); // row divider 0
+      expect(dividers[2].seed, 12); // row divider 1
+    });
+  });
+
+  // ── Column dividers ─────────────────────────────────────────────────
+
+  group('HandDrawnTable column dividers', () {
+    testWidgets('shows no column dividers by default', (tester) async {
+      await tester.pumpWidget(
+        _wrap(const HandDrawnTable(columns: _columns, rows: _rows)),
+      );
+      final verticalDividers = find.byWidgetPredicate(
+        (w) => w is HandDrawnDivider && w.direction == Axis.vertical,
+      );
+      expect(verticalDividers, findsNothing);
+    });
+
+    testWidgets('shows column dividers when enabled', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const HandDrawnTable(
+            columns: _columns,
+            rows: _rows,
+            columnDividers: TableDividerStyle(),
+          ),
+        ),
+      );
+      // 2 columns → 1 boundary → 1 vertical divider.
+      final verticalDividers = find.byWidgetPredicate(
+        (w) => w is HandDrawnDivider && w.direction == Axis.vertical,
+      );
+      expect(verticalDividers, findsOneWidget);
+    });
+
+    testWidgets('non-uniform column dividers have distinct seeds', (
+      tester,
+    ) async {
+      const threeColumns = [
+        HandDrawnTableColumn(header: 'A', flex: 1),
+        HandDrawnTableColumn(header: 'B', flex: 1),
+        HandDrawnTableColumn(header: 'C', flex: 1),
+      ];
+      const threeColRows = [
+        HandDrawnTableRow(cells: ['1', '2', '3']),
+      ];
+      await tester.pumpWidget(
+        _wrap(
+          const HandDrawnTable(
+            columns: threeColumns,
+            rows: threeColRows,
+            columnDividers: TableDividerStyle(seed: 20, uniform: false),
+          ),
+        ),
+      );
+      final verticals = tester
+          .widgetList<HandDrawnDivider>(
+            find.byWidgetPredicate(
+              (w) => w is HandDrawnDivider && w.direction == Axis.vertical,
+            ),
+          )
+          .toList();
+      // 3 columns → 2 boundaries with seeds 21, 22.
+      expect(verticals.length, 2);
+      expect(verticals[0].seed, 21);
+      expect(verticals[1].seed, 22);
+    });
+  });
+
+  // ── Container styling ───────────────────────────────────────────────
+
+  group('HandDrawnTable container styling', () {
+    testWidgets('forwards styling params to HandDrawnContainer', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          const HandDrawnTable(
+            columns: _columns,
+            rows: _rows,
+            seed: 99,
+            irregularity: 5.0,
+            strokeWidth: 3.0,
+            strokeColor: Color(0xFFFF0000),
+            backgroundColor: Color(0xFF00FF00),
+          ),
+        ),
+      );
+      final container = tester.widget<HandDrawnContainer>(
+        find.byType(HandDrawnContainer),
+      );
+      expect(container.seed, 99);
+      expect(container.irregularity, 5.0);
+      expect(container.strokeWidth, 3.0);
+      expect(container.strokeColor, const Color(0xFFFF0000));
+      expect(container.backgroundColor, const Color(0xFF00FF00));
     });
   });
 

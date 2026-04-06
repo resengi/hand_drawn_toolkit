@@ -198,7 +198,9 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
         final path = wobblyRect(rect, barSeed);
 
         final fillPaint = Paint()
-          ..color = segment.color.withValues(alpha: barFillAlpha)
+          ..color = (segment.fillColor ?? segment.color).withValues(
+            alpha: segment.fillAlpha ?? barFillAlpha,
+          )
           ..style = PaintingStyle.fill;
         canvas.drawPath(path, fillPaint);
 

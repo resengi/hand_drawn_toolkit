@@ -41,16 +41,34 @@ class LegendEntry {
 ///
 /// The [value] must be non-negative. This is enforced by a debug assertion
 /// here and by release-safe validation in [HandDrawnBarChartPainter].
+///
+/// By default, segments are filled with a translucent version of [color].
+/// Use [fillColor] to set a completely different fill hue, or [fillAlpha]
+/// to control fill opacity (0.0 = empty, 1.0 = solid). Both are optional
+/// and can be combined.
 class BarSegment {
   const BarSegment({
     required this.category,
     required this.value,
     required this.color,
-  }) : assert(value >= 0, 'BarSegment.value must be non-negative, got $value');
+    this.fillColor,
+    this.fillAlpha,
+  }) : assert(value >= 0, 'BarSegment.value must be non-negative, got $value'),
+       assert(
+         fillAlpha == null || (fillAlpha >= 0 && fillAlpha <= 1),
+         'BarSegment.fillAlpha must be between 0 and 1, got $fillAlpha',
+       );
 
   final String category;
   final double value;
   final Color color;
+
+  /// Optional fill color. When null, falls back to [color].
+  final Color? fillColor;
+
+  /// Optional fill opacity. When null, falls back to the default (0.15).
+  /// Use `0.0` for an empty (unfilled) bar or `1.0` for a fully solid fill.
+  final double? fillAlpha;
 
   @override
   bool operator ==(Object other) =>
@@ -58,10 +76,12 @@ class BarSegment {
       other is BarSegment &&
           category == other.category &&
           value == other.value &&
-          color == other.color;
+          color == other.color &&
+          fillColor == other.fillColor &&
+          fillAlpha == other.fillAlpha;
 
   @override
-  int get hashCode => Object.hash(category, value, color);
+  int get hashCode => Object.hash(category, value, color, fillColor, fillAlpha);
 }
 
 /// One bar in a bar chart (may contain multiple stacked segments).
