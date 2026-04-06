@@ -193,6 +193,17 @@ const double scatterStrokeAlpha = 0.6;
 const double scatterStrokeWidth = 1.0;
 const double scatterDefaultDotRadius = 5.0;
 
+// ── Chart hit-test defaults ───────────────────────────────────────────────
+
+/// Default touch tolerance for scatter point hit-testing.
+const double scatterHitTestTolerance = 16.0;
+
+/// Default touch tolerance for line chart point hit-testing.
+const double linePointHitTestTolerance = 12.0;
+
+/// Default touch tolerance for line chart segment hit-testing.
+const double lineSegmentHitTestTolerance = 16.0;
+
 // ══════════════════════════════════════════════════════════════════════════
 // TABLE DEFAULTS
 // ══════════════════════════════════════════════════════════════════════════

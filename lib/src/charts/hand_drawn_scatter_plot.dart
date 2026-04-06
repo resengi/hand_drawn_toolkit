@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../hand_drawn_constants.dart';
 import '../hand_drawn_toolkit_defaults.dart';
 import 'chart_data.dart';
+import 'chart_interaction.dart';
 import 'chart_widget_helpers.dart';
 import 'hand_drawn_chart_painter.dart';
 
@@ -72,6 +73,45 @@ class HandDrawnScatterPlotPainter extends HandDrawnChartPainter {
       canvas.drawPath(circle, dotPaint);
       canvas.drawPath(circle, strokePaint);
     }
+  }
+
+  /// Computes an immutable layout snapshot for this scatter plot at [size].
+  ///
+  /// The returned [ScatterPlotLayout] is valid only for the given [size].
+  /// Recompute when the rendered size changes.
+  ScatterPlotLayout computeLayout(Size size) {
+    final frame = buildFrame(size);
+
+    if (data.points.isEmpty) {
+      return ScatterPlotLayout(
+        size: size,
+        chartArea: frame.chartArea,
+        points: const [],
+      );
+    }
+
+    final points = <ScatterPointLayout>[];
+    for (int i = 0; i < data.points.length; i++) {
+      final p = data.points[i];
+      final x = frame.xToCanvasValue(p.x);
+      final y = frame.yToCanvas(p.y);
+      final radius = p.size ?? scatterDefaultDotRadius;
+
+      points.add(
+        ScatterPointLayout(
+          pointIndex: i,
+          rawPoint: p,
+          center: Offset(x, y),
+          visualRadius: radius,
+        ),
+      );
+    }
+
+    return ScatterPlotLayout(
+      size: size,
+      chartArea: frame.chartArea,
+      points: points,
+    );
   }
 
   @override

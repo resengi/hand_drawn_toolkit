@@ -40,6 +40,7 @@
 library;
 
 export 'src/charts/chart_data.dart';
+export 'src/charts/chart_interaction.dart';
 export 'src/charts/hand_drawn_bar_chart.dart';
 export 'src/charts/hand_drawn_chart_painter.dart';
 export 'src/charts/hand_drawn_line_chart.dart';

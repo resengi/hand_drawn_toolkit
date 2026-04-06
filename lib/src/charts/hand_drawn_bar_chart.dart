@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../hand_drawn_constants.dart';
 import '../hand_drawn_toolkit_defaults.dart';
 import 'chart_data.dart';
+import 'chart_interaction.dart';
 import 'chart_widget_helpers.dart';
 import 'hand_drawn_chart_painter.dart';
 
@@ -68,11 +69,97 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
     return max == 0 ? 1 : max;
   }
 
+  /// Computes the logical bar width from slot width, applying the width
+  /// ratio and min/max clamping.
+  static double _computeBarWidth(double slotWidth) {
+    return (slotWidth * barWidthRatio)
+        .clamp(slotWidth >= barMinWidth ? barMinWidth : 0.0, barMaxWidth)
+        .clamp(0.0, slotWidth);
+  }
+
   @override
   double xPositionForLabel(int index, int count) {
     if (count <= 0) return chartArea.center.dx;
     final slotWidth = chartArea.width / count;
     return chartArea.left + slotWidth * (index + 0.5);
+  }
+
+  /// Computes an immutable layout snapshot for this bar chart at [size].
+  ///
+  /// The returned [BarChartLayout] is valid only for the given [size].
+  /// Recompute when the rendered size changes.
+  ///
+  /// ```dart
+  /// LayoutBuilder(
+  ///   builder: (context, constraints) {
+  ///     final size = Size(constraints.maxWidth, 240);
+  ///     final layout = painter.computeLayout(size);
+  ///     return GestureDetector(
+  ///       onTapDown: (d) {
+  ///         final hit = layout.hitTest(d.localPosition);
+  ///         // Consumer-owned behavior.
+  ///       },
+  ///       child: CustomPaint(size: size, painter: painter),
+  ///     );
+  ///   },
+  /// )
+  /// ```
+  BarChartLayout computeLayout(Size size) {
+    final frame = buildFrame(size);
+
+    if (data.bars.isEmpty) {
+      return BarChartLayout(
+        size: size,
+        chartArea: frame.chartArea,
+        segments: const [],
+      );
+    }
+
+    final barCount = data.bars.length;
+    final slotWidth = frame.chartArea.width / barCount;
+    final barWidth = _computeBarWidth(slotWidth);
+
+    final segments = <BarSegmentLayout>[];
+
+    for (int i = 0; i < barCount; i++) {
+      final bar = data.bars[i];
+      final centerX = frame.xPositionForBar(i, barCount);
+
+      double cumulativeValue = 0.0;
+      for (int j = 0; j < bar.segments.length; j++) {
+        final segment = bar.segments[j];
+        if (segment.value == 0) continue;
+
+        final segmentBottom = frame.yToCanvas(cumulativeValue);
+        final cumulativeStart = cumulativeValue;
+        cumulativeValue += segment.value;
+        final segmentTop = frame.yToCanvas(cumulativeValue);
+
+        segments.add(
+          BarSegmentLayout(
+            barIndex: i,
+            segmentIndex: j,
+            barLabel: bar.label,
+            category: segment.category,
+            value: segment.value,
+            cumulativeStart: cumulativeStart,
+            cumulativeEnd: cumulativeValue,
+            bounds: Rect.fromLTRB(
+              centerX - barWidth / 2,
+              segmentTop,
+              centerX + barWidth / 2,
+              segmentBottom,
+            ),
+          ),
+        );
+      }
+    }
+
+    return BarChartLayout(
+      size: size,
+      chartArea: frame.chartArea,
+      segments: segments,
+    );
   }
 
   @override
@@ -81,9 +168,7 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
 
     final barCount = data.bars.length;
     final slotWidth = chartArea.width / barCount;
-    final barWidth = (slotWidth * barWidthRatio)
-        .clamp(slotWidth >= barMinWidth ? barMinWidth : 0.0, barMaxWidth)
-        .clamp(0.0, slotWidth);
+    final barWidth = _computeBarWidth(slotWidth);
 
     for (int i = 0; i < barCount; i++) {
       final bar = data.bars[i];

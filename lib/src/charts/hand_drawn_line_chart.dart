@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../hand_drawn_constants.dart';
 import '../hand_drawn_toolkit_defaults.dart';
 import 'chart_data.dart';
+import 'chart_interaction.dart';
 import 'chart_widget_helpers.dart';
 import 'hand_drawn_chart_painter.dart';
 
@@ -49,6 +50,68 @@ class HandDrawnLineChartPainter extends HandDrawnChartPainter {
        );
 
   final LineChartData data;
+
+  /// Computes an immutable layout snapshot for this line chart at [size].
+  ///
+  /// The returned [LineChartLayout] contains point and segment layouts
+  /// across all series, using logical (non-wobbly) geometry. Hit-test
+  /// results are based on these logical positions, ensuring wobble does
+  /// not affect interaction behavior.
+  ///
+  /// Valid only for the given [size]. Recompute when size changes.
+  LineChartLayout computeLayout(Size size) {
+    final frame = buildFrame(size);
+
+    final allPoints = <LinePointLayout>[];
+    final allSegments = <LineSegmentLayout>[];
+
+    for (int s = 0; s < data.series.length; s++) {
+      final series = data.series[s];
+      if (series.points.isEmpty) continue;
+
+      // Compute canvas positions for each point in this series.
+      final canvasPoints = <Offset>[];
+      for (int i = 0; i < series.points.length; i++) {
+        final pt = series.points[i];
+        final x = frame.xToCanvasValue(pt.x);
+        final y = frame.yToCanvas(pt.y);
+        final center = Offset(x, y);
+        canvasPoints.add(center);
+
+        allPoints.add(
+          LinePointLayout(
+            seriesIndex: s,
+            seriesName: series.name,
+            pointIndex: i,
+            rawPoint: pt,
+            center: center,
+          ),
+        );
+      }
+
+      // Build segments between consecutive points.
+      for (int i = 0; i < canvasPoints.length - 1; i++) {
+        allSegments.add(
+          LineSegmentLayout(
+            seriesIndex: s,
+            seriesName: series.name,
+            segmentIndex: i,
+            rawStartPoint: series.points[i],
+            rawEndPoint: series.points[i + 1],
+            start: canvasPoints[i],
+            end: canvasPoints[i + 1],
+          ),
+        );
+      }
+    }
+
+    return LineChartLayout(
+      size: size,
+      chartArea: frame.chartArea,
+      points: allPoints,
+      segments: allSegments,
+    );
+  }
 
   /// Paints line series with a semi-transparent fill below each line.
   ///

@@ -7,6 +7,7 @@ import '../hand_drawn_constants.dart';
 import '../hand_drawn_toolkit_defaults.dart';
 import '../hand_drawn_toolkit_helpers.dart';
 import 'chart_data.dart';
+import 'chart_layout.dart';
 
 /// Abstract base painter for hand-drawn charts.
 ///
@@ -118,32 +119,42 @@ abstract class HandDrawnChartPainter extends CustomPainter {
   final double gridStrokeWidth;
   final double gridJitterRatio;
 
-  /// Chart area after layout bands are computed. Set during [paint].
-  late Rect chartArea;
+  /// Internal frame layout, set during [paint] via [buildFrame].
+  late ChartFrameLayout _frame;
+
+  /// The main plotting region. Read-only; computed during [paint].
+  ///
+  /// Consumers should use the layout objects returned by `computeLayout()`
+  /// instead of reading this directly.
+  Rect get chartArea => _frame.chartArea;
+
+  /// Builds the canonical [ChartFrameLayout] for a given [size].
+  ///
+  /// Both [paint] and subclass `computeLayout()` methods use this to
+  /// ensure a single source of truth for chart geometry.
+  @protected
+  ChartFrameLayout buildFrame(Size size) {
+    return buildChartFrame(
+      size: size,
+      padding: padding,
+      yMin: yMin,
+      yMax: yMax,
+      xMin: xMin,
+      xMax: xMax,
+      title: title,
+      titleStyle: titleStyle,
+      labelStyle: labelStyle,
+      xAxisLabel: xAxisLabel,
+      xLabels: xLabels,
+      hasNumericXAxis: _hasNumericXAxis,
+      hasLegend: legend.isNotEmpty,
+    );
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Compute layout bands within the padded area.
-    final padded = Rect.fromLTWH(
-      padding.left,
-      padding.top,
-      size.width - padding.left - padding.right,
-      size.height - padding.top - padding.bottom,
-    );
-
-    // Measure band heights.
-    final titleHeight = _measureTitleHeight();
-    final xTickHeight = _measureXTickHeight();
-    final xAxisTitleHeight = _measureXAxisTitleHeight();
-    final legendHeight = legend.isNotEmpty ? chartLegendBandHeight : 0.0;
-
-    // Chart area fills whatever is left.
-    chartArea = Rect.fromLTRB(
-      padded.left,
-      padded.top + titleHeight,
-      padded.right,
-      padded.bottom - xTickHeight - xAxisTitleHeight - legendHeight,
-    );
+    _frame = buildFrame(size);
+    final padded = _frame.paddedBounds;
 
     // Paint in order: background → axes → data → overlays.
     if (title != null) _paintTitle(canvas, padded);
@@ -187,27 +198,6 @@ abstract class HandDrawnChartPainter extends CustomPainter {
         oldDelegate.gridJitterRatio != gridJitterRatio ||
         !listEquals(oldDelegate.xLabels, xLabels) ||
         !listEquals(oldDelegate.legend, legend);
-  }
-
-  // ── Layout measurement helpers ───────────────────────────────────────
-
-  double _measureTitleHeight() {
-    if (title == null) return 0;
-    final tp = _layoutText(title!, _effectiveTitleStyle);
-    return tp.height + chartTitleSpacing;
-  }
-
-  double _measureXTickHeight() {
-    if (xLabels.isNotEmpty || _hasNumericXAxis) {
-      return chartXTickBandHeight;
-    }
-    return 0;
-  }
-
-  double _measureXAxisTitleHeight() {
-    if (xAxisLabel == null) return 0;
-    final tp = _layoutText(xAxisLabel!, labelStyle);
-    return tp.height + chartXAxisTitleSpacing;
   }
 
   bool get _hasNumericXAxis => xMin != null && xMax != null;
@@ -559,7 +549,7 @@ abstract class HandDrawnChartPainter extends CustomPainter {
   // ── X-axis title ─────────────────────────────────────────────────────
 
   void _paintXAxisTitle(Canvas canvas) {
-    final xTickH = _measureXTickHeight();
+    final xTickH = _frame.xTickHeight;
     final tp = _layoutText(xAxisLabel!, labelStyle);
     tp.paint(
       canvas,
@@ -626,20 +616,16 @@ abstract class HandDrawnChartPainter extends CustomPainter {
   // ── Coordinate helpers for subclasses ────────────────────────────────
 
   /// Converts a Y data value to canvas Y coordinate.
-  double yToCanvas(double value) {
-    if (yMax == yMin) return chartArea.center.dy;
-    final fraction = (value - yMin) / (yMax - yMin);
-    return chartArea.bottom - chartArea.height * fraction;
-  }
+  ///
+  /// Delegates to the internal frame layout for consistency with
+  /// `computeLayout()`.
+  double yToCanvas(double value) => _frame.yToCanvas(value);
 
   /// Converts an X data value to canvas X coordinate using numeric range.
-  double xToCanvasValue(double value) {
-    final minVal = xMin ?? 0;
-    final maxVal = xMax ?? 1;
-    if (maxVal == minVal) return chartArea.center.dx;
-    final fraction = (value - minVal) / (maxVal - minVal);
-    return chartArea.left + chartArea.width * fraction;
-  }
+  ///
+  /// Delegates to the internal frame layout for consistency with
+  /// `computeLayout()`.
+  double xToCanvasValue(double value) => _frame.xToCanvasValue(value);
 
   /// Converts a point index to canvas X coordinate (for categorical axes).
   @Deprecated('Use xToCanvasValue or xPositionForLabel instead')
