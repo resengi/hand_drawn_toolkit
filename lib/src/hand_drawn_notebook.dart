@@ -38,14 +38,14 @@ class HandDrawnNotebook extends StatelessWidget {
   const HandDrawnNotebook({
     required this.child,
     required this.lineHeight,
-    this.lineColor = const Color(0xFFE0E0E0),
+    this.lineColor = HandDrawnDefaults.notebookLineColor,
     this.strokeWidth = HandDrawnDefaults.notebookStrokeWidth,
     this.seed = HandDrawnDefaults.seed,
     this.uniformLines = true,
     this.irregularity = HandDrawnDefaults.notebookIrregularity,
     this.segments = HandDrawnDefaults.notebookSegments,
     super.key,
-  });
+  }) : assert(lineHeight > 0, 'lineHeight must be positive');
 
   /// The content displayed on top of the ruled lines.
   final Widget child;
@@ -109,7 +109,11 @@ class _HandDrawnNotebookLinesPainter extends CustomPainter {
     required this.uniformLines,
     required this.irregularity,
     required this.segments,
-  });
+  }) {
+    if (lineHeight <= 0) {
+      throw ArgumentError.value(lineHeight, 'lineHeight', 'must be positive');
+    }
+  }
 
   final double lineHeight;
   final Color lineColor;

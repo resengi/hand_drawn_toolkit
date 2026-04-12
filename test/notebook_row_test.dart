@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
 
+import 'test_utils.dart';
+
 void main() {
   group('NotebookRow', () {
     Widget buildApp({required Widget child}) {
@@ -108,6 +110,67 @@ void main() {
         expect(paddingFinder, findsOneWidget);
         final padding = tester.widget<Padding>(paddingFinder);
         expect(padding.padding, edgeInsets);
+      });
+      // Vertical padding breaks the row-height contract. The assertion must
+      // cover both EdgeInsets and EdgeInsetsDirectional; a type-specific
+      // check would let directional vertical padding slip through.
+      testWidgets('asserts on EdgeInsets with vertical padding', (
+        tester,
+      ) async {
+        final errors = await captureFlutterErrors(() async {
+          await tester.pumpWidget(
+            buildApp(
+              child: const NotebookRow(
+                lineHeight: 28.0,
+                padding: EdgeInsets.only(bottom: 4),
+                child: Text('Test'),
+              ),
+            ),
+          );
+        });
+
+        expect(
+          errors.any((e) => e.exception.toString().contains('horizontal-only')),
+          isTrue,
+        );
+      });
+
+      testWidgets('asserts on EdgeInsetsDirectional with vertical padding', (
+        tester,
+      ) async {
+        final errors = await captureFlutterErrors(() async {
+          await tester.pumpWidget(
+            buildApp(
+              child: const NotebookRow(
+                lineHeight: 28.0,
+                padding: EdgeInsetsDirectional.only(top: 8),
+                child: Text('Test'),
+              ),
+            ),
+          );
+        });
+
+        expect(
+          errors.any((e) => e.exception.toString().contains('horizontal-only')),
+          isTrue,
+        );
+      });
+
+      testWidgets('accepts horizontal-only EdgeInsetsDirectional', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          buildApp(
+            child: const NotebookRow(
+              lineHeight: 28.0,
+              padding: EdgeInsetsDirectional.only(start: 16, end: 16),
+              child: Text('Test'),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
       });
     });
   });
@@ -249,6 +312,31 @@ void main() {
 
     test('negative returns zero', () {
       expect(rowsForHeight(-5.0, 32.0), 0);
+    });
+
+    test('throws ArgumentError when rowHeight is zero', () {
+      expect(() => rowsForHeight(100.0, 0.0), throwsA(isA<ArgumentError>()));
+    });
+
+    test('throws ArgumentError when rowHeight is negative', () {
+      expect(() => rowsForHeight(100.0, -10.0), throwsA(isA<ArgumentError>()));
+    });
+  });
+
+  group('snapHeightToRows validation', () {
+    test('throws ArgumentError when rowHeight is zero', () {
+      expect(() => snapHeightToRows(100.0, 0.0), throwsA(isA<ArgumentError>()));
+    });
+
+    test('throws ArgumentError when rowHeight is negative', () {
+      expect(
+        () => snapHeightToRows(100.0, -10.0),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('accepts valid rowHeight', () {
+      expect(() => snapHeightToRows(100.0, 32.0), returnsNormally);
     });
   });
 }

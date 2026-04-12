@@ -23,7 +23,8 @@ class NotebookRow extends StatelessWidget {
     this.rowSpan = 1,
     this.padding,
     super.key,
-  });
+  }) : assert(lineHeight > 0, 'lineHeight must be positive'),
+       assert(rowSpan > 0, 'rowSpan must be positive');
 
   /// The content to place inside the row.
   final Widget child;
@@ -40,6 +41,11 @@ class NotebookRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    assert(
+      padding == null || padding!.vertical == 0.0,
+      'NotebookRow padding must be horizontal-only to preserve the row '
+      'height contract',
+    );
     Widget content = SizedBox(
       height: lineHeight * rowSpan,
       child: Align(alignment: Alignment.centerLeft, child: child),
@@ -82,7 +88,8 @@ class NotebookSnappedBlock extends StatelessWidget {
     this.minRows = 1,
     this.padding,
     super.key,
-  });
+  }) : assert(lineHeight > 0, 'lineHeight must be positive'),
+       assert(minRows > 0, 'minRows must be positive');
 
   /// The dynamic-height content to wrap.
   final Widget child;
@@ -99,6 +106,11 @@ class NotebookSnappedBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    assert(
+      padding == null || padding!.vertical == 0.0,
+      'NotebookSnappedBlock padding must be horizontal-only to preserve the '
+      'row height contract',
+    );
     Widget content = child;
     if (padding != null) {
       content = Padding(padding: padding!, child: content);
@@ -120,12 +132,18 @@ class NotebookSnappedBlock extends StatelessWidget {
 /// snapHeightToRows(0.0, 32.0);  // → 0.0
 /// ```
 double snapHeightToRows(double height, double rowHeight) {
+  if (rowHeight <= 0) {
+    throw ArgumentError.value(rowHeight, 'rowHeight', 'must be positive');
+  }
   if (height <= 0) return 0;
   return (height / rowHeight).ceil() * rowHeight;
 }
 
 /// Returns the number of whole notebook rows needed to contain [height].
 int rowsForHeight(double height, double rowHeight) {
+  if (rowHeight <= 0) {
+    throw ArgumentError.value(rowHeight, 'rowHeight', 'must be positive');
+  }
   if (height <= 0) return 0;
   return (height / rowHeight).ceil();
 }

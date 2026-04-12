@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 
+import 'hand_drawn_constants.dart';
 import 'hand_drawn_line_painter.dart';
 import 'hand_drawn_toolkit_defaults.dart';
+
+/// Returns the cross-axis extent used by divider layout for a given thickness.
+double _dividerCrossAxisExtent(double thickness) =>
+    thickness * dividerCrossAxisMultiplier;
 
 /// A horizontal or vertical divider rendered with a hand-drawn, sketchy stroke.
 ///
@@ -38,7 +43,7 @@ class HandDrawnDivider extends StatelessWidget {
   const HandDrawnDivider({
     super.key,
     this.direction = Axis.horizontal,
-    this.color = Colors.black54,
+    this.color = HandDrawnDefaults.dividerColor,
     this.thickness = HandDrawnDefaults.dividerThickness,
     this.irregularity = HandDrawnDefaults.dividerIrregularity,
     this.segments = HandDrawnDefaults.dividerSegments,
@@ -47,7 +52,14 @@ class HandDrawnDivider extends StatelessWidget {
     this.height,
     this.indent = 0.0,
     this.endIndent = 0.0,
-  });
+  }) : assert(thickness > 0),
+       assert(segments > 0),
+       assert(indent >= 0),
+       assert(endIndent >= 0),
+       assert(
+         direction == Axis.horizontal || height != null,
+         'height is required when direction is Axis.vertical',
+       );
 
   /// Whether this divider runs horizontally or vertically.
   final Axis direction;
@@ -91,9 +103,9 @@ class HandDrawnDivider extends StatelessWidget {
     final isHorizontal = direction == Axis.horizontal;
 
     // The drawing area needs a small cross-axis extent to contain the
-    // jittered stroke without clipping. We use thickness * 4 to give the
-    // wobble comfortable room.
-    final crossAxis = thickness * 4;
+    // jittered stroke without clipping. See [dividerCrossAxisMultiplier]
+    // for the multiplier used to give the wobble comfortable room.
+    final crossAxis = _dividerCrossAxisExtent(thickness);
 
     return Padding(
       padding: isHorizontal

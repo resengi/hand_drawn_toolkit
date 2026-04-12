@@ -5,6 +5,44 @@ import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
 
 void main() {
   group('HandDrawnHelpers', () {
+    group('smooth (static)', () {
+      test('preserves first and last values', () {
+        final raw = [1.0, 5.0, -3.0, 2.0, 4.0];
+        final result = HandDrawnHelpers.smooth(raw);
+        expect(result.first, raw.first);
+        expect(result.last, raw.last);
+      });
+
+      test('applies 3-point moving average to interior values', () {
+        final raw = [0.0, 3.0, 6.0, 9.0, 0.0];
+        final result = HandDrawnHelpers.smooth(raw);
+        // Interior point at index 1: (0+3+6)/3 = 3.0
+        expect(result[1], 3.0);
+        // Interior point at index 2: (3+6+9)/3 = 6.0
+        expect(result[2], 6.0);
+        // Interior point at index 3: (6+9+0)/3 = 5.0
+        expect(result[3], 5.0);
+      });
+
+      test('returns same length as input', () {
+        final raw = [1.0, 2.0, 3.0, 4.0, 5.0];
+        final result = HandDrawnHelpers.smooth(raw);
+        expect(result.length, raw.length);
+      });
+
+      test('handles single-element list', () {
+        final raw = [5.0];
+        final result = HandDrawnHelpers.smooth(raw);
+        expect(result, [5.0]);
+      });
+
+      test('handles two-element list (no interior points)', () {
+        final raw = [1.0, 9.0];
+        final result = HandDrawnHelpers.smooth(raw);
+        expect(result, [1.0, 9.0]);
+      });
+    });
+
     group('smoothedOffsets', () {
       test('returns segments + 1 values', () {
         const segments = 20;
@@ -187,6 +225,67 @@ void main() {
 
         // The offsets should differ because the RNG state has advanced.
         expect(afterRect, isNot(equals(beforeRect)));
+      });
+    });
+
+    group('constructor validation', () {
+      test('throws ArgumentError when segments is zero', () {
+        expect(
+          () => HandDrawnHelpers(seed: 0, segments: 0, irregularity: 1.0),
+          throwsA(isA<ArgumentError>()),
+        );
+      });
+
+      test('throws ArgumentError when segments is negative', () {
+        expect(
+          () => HandDrawnHelpers(seed: 0, segments: -5, irregularity: 1.0),
+          throwsA(isA<ArgumentError>()),
+        );
+      });
+
+      test('throws ArgumentError when irregularity is negative', () {
+        expect(
+          () => HandDrawnHelpers(seed: 0, segments: 10, irregularity: -1.0),
+          throwsA(isA<ArgumentError>()),
+        );
+      });
+
+      test('accepts irregularity of zero', () {
+        expect(
+          () => HandDrawnHelpers(seed: 0, segments: 10, irregularity: 0.0),
+          returnsNormally,
+        );
+      });
+
+      test('accepts valid parameters', () {
+        expect(
+          () => HandDrawnHelpers(seed: 42, segments: 24, irregularity: 3.5),
+          returnsNormally,
+        );
+      });
+    });
+
+    group('irregularity consistency', () {
+      test('smoothedOffsets range follows (random - 0.5) * irregularity', () {
+        // With a known irregularity, the raw (pre-smoothing) offsets should
+        // be bounded by [-irregularity/2, +irregularity/2]. After smoothing
+        // (3-point average), all values must be strictly within that bound.
+        const irr = 6.0;
+        final helpers = HandDrawnHelpers(
+          seed: 42,
+          segments: 100,
+          irregularity: irr,
+        );
+
+        final offsets = helpers.smoothedOffsets();
+
+        for (final o in offsets) {
+          expect(
+            o.abs(),
+            lessThanOrEqualTo(irr / 2),
+            reason: 'offset $o exceeds irregularity/2 bound',
+          );
+        }
       });
     });
   });

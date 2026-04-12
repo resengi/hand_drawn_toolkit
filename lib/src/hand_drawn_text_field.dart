@@ -44,16 +44,29 @@ class HandDrawnTextField extends StatelessWidget {
     this.style,
     this.autofocus = false,
     this.textCapitalization = TextCapitalization.sentences,
-    this.backgroundColor = const Color(0xFFF5F5F5),
-    this.textColor = const Color(0xFF1A1A1A),
-    this.hintColor = const Color(0xFF999999),
-    this.dividerColor = const Color(0xFFE0E0E0),
+    this.backgroundColor = HandDrawnDefaults.textFieldBackgroundColor,
+    this.textColor = HandDrawnDefaults.textFieldTextColor,
+    this.hintColor = HandDrawnDefaults.textFieldHintColor,
+    this.dividerColor = HandDrawnDefaults.textFieldDividerColor,
     this.fontSize = HandDrawnDefaults.textFieldFontSize,
     this.borderRadius = HandDrawnDefaults.textFieldBorderRadius,
-    this.padding = const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+    this.padding = HandDrawnDefaults.textFieldPadding,
     this.dividerThickness = HandDrawnDefaults.textFieldDividerThickness,
+    this.minLines,
+    this.keyboardType,
+    this.textInputAction,
+    this.enabled = true,
+    this.readOnly = false,
     super.key,
-  });
+  }) : assert(fontSize > 0),
+       assert(borderRadius >= 0),
+       assert(dividerThickness > 0),
+       assert(maxLines > 0),
+       assert(minLines == null || minLines > 0),
+       assert(
+         minLines == null || minLines <= maxLines,
+         'minLines ($minLines) must be <= maxLines ($maxLines)',
+       );
 
   /// Controls the text being edited.
   final TextEditingController? controller;
@@ -111,6 +124,21 @@ class HandDrawnTextField extends StatelessWidget {
   /// Thickness of the hand-drawn divider underline.
   final double dividerThickness;
 
+  /// The minimum number of lines for the text field.
+  final int? minLines;
+
+  /// The type of keyboard to display (e.g., numeric, email).
+  final TextInputType? keyboardType;
+
+  /// The action button on the soft keyboard (e.g., done, next).
+  final TextInputAction? textInputAction;
+
+  /// Whether the text field is interactive. Defaults to true.
+  final bool enabled;
+
+  /// Whether the text is read-only. Defaults to false.
+  final bool readOnly;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -128,15 +156,22 @@ class HandDrawnTextField extends StatelessWidget {
             onChanged: onChanged,
             onSubmitted: onSubmitted,
             maxLines: maxLines,
+            minLines: minLines,
             autofocus: autofocus,
             textCapitalization: textCapitalization,
+            keyboardType: keyboardType,
+            textInputAction: textInputAction,
+            enabled: enabled,
+            readOnly: readOnly,
             style: style ?? TextStyle(fontSize: fontSize, color: textColor),
             decoration: InputDecoration(
               hintText: hintText,
               hintStyle: TextStyle(fontSize: fontSize, color: hintColor),
               border: InputBorder.none,
               isDense: true,
-              contentPadding: const EdgeInsets.symmetric(vertical: 6),
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: HandDrawnDefaults.textFieldContentVerticalPadding,
+              ),
             ),
           ),
           HandDrawnDivider(
