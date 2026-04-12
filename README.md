@@ -730,6 +730,7 @@ HandDrawnTable(
 |-----------|------|---------|-------------|
 | `seed` | `int` | `42` | Random seed for divider wobble |
 | `irregularity` | `double` | `1.0` | Wobble magnitude |
+| `thickness` | `double` | `1.5` | Stroke thickness of the dividers |
 | `uniform` | `bool` | `true` | When true, all dividers share the same seed. When false, each gets `seed + 1`, `seed + 2`, etc. |
 
 ## Usage Guide
@@ -927,7 +928,7 @@ CustomPaint(
 
 5. **Determinism** — All randomness flows through `dart:math.Random(seed)`, so identical parameters always produce identical strokes.
 
-6. **Chart geometry** — Chart layout is computed from a single canonical frame builder shared by both `paint()` and `computeLayout()`. Coordinate helpers are pure functions of immutable frame data, ensuring layout snapshots always match the rendered output.
+6. **Chart geometry** — Chart layout is computed from a single canonical frame builder shared by both `paint()` and `computeLayout()`. Coordinate helpers are pure functions of immutable frame data, ensuring layout snapshots always match the rendered output. In debug, the frame builder asserts when the available height is insufficient for the configured title, axis, and legend bands; in release, the plot region is clamped so it can never invert.
 
 7. **Interaction foundation** — Hit-testing uses logical (non-wobbly) geometry so results are stable regardless of rendering style. Point hits take priority over segment hits in line charts, and bar hit-testing iterates in reverse paint order so the topmost segment wins.
 
@@ -947,6 +948,8 @@ ListView.builder(
 ```
 
 **Increase left padding for formatted Y labels** — the default 40 px left padding suits short numeric labels. When using a `yValueFormatter` that produces longer strings (e.g. `"$1,234.56"`), increase the left padding to prevent clipping.
+
+**Give charts enough vertical space** — the plot region shares height with optional title, X tick label, axis title, and legend bands. At very small heights these bands can squeeze the plot to zero. If you see debug asserts about insufficient vertical space, either increase the chart height or omit bands you don't need.
 
 **Keep segment count reasonable** — 20–30 segments is the sweet spot for most use cases. Going above 50 adds computation without visible improvement at typical widget sizes.
 

@@ -1,9 +1,15 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'hand_drawn_constants.dart';
 import 'hand_drawn_container.dart';
 import 'hand_drawn_divider.dart';
 import 'hand_drawn_toolkit_defaults.dart';
+
+/// Cross-axis extent of a divider for a given thickness.
+double _dividerCrossAxisExtent(double thickness) =>
+    thickness * dividerCrossAxisMultiplier;
 
 /// Definition of a single table column.
 class HandDrawnTableColumn {
@@ -61,6 +67,7 @@ class TableDividerStyle {
   const TableDividerStyle({
     this.seed = HandDrawnDefaults.seed,
     this.irregularity = HandDrawnDefaults.dividerIrregularity,
+    this.thickness = HandDrawnDefaults.dividerThickness,
     this.uniform = true,
   });
 
@@ -69,6 +76,9 @@ class TableDividerStyle {
 
   /// Wobble magnitude for the dividers.
   final double irregularity;
+
+  /// Stroke thickness of the dividers.
+  final double thickness;
 
   /// When true, all dividers share the same wobble pattern. When false,
   /// each divider gets a unique seed for distinct character.
@@ -80,10 +90,11 @@ class TableDividerStyle {
       other is TableDividerStyle &&
           seed == other.seed &&
           irregularity == other.irregularity &&
+          thickness == other.thickness &&
           uniform == other.uniform;
 
   @override
-  int get hashCode => Object.hash(seed, irregularity, uniform);
+  int get hashCode => Object.hash(seed, irregularity, thickness, uniform);
 }
 
 /// A generic hand-drawn table widget.
@@ -341,6 +352,7 @@ class HandDrawnTable extends StatelessWidget {
     return HandDrawnDivider(
       seed: rowDividers!.seed,
       irregularity: rowDividers!.irregularity,
+      thickness: rowDividers!.thickness,
     );
   }
 
@@ -349,6 +361,7 @@ class HandDrawnTable extends StatelessWidget {
     return HandDrawnDivider(
       seed: config.uniform ? config.seed : config.seed + index + 1,
       irregularity: config.irregularity,
+      thickness: config.thickness,
     );
   }
 
@@ -356,18 +369,21 @@ class HandDrawnTable extends StatelessWidget {
 
   Widget _columnDividerStack(Widget content, List<double> boundaries) {
     final config = columnDividers!;
+    final thickness = config.thickness;
+    final halfCross = _dividerCrossAxisExtent(thickness) / 2;
     return IntrinsicHeight(
       child: Stack(
         children: [
           content,
           for (int i = 0; i < boundaries.length; i++)
             Positioned(
-              left: boundaries[i],
+              left: boundaries[i] - halfCross,
               top: 0,
               bottom: 0,
               child: HandDrawnDivider(
                 direction: Axis.vertical,
                 height: double.infinity,
+                thickness: thickness,
                 seed: config.uniform ? config.seed : config.seed + i + 1,
                 irregularity: config.irregularity,
               ),
@@ -387,7 +403,7 @@ class HandDrawnTable extends StatelessWidget {
         totalFlex += col.flex;
       }
     }
-    final flexSpace = availableWidth - fixedTotal;
+    final flexSpace = math.max(0.0, availableWidth - fixedTotal);
 
     final boundaries = <double>[];
     double x = 0;

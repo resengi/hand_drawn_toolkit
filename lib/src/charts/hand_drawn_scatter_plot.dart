@@ -7,6 +7,15 @@ import 'chart_interaction.dart';
 import 'chart_widget_helpers.dart';
 import 'hand_drawn_chart_painter.dart';
 
+/// Validates that [radius] is positive; throws [ArgumentError] otherwise.
+void _validateScatterRadius(double radius, double? rawSize, int index) {
+  if (radius <= 0) {
+    throw ArgumentError(
+      'ScatterPoint.size must be positive, got $rawSize at index $index.',
+    );
+  }
+}
+
 /// Painter for hand-drawn scatter plots.
 ///
 /// Draws wobbly circles at each data point. All axis furniture is
@@ -61,12 +70,7 @@ class HandDrawnScatterPlotPainter extends HandDrawnChartPainter {
       final x = xToCanvasValue(p.x);
       final y = yToCanvas(p.y);
       final radius = p.size ?? scatterDefaultDotRadius;
-
-      if (radius <= 0) {
-        throw ArgumentError(
-          'ScatterPoint.size must be positive, got ${p.size} at index $i.',
-        );
-      }
+      _validateScatterRadius(radius, p.size, i);
 
       final dotSeed = seed + scatterSeedOffset + i * scatterPointSeedStep;
       final circle = wobblyCircle(Offset(x, y), radius, dotSeed);
@@ -96,6 +100,7 @@ class HandDrawnScatterPlotPainter extends HandDrawnChartPainter {
       final x = frame.xToCanvasValue(p.x);
       final y = frame.yToCanvas(p.y);
       final radius = p.size ?? scatterDefaultDotRadius;
+      _validateScatterRadius(radius, p.size, i);
 
       points.add(
         ScatterPointLayout(

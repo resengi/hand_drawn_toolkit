@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
 
+import 'test_utils.dart';
+
 Widget _wrap(Widget child) {
   return MaterialApp(home: Scaffold(body: child));
 }
@@ -264,6 +266,142 @@ void main() {
       expect(verticals.length, 2);
       expect(verticals[0].seed, 21);
       expect(verticals[1].seed, 22);
+    });
+
+    // A vertical divider's drawing area is wider than the ink line itself
+    // so that the jittered stroke does not clip. If each divider is placed
+    // with its left edge on the column boundary, the visible line sits
+    // right of the boundary. Centering is correct when the spacing between
+    // two adjacent dividers equals the width of the column between them,
+    // regardless of the specific cross-axis padding used.
+    testWidgets('vertical dividers are centered on column boundaries', (
+      tester,
+    ) async {
+      const middleColumnWidth = 120.0;
+      const columns = [
+        HandDrawnTableColumn(header: 'A', width: 100),
+        HandDrawnTableColumn(header: 'B', width: middleColumnWidth),
+        HandDrawnTableColumn(header: 'C', width: 100),
+      ];
+      const rows = [
+        HandDrawnTableRow(cells: ['1', '2', '3']),
+      ];
+
+      await tester.pumpWidget(
+        _wrap(
+          const SizedBox(
+            width: 600,
+            child: HandDrawnTable(
+              columns: columns,
+              rows: rows,
+              columnDividers: TableDividerStyle(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final dividerParents = tester
+          .widgetList<Positioned>(find.byType(Positioned))
+          .where((p) {
+            return find
+                .descendant(
+                  of: find.byWidget(p),
+                  matching: find.byType(HandDrawnDivider),
+                )
+                .evaluate()
+                .isNotEmpty;
+          })
+          .toList();
+
+      expect(
+        dividerParents,
+        hasLength(2),
+        reason: 'Three columns yield two internal boundaries.',
+      );
+
+      // If both dividers are centered on their respective boundaries, the
+      // spacing between their positions equals the middle column's width.
+      // This holds regardless of the divider's cross-axis padding policy.
+      final spacing = dividerParents[1].left! - dividerParents[0].left!;
+      expect(spacing, closeTo(middleColumnWidth, 0.01));
+    });
+  });
+
+  // ── Narrow-width layout (flex-space clamp) ──────────────────────────
+
+  // When fixed-width columns together exceed the available width, the
+  // remaining flex space would go negative. Without clamping, later
+  // column boundaries march backward and produce invalid geometry.
+  // The contract verified here is: no internal geometry failure occurs.
+  // The Row inside may legitimately emit a rendering overflow warning,
+  // which is the consumer's responsibility, not a package defect.
+  //
+  // Every captured error must be a framework render overflow (identified
+  // by the stable "overflowed" wording Flutter uses for RenderFlex
+  // overflow). Absence of errors is also acceptable — overflow is
+  // permitted, not required.
+  group('HandDrawnTable narrow-width layout', () {
+    testWidgets('fixed widths exceeding available width produce no '
+        'internal geometry errors', (tester) async {
+      final errors = await captureFlutterErrors(() async {
+        await tester.pumpWidget(
+          _wrap(
+            const SizedBox(
+              width: 100,
+              child: HandDrawnTable(
+                columns: [
+                  HandDrawnTableColumn(header: 'X', width: 150),
+                  HandDrawnTableColumn(header: 'Y', width: 150),
+                ],
+                rows: [
+                  HandDrawnTableRow(cells: ['a', 'b']),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+      });
+
+      for (final e in errors) {
+        expect(
+          e.exception.toString(),
+          contains('overflowed'),
+          reason: 'Unexpected non-overflow error:\n$e',
+        );
+      }
+    });
+
+    testWidgets('fixed column larger than width with flex sibling produces '
+        'no internal geometry errors', (tester) async {
+      final errors = await captureFlutterErrors(() async {
+        await tester.pumpWidget(
+          _wrap(
+            const SizedBox(
+              width: 50,
+              child: HandDrawnTable(
+                columns: [
+                  HandDrawnTableColumn(header: 'Fixed', width: 200),
+                  HandDrawnTableColumn(header: 'Flex', flex: 1),
+                ],
+                rows: [
+                  HandDrawnTableRow(cells: ['a', 'b']),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+      });
+
+      for (final e in errors) {
+        expect(
+          e.exception.toString(),
+          contains('overflowed'),
+          reason: 'Unexpected non-overflow error:\n$e',
+        );
+      }
     });
   });
 

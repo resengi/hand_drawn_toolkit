@@ -42,10 +42,7 @@ class NotebookRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     assert(
-      padding == null ||
-          padding is! EdgeInsets ||
-          ((padding! as EdgeInsets).top == 0 &&
-              (padding! as EdgeInsets).bottom == 0),
+      padding == null || padding!.vertical == 0.0,
       'NotebookRow padding must be horizontal-only to preserve the row '
       'height contract',
     );
@@ -110,10 +107,7 @@ class NotebookSnappedBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     assert(
-      padding == null ||
-          padding is! EdgeInsets ||
-          ((padding! as EdgeInsets).top == 0 &&
-              (padding! as EdgeInsets).bottom == 0),
+      padding == null || padding!.vertical == 0.0,
       'NotebookSnappedBlock padding must be horizontal-only to preserve the '
       'row height contract',
     );

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' show Rect, Size;
 
 import 'package:flutter/painting.dart'
@@ -99,11 +100,24 @@ ChartFrameLayout buildChartFrame({
   final legendHeight = hasLegend ? chartLegendBandHeight : 0.0;
 
   // Chart area fills whatever is left.
+  final chartTop = paddedBounds.top + titleHeight;
+  final rawBottom =
+      paddedBounds.bottom - xTickHeight - xAxisTitleHeight - legendHeight;
+
+  assert(
+    rawBottom >= chartTop,
+    'Chart has been given insufficient vertical space for its configured '
+    'title, tick, axis-label, and legend bands. Provide more height or '
+    'reduce the number of visible bands.',
+  );
+
+  // Clamp for release safety so the plot rect never inverts.
+  final chartBottom = math.max(chartTop, rawBottom);
   final chartArea = Rect.fromLTRB(
     paddedBounds.left,
-    paddedBounds.top + titleHeight,
+    chartTop,
     paddedBounds.right,
-    paddedBounds.bottom - xTickHeight - xAxisTitleHeight - legendHeight,
+    chartBottom,
   );
 
   return ChartFrameLayout(

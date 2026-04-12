@@ -352,8 +352,8 @@ abstract class HandDrawnChartPainter extends CustomPainter {
     final rng = math.Random(circleSeed);
     final irr = jitter ?? (irregularity * 0.5);
 
-    final raw = List<double>.filled(points + 1, 0);
-    for (int i = 0; i <= points; i++) {
+    final raw = List<double>.filled(points, 0);
+    for (int i = 0; i < points; i++) {
       raw[i] = (rng.nextDouble() - 0.5) * irr;
     }
     final smoothed = HandDrawnHelpers.smooth(raw);
@@ -361,7 +361,7 @@ abstract class HandDrawnChartPainter extends CustomPainter {
     final path = Path();
     final step = 2 * math.pi / points;
 
-    for (int i = 0; i <= points; i++) {
+    for (int i = 0; i < points; i++) {
       final angle = i * step;
       final r = radius + smoothed[i];
       final x = center.dx + r * math.cos(angle);

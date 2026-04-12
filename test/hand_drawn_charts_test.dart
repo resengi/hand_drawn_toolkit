@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
 
+import 'test_utils.dart';
+
 // ── Test data factories ────────────────────────────────────────────────────
 
 BarChartData _barData({
@@ -1169,5 +1171,117 @@ void main() {
       final b = HandDrawnBarChartPainter(data: data);
       expect(a.shouldRepaint(b), isFalse);
     });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // CHART PAINTER — wobbly circle primitive
+  // ════════════════════════════════════════════════════════════════════════
+
+  // The wobbly-circle helper previously sampled the wrap-around angle
+  // twice, producing two separately-jittered points at the same angular
+  // position. When the path closed, the two points left a visible notch.
+  // The fix samples the circle exactly once per angular position and
+  // lets path.close() connect the last segment back to the first.
+  group('wobblyCircle primitive', () {
+    HandDrawnScatterPlotPainter makePainter({int seed = 42}) {
+      return HandDrawnScatterPlotPainter(
+        data: const ScatterPlotData(
+          points: [ScatterPoint(x: 0, y: 0)],
+          minX: -1,
+          maxX: 1,
+          minY: -1,
+          maxY: 1,
+        ),
+        seed: seed,
+      );
+    }
+
+    test('same seed and inputs produce identical path bounds', () {
+      final painter = makePainter();
+      final a = painter.wobblyCircle(const Offset(100, 100), 20.0, 42);
+      final b = painter.wobblyCircle(const Offset(100, 100), 20.0, 42);
+
+      expect(a.getBounds(), equals(b.getBounds()));
+    });
+
+    test('generates a single closed contour (no seam gap)', () {
+      final painter = makePainter(seed: 99);
+      final path = painter.wobblyCircle(const Offset(50, 50), 15.0, 99);
+      final metrics = path.computeMetrics().toList();
+
+      expect(metrics, hasLength(1));
+      expect(metrics.first.isClosed, isTrue);
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // CHART LAYOUT — insufficient vertical space
+  // ════════════════════════════════════════════════════════════════════════
+
+  // When a chart is given less vertical space than its title, tick, axis
+  // label, and legend bands collectively require, the derived plot
+  // rectangle would invert (bottom above top). The layout asserts on raw
+  // pre-clamp geometry in debug so the developer sees the misconfiguration,
+  // and clamps bottom to at least top for release-safe rendering.
+  group('Chart layout tight vertical constraints', () {
+    testWidgets('bar chart with insufficient height fires the size assertion', (
+      tester,
+    ) async {
+      final errors = await captureFlutterErrors(() async {
+        await tester.pumpWidget(
+          _wrap(
+            SizedBox(
+              width: 300,
+              height: 10,
+              child: HandDrawnBarChart(data: _barData()),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+      });
+
+      // The geometry assertion must fire; no plot-rect inversion may occur.
+      expect(
+        errors.any(
+          (e) =>
+              e.exception is AssertionError &&
+              e.exception.toString().contains('insufficient vertical space'),
+        ),
+        isTrue,
+        reason:
+            'Chart given insufficient vertical space must trigger the '
+            'buildChartFrame geometry assertion.',
+      );
+    });
+
+    testWidgets(
+      'line chart with insufficient height fires the size assertion',
+      (tester) async {
+        final errors = await captureFlutterErrors(() async {
+          await tester.pumpWidget(
+            _wrap(
+              SizedBox(
+                width: 300,
+                height: 10,
+                child: HandDrawnLineChart(data: _lineData()),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+        });
+
+        expect(
+          errors.any(
+            (e) =>
+                e.exception is AssertionError &&
+                e.exception.toString().contains('insufficient vertical space'),
+          ),
+          isTrue,
+          reason:
+              'Chart given insufficient vertical space must trigger the '
+              'buildChartFrame geometry assertion.',
+        );
+      },
+    );
   });
 }

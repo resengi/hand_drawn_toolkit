@@ -144,8 +144,7 @@ class HandDrawnLinePainter extends CustomPainter {
         old.strokeWidth != strokeWidth ||
         old.irregularity != irregularity ||
         old.seed != seed ||
-        old.segments != segments ||
-        old.buildPath != buildPath;
+        old.segments != segments;
     if (paramsChanged) {
       _cachedPath = null;
     }

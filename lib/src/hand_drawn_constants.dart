@@ -42,6 +42,11 @@ const double defaultDividerIrregularity = 1.0;
 const int defaultDividerSegments = 30;
 const Color defaultDividerColor = Color(0x8A000000);
 
+/// Multiplier applied to a divider's thickness to compute its cross-axis
+/// extent (the drawing area needed to contain the jittered stroke without
+/// clipping).
+const double dividerCrossAxisMultiplier = 4;
+
 // ── StatusSquare ───────────────────────────────────────────────────────────
 
 const double defaultStatusSquareSize = 14.0;
