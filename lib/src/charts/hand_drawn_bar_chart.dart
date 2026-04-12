@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../hand_drawn_constants.dart';
 import '../hand_drawn_toolkit_defaults.dart';
+import 'bar_geometry.dart';
 import 'chart_data.dart';
 import 'chart_interaction.dart';
 import 'chart_widget_helpers.dart';
@@ -17,7 +18,7 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
     required this.data,
     super.seed,
     super.axisColor,
-    super.gridColor,
+    super.grid,
     TextStyle? labelStyle,
     super.irregularity,
     super.segments,
@@ -26,10 +27,12 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
     super.titleStyle,
     super.legendStyle,
     super.axisStrokeWidth,
-    super.gridStrokeWidth,
-    super.gridJitterRatio,
   }) : super(
-         xLabels: [for (final b in data.bars) b.label],
+         // Project from resolvedCategories so grouped and legacy inputs
+         // both produce correct X-axis labels. For legacy `bars` input
+         // resolvedCategories yields one single-bar category per
+         // BarGroup with the original label, so behavior is unchanged.
+         xLabels: [for (final c in data.resolvedCategories) c.label],
          legend: data.legend,
          yMin: data.minY ?? 0,
          yMax: data.maxY ?? _computeMaxY(data),
@@ -42,14 +45,17 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
     // Release-safe validation: reject negative segment values in all
     // build modes. BarSegment's own assert catches this in debug mode at
     // the point of construction; this guard ensures invalid data never
-    // reaches paintData in release builds.
-    for (final bar in data.bars) {
-      for (final segment in bar.segments) {
-        if (segment.value < 0) {
-          throw ArgumentError(
-            'BarSegment.value must be non-negative, got ${segment.value} '
-            'in bar "${bar.label}".',
-          );
+    // reaches paintData in release builds. Iterates resolvedCategories
+    // so grouped and legacy inputs are both validated.
+    for (final category in data.resolvedCategories) {
+      for (final bar in category.bars) {
+        for (final segment in bar.segments) {
+          if (segment.value < 0) {
+            throw ArgumentError(
+              'BarSegment.value must be non-negative, got ${segment.value} '
+              'in bar "${bar.label}" of category "${category.label}".',
+            );
+          }
         }
       }
     }
@@ -57,24 +63,27 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
 
   final BarChartData data;
 
-  /// Computes the default Y-axis maximum from bar totals.
+  /// Computes the default Y-axis maximum from inner-bar totals across
+  /// every category.
   ///
-  /// Assumes all segment values are non-negative (guaranteed by the
-  /// non-negative policy enforced in the constructor).
+  /// Per the grouped-bar plan, the chart scales by the **maximum** inner
+  /// bar height (not the sum across siblings) — siblings sit side-by-side,
+  /// so the Y-axis only needs to cover the tallest one. For ungrouped
+  /// charts this collapses to `max(BarGroup.total)` because the legacy
+  /// projection produces one inner bar per category, preserving the
+  /// pre-grouped default exactly.
+  ///
+  /// Note: `BarGroup.total` is not mutated or reinterpreted — it remains
+  /// the pure sum of segment values. The "max vs sum" decision lives
+  /// here at the chart-rendering level, where it belongs.
   static double _computeMaxY(BarChartData data) {
     double max = 0;
-    for (final bar in data.bars) {
-      if (bar.total > max) max = bar.total;
+    for (final category in data.resolvedCategories) {
+      for (final innerBar in category.bars) {
+        if (innerBar.total > max) max = innerBar.total;
+      }
     }
     return max == 0 ? 1 : max;
-  }
-
-  /// Computes the logical bar width from slot width, applying the width
-  /// ratio and min/max clamping.
-  static double _computeBarWidth(double slotWidth) {
-    return (slotWidth * barWidthRatio)
-        .clamp(slotWidth >= barMinWidth ? barMinWidth : 0.0, barMaxWidth)
-        .clamp(0.0, slotWidth);
   }
 
   @override
@@ -107,7 +116,7 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
   BarChartLayout computeLayout(Size size) {
     final frame = buildFrame(size);
 
-    if (data.bars.isEmpty) {
+    if (data.isEmpty) {
       return BarChartLayout(
         size: size,
         chartArea: frame.chartArea,
@@ -115,45 +124,29 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
       );
     }
 
-    final barCount = data.bars.length;
-    final slotWidth = frame.chartArea.width / barCount;
-    final barWidth = _computeBarWidth(slotWidth);
+    // Single source of truth for bar segment rectangles. The painter
+    // consumes the same helper so paint output and hit-test bounds can
+    // never drift.
+    final specs = computeBarSegmentRects(
+      frame: frame,
+      categories: data.resolvedCategories,
+    );
 
-    final segments = <BarSegmentLayout>[];
-
-    for (int i = 0; i < barCount; i++) {
-      final bar = data.bars[i];
-      final centerX = frame.xPositionForBar(i, barCount);
-
-      double cumulativeValue = 0.0;
-      for (int j = 0; j < bar.segments.length; j++) {
-        final segment = bar.segments[j];
-        if (segment.value == 0) continue;
-
-        final segmentBottom = frame.yToCanvas(cumulativeValue);
-        final cumulativeStart = cumulativeValue;
-        cumulativeValue += segment.value;
-        final segmentTop = frame.yToCanvas(cumulativeValue);
-
-        segments.add(
-          BarSegmentLayout(
-            barIndex: i,
-            segmentIndex: j,
-            barLabel: bar.label,
-            category: segment.category,
-            value: segment.value,
-            cumulativeStart: cumulativeStart,
-            cumulativeEnd: cumulativeValue,
-            bounds: Rect.fromLTRB(
-              centerX - barWidth / 2,
-              segmentTop,
-              centerX + barWidth / 2,
-              segmentBottom,
-            ),
-          ),
-        );
-      }
-    }
+    final segments = <BarSegmentLayout>[
+      for (final s in specs)
+        BarSegmentLayout(
+          barIndex: s.categoryIndex,
+          innerBarIndex: s.innerBarIndex,
+          innerBarLabel: s.innerBarLabel,
+          segmentIndex: s.segmentIndex,
+          barLabel: s.categoryLabel,
+          category: s.segment.category,
+          value: s.segment.value,
+          cumulativeStart: s.cumulativeStart,
+          cumulativeEnd: s.cumulativeEnd,
+          bounds: s.rect,
+        ),
+    ];
 
     return BarChartLayout(
       size: size,
@@ -164,54 +157,44 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
 
   @override
   void paintData(Canvas canvas, Size size) {
-    if (data.bars.isEmpty) return;
+    if (data.isEmpty) return;
 
-    final barCount = data.bars.length;
-    final slotWidth = chartArea.width / barCount;
-    final barWidth = _computeBarWidth(slotWidth);
+    // Same geometry source as computeLayout() — guarantees painted
+    // bars and hit-testable bounds always match.
+    final specs = computeBarSegmentRects(
+      frame: frame,
+      categories: data.resolvedCategories,
+    );
 
-    for (int i = 0; i < barCount; i++) {
-      final bar = data.bars[i];
-      final centerX = chartArea.left + slotWidth * (i + 0.5);
+    for (final s in specs) {
+      // Deterministic per-segment seed. For ungrouped charts (the
+      // legacy projection where every innerBarIndex is 0) the inner
+      // term contributes nothing, so wobble patterns are bit-identical
+      // to the pre-grouped renderer. For grouped charts each side-by-
+      // side bar gets distinct wobble.
+      final barSeed =
+          seed +
+          barChartSeedOffset +
+          s.categoryIndex * barSegmentSeedMultiplier +
+          s.innerBarIndex * barInnerSeedMultiplier +
+          s.segmentIndex * barSegmentSeedStep;
+      final path = wobblyRect(s.rect, barSeed);
 
-      double cumulativeValue = 0.0;
-      for (int j = 0; j < bar.segments.length; j++) {
-        final segment = bar.segments[j];
-        if (segment.value == 0) continue; // Zero height — nothing to draw.
+      final segment = s.segment;
+      final fillPaint = Paint()
+        ..color = (segment.fillColor ?? segment.color).withValues(
+          alpha: segment.fillAlpha ?? barFillAlpha,
+        )
+        ..style = PaintingStyle.fill;
+      canvas.drawPath(path, fillPaint);
 
-        final segmentBottom = yToCanvas(cumulativeValue);
-        cumulativeValue += segment.value;
-        final segmentTop = yToCanvas(cumulativeValue);
-
-        final rect = Rect.fromLTRB(
-          centerX - barWidth / 2,
-          segmentTop,
-          centerX + barWidth / 2,
-          segmentBottom,
-        );
-
-        final barSeed =
-            seed +
-            barChartSeedOffset +
-            i * barSegmentSeedMultiplier +
-            j * barSegmentSeedStep;
-        final path = wobblyRect(rect, barSeed);
-
-        final fillPaint = Paint()
-          ..color = (segment.fillColor ?? segment.color).withValues(
-            alpha: segment.fillAlpha ?? barFillAlpha,
-          )
-          ..style = PaintingStyle.fill;
-        canvas.drawPath(path, fillPaint);
-
-        final strokePaint = Paint()
-          ..color = segment.color
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = barStrokeWidth
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round;
-        canvas.drawPath(path, strokePaint);
-      }
+      final strokePaint = Paint()
+        ..color = segment.color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = barStrokeWidth
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+      canvas.drawPath(path, strokePaint);
     }
   }
 
@@ -228,7 +211,7 @@ class HandDrawnBarChart extends StatelessWidget {
     this.height = HandDrawnDefaults.chartHeight,
     this.seed = HandDrawnDefaults.seed,
     this.axisColor = chartAxisColor,
-    this.gridColor = chartGridColor,
+    this.grid = GridConfig.standard,
     this.labelStyle,
     this.irregularity = chartIrregularity,
     this.segments = chartSegments,
@@ -237,8 +220,6 @@ class HandDrawnBarChart extends StatelessWidget {
     this.titleStyle,
     this.legendStyle,
     this.axisStrokeWidth = chartAxisStrokeWidth,
-    this.gridStrokeWidth = chartGridStrokeWidth,
-    this.gridJitterRatio = chartGridJitterRatio,
     this.emptyStyle,
     super.key,
   });
@@ -247,7 +228,9 @@ class HandDrawnBarChart extends StatelessWidget {
   final double height;
   final int seed;
   final Color axisColor;
-  final Color gridColor;
+
+  /// Grid configuration bundle. See [GridConfig] for all knobs.
+  final GridConfig grid;
   final TextStyle? labelStyle;
   final double irregularity;
   final int segments;
@@ -256,8 +239,6 @@ class HandDrawnBarChart extends StatelessWidget {
   final TextStyle? titleStyle;
   final TextStyle? legendStyle;
   final double axisStrokeWidth;
-  final double gridStrokeWidth;
-  final double gridJitterRatio;
   final TextStyle? emptyStyle;
 
   @override
@@ -273,7 +254,7 @@ class HandDrawnBarChart extends StatelessWidget {
           data: data!,
           seed: seed,
           axisColor: axisColor,
-          gridColor: gridColor,
+          grid: grid,
           labelStyle: labelStyle,
           irregularity: irregularity,
           segments: segments,
@@ -282,8 +263,6 @@ class HandDrawnBarChart extends StatelessWidget {
           titleStyle: titleStyle,
           legendStyle: legendStyle,
           axisStrokeWidth: axisStrokeWidth,
-          gridStrokeWidth: gridStrokeWidth,
-          gridJitterRatio: gridJitterRatio,
         ),
       ),
     );

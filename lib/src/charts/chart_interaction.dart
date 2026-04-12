@@ -55,10 +55,33 @@ class BarSegmentLayout {
     required this.cumulativeStart,
     required this.cumulativeEnd,
     required this.bounds,
+    this.innerBarIndex = 0,
+    this.innerBarLabel = '',
   });
 
   /// Index of the bar group within the chart.
+  ///
+  /// For grouped-bar charts this is the **outer category index** —
+  /// i.e. which x-axis tick the segment belongs to. Combine with
+  /// [innerBarIndex] to disambiguate side-by-side bars under one tick.
   final int barIndex;
+
+  /// Index of the inner bar within its outer category.
+  ///
+  /// Always `0` for ungrouped charts (the legacy single-bar-per-tick
+  /// shape). For grouped charts this is `0..N-1` where N is the number
+  /// of side-by-side bars under that category's x-axis tick.
+  final int innerBarIndex;
+
+  /// Label of the inner bar within its outer category.
+  ///
+  /// For grouped charts this is the inner `BarGroup.label` (e.g.
+  /// "North" when the outer category is "Q4"). For legacy ungrouped
+  /// charts this equals [barLabel] — the category-level label IS the
+  /// bar label in that shape. Consumers building tooltips, analytics,
+  /// or accessibility labels should read this field when grouped,
+  /// since [barLabel] returns the outer category instead.
+  final String innerBarLabel;
 
   /// Index of this segment within its bar group.
   final int segmentIndex;

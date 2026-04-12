@@ -3,9 +3,9 @@ import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
 
-// ── Shared constants ──────────────────────────────────────────────────────
+import 'test_utils.dart';
 
-const _size = Size(400, 300);
+// ── Shared constants ──────────────────────────────────────────────────────
 
 // ── Test data factories ───────────────────────────────────────────────────
 
@@ -126,22 +126,22 @@ void main() {
 
   group('BarChartLayout', () {
     test('computeLayout returns valid layout with size and chartArea', () {
-      final layout = _barPainter().computeLayout(_size);
+      final layout = _barPainter().computeLayout(kChartTestSize);
 
-      expect(layout.size, _size);
+      expect(layout.size, kChartTestSize);
       expect(layout.chartArea.width, greaterThan(0));
       expect(layout.chartArea.height, greaterThan(0));
     });
 
     test('segment count matches non-zero segments', () {
-      final layout = _barPainter().computeLayout(_size);
+      final layout = _barPainter().computeLayout(kChartTestSize);
 
       // 3 bars × 1 segment each = 3 segments
       expect(layout.segments.length, 3);
     });
 
     test('segment bounds are within chart area', () {
-      final layout = _barPainter().computeLayout(_size);
+      final layout = _barPainter().computeLayout(kChartTestSize);
 
       for (final seg in layout.segments) {
         expect(seg.bounds.left, greaterThanOrEqualTo(layout.chartArea.left));
@@ -152,7 +152,7 @@ void main() {
     });
 
     test('bar X positions use slot-center spacing', () {
-      final layout = _barPainter().computeLayout(_size);
+      final layout = _barPainter().computeLayout(kChartTestSize);
 
       final slotWidth = layout.chartArea.width / 3;
       for (final seg in layout.segments) {
@@ -163,7 +163,9 @@ void main() {
     });
 
     test('stacked bar segments have correct cumulative values', () {
-      final layout = _barPainter(data: _stackedBarData()).computeLayout(_size);
+      final layout = _barPainter(
+        data: _stackedBarData(),
+      ).computeLayout(kChartTestSize);
 
       // Bar A: x=10, y=20 → cumulative [0,10], [10,30]
       final barASegments = layout.segments
@@ -177,7 +179,7 @@ void main() {
     });
 
     test('hitTest returns segment when point is inside bounds', () {
-      final layout = _barPainter().computeLayout(_size);
+      final layout = _barPainter().computeLayout(kChartTestSize);
       final firstSeg = layout.segments.first;
 
       final hit = layout.hitTest(firstSeg.bounds.center);
@@ -187,7 +189,7 @@ void main() {
     });
 
     test('hitTest returns null when point is outside all bars', () {
-      final layout = _barPainter().computeLayout(_size);
+      final layout = _barPainter().computeLayout(kChartTestSize);
 
       // Far outside the chart
       final hit = layout.hitTest(const Offset(-100, -100));
@@ -199,7 +201,7 @@ void main() {
       () {
         final layout = _barPainter(
           data: _stackedBarData(),
-        ).computeLayout(_size);
+        ).computeLayout(kChartTestSize);
 
         // Find the top segment of bar A (category y, painted last)
         final topSeg = layout.segments
@@ -216,9 +218,9 @@ void main() {
 
     test('empty data returns valid layout with empty segments', () {
       const data = BarChartData(bars: [], legend: []);
-      final layout = _barPainter(data: data).computeLayout(_size);
+      final layout = _barPainter(data: data).computeLayout(kChartTestSize);
 
-      expect(layout.size, _size);
+      expect(layout.size, kChartTestSize);
       expect(layout.chartArea.width, greaterThan(0));
       expect(layout.segments, isEmpty);
       expect(layout.hitTest(layout.chartArea.center), isNull);
@@ -238,13 +240,13 @@ void main() {
 
   group('ScatterPlotLayout', () {
     test('computeLayout returns correct number of points', () {
-      final layout = _scatterPainter().computeLayout(_size);
+      final layout = _scatterPainter().computeLayout(kChartTestSize);
 
       expect(layout.points.length, 5);
     });
 
     test('point centers are within chart area', () {
-      final layout = _scatterPainter().computeLayout(_size);
+      final layout = _scatterPainter().computeLayout(kChartTestSize);
 
       for (final pt in layout.points) {
         expect(
@@ -258,7 +260,7 @@ void main() {
     });
 
     test('point positions scale correctly with data values', () {
-      final layout = _scatterPainter().computeLayout(_size);
+      final layout = _scatterPainter().computeLayout(kChartTestSize);
 
       // Point 0: (0, 0) should be at bottom-left of chart area
       final p0 = layout.points[0];
@@ -275,7 +277,7 @@ void main() {
     });
 
     test('hitTest returns nearest point within tolerance', () {
-      final layout = _scatterPainter().computeLayout(_size);
+      final layout = _scatterPainter().computeLayout(kChartTestSize);
       final target = layout.points[2];
 
       // Slightly offset from center, within default tolerance
@@ -285,7 +287,7 @@ void main() {
     });
 
     test('hitTest returns null when outside tolerance', () {
-      final layout = _scatterPainter().computeLayout(_size);
+      final layout = _scatterPainter().computeLayout(kChartTestSize);
 
       // Far from any point
       final hit = layout.hitTest(const Offset(-100, -100));
@@ -303,7 +305,9 @@ void main() {
           maxY: 100,
           points: [ScatterPoint(x: 50, y: 50, size: 2)],
         );
-        final layout = _scatterPainter(data: data).computeLayout(_size);
+        final layout = _scatterPainter(
+          data: data,
+        ).computeLayout(kChartTestSize);
 
         final pt = layout.points[0];
         // 10px away should still hit with default tolerance of 16
@@ -320,14 +324,14 @@ void main() {
         maxY: 100,
         points: [],
       );
-      final layout = _scatterPainter(data: data).computeLayout(_size);
+      final layout = _scatterPainter(data: data).computeLayout(kChartTestSize);
 
       expect(layout.points, isEmpty);
       expect(layout.hitTest(layout.chartArea.center), isNull);
     });
 
     test('rawPoint data is preserved in layout', () {
-      final layout = _scatterPainter().computeLayout(_size);
+      final layout = _scatterPainter().computeLayout(kChartTestSize);
 
       expect(layout.points[2].rawPoint.x, 40.0);
       expect(layout.points[2].rawPoint.y, 80.0);
@@ -338,7 +342,7 @@ void main() {
 
   group('LineChartLayout', () {
     test('computeLayout returns correct point and segment counts', () {
-      final layout = _linePainter().computeLayout(_size);
+      final layout = _linePainter().computeLayout(kChartTestSize);
 
       // 5 points, 4 segments for 1 series
       expect(layout.points.length, 5);
@@ -348,7 +352,7 @@ void main() {
     test('multi-series produces points and segments for all series', () {
       final layout = _linePainter(
         data: _lineData(seriesCount: 3),
-      ).computeLayout(_size);
+      ).computeLayout(kChartTestSize);
 
       // 3 series × 5 points = 15 points
       // 3 series × 4 segments = 12 segments
@@ -357,7 +361,7 @@ void main() {
     });
 
     test('point centers are correctly positioned', () {
-      final layout = _linePainter().computeLayout(_size);
+      final layout = _linePainter().computeLayout(kChartTestSize);
 
       // Point 0: x=0, y=10 → x fraction = 0, y fraction = 0.1
       final p0 = layout.points[0];
@@ -368,7 +372,7 @@ void main() {
     });
 
     test('segment endpoints match consecutive point centers', () {
-      final layout = _linePainter().computeLayout(_size);
+      final layout = _linePainter().computeLayout(kChartTestSize);
 
       for (int i = 0; i < layout.segments.length; i++) {
         final seg = layout.segments[i];
@@ -389,7 +393,7 @@ void main() {
     });
 
     test('hitTest returns point hit when near a data point', () {
-      final layout = _linePainter().computeLayout(_size);
+      final layout = _linePainter().computeLayout(kChartTestSize);
       final target = layout.points[2];
 
       final hit = layout.hitTest(target.center + const Offset(2, 2));
@@ -406,7 +410,7 @@ void main() {
     test(
       'hitTest returns segment hit when near a line but far from points',
       () {
-        final layout = _linePainter().computeLayout(_size);
+        final layout = _linePainter().computeLayout(kChartTestSize);
         final seg = layout.segments[1]; // segment between points 1 and 2
 
         // Midpoint of the segment, offset perpendicular by a small amount
@@ -439,7 +443,7 @@ void main() {
     );
 
     test('hitTest prefers point over segment when both qualify', () {
-      final layout = _linePainter().computeLayout(_size);
+      final layout = _linePainter().computeLayout(kChartTestSize);
       final target = layout.points[2];
 
       // Right at the point center — both point and segment qualify
@@ -449,14 +453,14 @@ void main() {
     });
 
     test('hitTest returns null when far from everything', () {
-      final layout = _linePainter().computeLayout(_size);
+      final layout = _linePainter().computeLayout(kChartTestSize);
       final hit = layout.hitTest(const Offset(-100, -100));
       expect(hit, isNull);
     });
 
     test('hitTest finds nearest point across multiple series', () {
       final data = _lineData(seriesCount: 2, pointCount: 3);
-      final layout = _linePainter(data: data).computeLayout(_size);
+      final layout = _linePainter(data: data).computeLayout(kChartTestSize);
 
       // All points from both series at pointIndex=1 share the same x
       // but may differ in y (they have the same data in this factory).
@@ -485,7 +489,7 @@ void main() {
           ),
         ],
       );
-      final layout = _linePainter(data: data).computeLayout(_size);
+      final layout = _linePainter(data: data).computeLayout(kChartTestSize);
 
       // The midpoint of the segment in canvas space
       final seg = layout.segments[0];
@@ -505,7 +509,7 @@ void main() {
     });
 
     test('sealed result supports exhaustive switch', () {
-      final layout = _linePainter().computeLayout(_size);
+      final layout = _linePainter().computeLayout(kChartTestSize);
       final hit = layout.hitTest(layout.points.first.center);
 
       // This test verifies the sealed hierarchy compiles with exhaustive
@@ -527,7 +531,7 @@ void main() {
         maxY: 1,
         series: [],
       );
-      final layout = _linePainter(data: data).computeLayout(_size);
+      final layout = _linePainter(data: data).computeLayout(kChartTestSize);
 
       expect(layout.points, isEmpty);
       expect(layout.segments, isEmpty);
@@ -549,7 +553,7 @@ void main() {
           ),
         ],
       );
-      final layout = _linePainter(data: data).computeLayout(_size);
+      final layout = _linePainter(data: data).computeLayout(kChartTestSize);
 
       // Only the non-empty series contributes points and segments
       expect(layout.points.length, 2);
@@ -561,7 +565,7 @@ void main() {
     test('seriesName is preserved in point and segment layouts', () {
       final layout = _linePainter(
         data: _lineData(seriesCount: 2),
-      ).computeLayout(_size);
+      ).computeLayout(kChartTestSize);
 
       for (final pt in layout.points) {
         expect(pt.seriesName, 'Series ${pt.seriesIndex}');
@@ -576,40 +580,60 @@ void main() {
 
   group('Layout size-bound invariants', () {
     test('layout includes correct size', () {
-      final barLayout = _barPainter().computeLayout(_size);
-      final lineLayout = _linePainter().computeLayout(_size);
-      final scatterLayout = _scatterPainter().computeLayout(_size);
+      final barLayout = _barPainter().computeLayout(kChartTestSize);
+      final lineLayout = _linePainter().computeLayout(kChartTestSize);
+      final scatterLayout = _scatterPainter().computeLayout(kChartTestSize);
 
-      expect(barLayout.size, _size);
-      expect(lineLayout.size, _size);
-      expect(scatterLayout.size, _size);
+      expect(barLayout.size, kChartTestSize);
+      expect(lineLayout.size, kChartTestSize);
+      expect(scatterLayout.size, kChartTestSize);
     });
 
     test('chart area is within canvas bounds', () {
-      final barLayout = _barPainter().computeLayout(_size);
+      final barLayout = _barPainter().computeLayout(kChartTestSize);
       expect(barLayout.chartArea.left, greaterThanOrEqualTo(0));
       expect(barLayout.chartArea.top, greaterThanOrEqualTo(0));
-      expect(barLayout.chartArea.right, lessThanOrEqualTo(_size.width));
-      expect(barLayout.chartArea.bottom, lessThanOrEqualTo(_size.height));
+      expect(
+        barLayout.chartArea.right,
+        lessThanOrEqualTo(kChartTestSize.width),
+      );
+      expect(
+        barLayout.chartArea.bottom,
+        lessThanOrEqualTo(kChartTestSize.height),
+      );
 
-      final lineLayout = _linePainter().computeLayout(_size);
+      final lineLayout = _linePainter().computeLayout(kChartTestSize);
       expect(lineLayout.chartArea.left, greaterThanOrEqualTo(0));
       expect(lineLayout.chartArea.top, greaterThanOrEqualTo(0));
-      expect(lineLayout.chartArea.right, lessThanOrEqualTo(_size.width));
-      expect(lineLayout.chartArea.bottom, lessThanOrEqualTo(_size.height));
+      expect(
+        lineLayout.chartArea.right,
+        lessThanOrEqualTo(kChartTestSize.width),
+      );
+      expect(
+        lineLayout.chartArea.bottom,
+        lessThanOrEqualTo(kChartTestSize.height),
+      );
 
-      final scatterLayout = _scatterPainter().computeLayout(_size);
+      final scatterLayout = _scatterPainter().computeLayout(kChartTestSize);
       expect(scatterLayout.chartArea.left, greaterThanOrEqualTo(0));
       expect(scatterLayout.chartArea.top, greaterThanOrEqualTo(0));
-      expect(scatterLayout.chartArea.right, lessThanOrEqualTo(_size.width));
-      expect(scatterLayout.chartArea.bottom, lessThanOrEqualTo(_size.height));
+      expect(
+        scatterLayout.chartArea.right,
+        lessThanOrEqualTo(kChartTestSize.width),
+      );
+      expect(
+        scatterLayout.chartArea.bottom,
+        lessThanOrEqualTo(kChartTestSize.height),
+      );
     });
 
     test('title affects chart area position', () {
-      final noTitle = _barPainter(data: _barData()).computeLayout(_size);
+      final noTitle = _barPainter(
+        data: _barData(),
+      ).computeLayout(kChartTestSize);
       final withTitle = _barPainter(
         data: _barData(title: 'My Chart'),
-      ).computeLayout(_size);
+      ).computeLayout(kChartTestSize);
 
       // Title pushes chart area down
       expect(withTitle.chartArea.top, greaterThan(noTitle.chartArea.top));
