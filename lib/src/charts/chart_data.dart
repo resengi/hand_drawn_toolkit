@@ -2,6 +2,14 @@ import 'dart:ui' show Color;
 
 import 'package:flutter/foundation.dart' show listEquals;
 
+import '../hand_drawn_constants.dart'
+    show
+        chartGridColor,
+        chartGridJitterRatio,
+        chartGridStrokeWidth,
+        defaultSampleCount,
+        defaultWobbleAnchorStride;
+
 /// Generic color mapping keyed by category name (e.g., "completed",
 /// "skipped", "primary").
 typedef ChartColorPalette = Map<String, Color>;
@@ -18,6 +26,196 @@ typedef ChartColorPalette = Map<String, Color>;
 /// )
 /// ```
 typedef AxisValueFormatter = String Function(double value);
+
+/// How an axis line should be drawn.
+///
+/// - [edge]: the default. Horizontal axis drawn at the chart bottom;
+///   vertical axis drawn at the chart left.
+/// - [zeroCrossing]: when the axis is numeric and zero is inside the
+///   visible range, draw the axis line at the zero position instead of
+///   the chart edge. Tick labels remain in their outer label bands.
+///   Falls back to [edge] behavior when zero is outside the visible
+///   range.
+enum AxisDisplayMode { edge, zeroCrossing }
+
+/// Per-axis display configuration for numeric charts.
+///
+/// Both axes default to [AxisDisplayMode.edge] — the existing behavior.
+/// Opt into zero-crossing axes explicitly:
+///
+/// ```dart
+/// LineChartData(
+///   axisDisplay: const AxisDisplay(
+///     horizontal: AxisDisplayMode.zeroCrossing,
+///     vertical: AxisDisplayMode.zeroCrossing,
+///   ),
+///   // ...
+/// )
+/// ```
+///
+/// **Fall-back rules.** Zero-crossing only takes effect when zero is
+/// strictly inside the relevant range; otherwise the axis silently
+/// reverts to its chart edge:
+///
+/// - [horizontal] zero-crossing requires `minY < 0 < maxY`.
+/// - [vertical] zero-crossing requires a numeric X scale (i.e. the
+///   chart actually has `minX`/`maxX` configured) AND `minX < 0 < maxX`.
+///   On categorical-X charts the vertical axis stays at the chart's
+///   left edge regardless of this setting.
+///
+/// Tick labels are unaffected — they always render in the bottom band
+/// (X) and left gutter (Y) regardless of axis mode.
+class AxisDisplay {
+  const AxisDisplay({
+    this.horizontal = AxisDisplayMode.edge,
+    this.vertical = AxisDisplayMode.edge,
+  });
+
+  /// Display mode for the horizontal (X) axis line.
+  final AxisDisplayMode horizontal;
+
+  /// Display mode for the vertical (Y) axis line.
+  final AxisDisplayMode vertical;
+
+  static const AxisDisplay edge = AxisDisplay();
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AxisDisplay &&
+          horizontal == other.horizontal &&
+          vertical == other.vertical;
+
+  @override
+  int get hashCode => Object.hash(horizontal, vertical);
+}
+
+/// Visual configuration for a chart's background grid.
+///
+/// Bundles styling, visibility, and density controls into a single
+/// immutable value. Replaces the older flat `gridColor` /
+/// `gridStrokeWidth` / `gridJitterRatio` painter fields — they are now
+/// accessed as `grid.color`, `grid.strokeWidth`, etc.
+///
+/// The defaults ([GridConfig.standard]) render both axes' grid lines
+/// at each tick position with no sub-divisions. To hide a grid,
+/// combine with one of the named presets:
+///
+/// ```dart
+/// HandDrawnLineChart(
+///   data: data,
+///   grid: GridConfig.horizontalOnly,  // no vertical lines
+/// )
+/// ```
+///
+/// Sub-grid lines ([horizontalSubGridLinesBetweenTicks] and
+/// [verticalSubGridLinesBetweenTicks]) insert N additional lines
+/// between each pair of tick-aligned grid lines. Those lines render
+/// at [subGridAlphaMultiplier] of the main grid color's alpha, giving
+/// a graph-paper-style two-tier grid without visual noise. A value of
+/// `0` (the default) disables the feature.
+///
+/// Vertical grid lines only render for charts with a numeric X axis
+/// (line and scatter plots with `minX`/`maxX` set). Bar charts and
+/// categorical-X line charts ignore [showVertical].
+class GridConfig {
+  const GridConfig({
+    this.color = chartGridColor,
+    this.strokeWidth = chartGridStrokeWidth,
+    this.jitterRatio = chartGridJitterRatio,
+    this.showHorizontal = true,
+    this.showVertical = true,
+    this.horizontalSubGridLinesBetweenTicks = 0,
+    this.verticalSubGridLinesBetweenTicks = 0,
+    this.subGridAlphaMultiplier = 0.6,
+  }) : assert(
+         horizontalSubGridLinesBetweenTicks >= 0,
+         'horizontalSubGridLinesBetweenTicks must be non-negative',
+       ),
+       assert(
+         verticalSubGridLinesBetweenTicks >= 0,
+         'verticalSubGridLinesBetweenTicks must be non-negative',
+       ),
+       assert(
+         subGridAlphaMultiplier >= 0 && subGridAlphaMultiplier <= 1,
+         'subGridAlphaMultiplier must be in [0, 1]',
+       );
+
+  /// Grid line color. Applied to both horizontal and vertical grids.
+  final Color color;
+
+  /// Stroke width of grid lines in logical pixels.
+  final double strokeWidth;
+
+  /// Irregularity multiplier applied to the grid-line wobble. Lower
+  /// values produce straighter grid lines (keeping them visually
+  /// distinct from data).
+  final double jitterRatio;
+
+  /// Whether to draw horizontal (Y-division) grid lines.
+  final bool showHorizontal;
+
+  /// Whether to draw vertical (X-division) grid lines. Only applies
+  /// to charts with a numeric X axis; categorical-X charts ignore it.
+  final bool showVertical;
+
+  /// Extra horizontal grid lines to insert between each pair of
+  /// tick-aligned horizontal grid lines. `0` disables sub-grids.
+  final int horizontalSubGridLinesBetweenTicks;
+
+  /// Extra vertical grid lines to insert between each pair of
+  /// tick-aligned vertical grid lines. `0` disables sub-grids.
+  final int verticalSubGridLinesBetweenTicks;
+
+  /// Alpha multiplier applied to [color] when drawing sub-grid lines.
+  /// `1.0` makes sub-grid lines visually identical to main grid lines;
+  /// lower values produce the familiar graph-paper two-tier look.
+  final double subGridAlphaMultiplier;
+
+  /// Default configuration — both grids shown at every tick with no
+  /// sub-divisions. Matches the pre-GridConfig behavior exactly.
+  static const GridConfig standard = GridConfig();
+
+  /// No grid lines at all.
+  static const GridConfig none = GridConfig(
+    showHorizontal: false,
+    showVertical: false,
+  );
+
+  /// Horizontal grid only (no vertical lines even on numeric-X charts).
+  static const GridConfig horizontalOnly = GridConfig(showVertical: false);
+
+  /// Vertical grid only (useful for categorical-Y charts, though most
+  /// charts in this package have numeric Y).
+  static const GridConfig verticalOnly = GridConfig(showHorizontal: false);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GridConfig &&
+          color == other.color &&
+          strokeWidth == other.strokeWidth &&
+          jitterRatio == other.jitterRatio &&
+          showHorizontal == other.showHorizontal &&
+          showVertical == other.showVertical &&
+          horizontalSubGridLinesBetweenTicks ==
+              other.horizontalSubGridLinesBetweenTicks &&
+          verticalSubGridLinesBetweenTicks ==
+              other.verticalSubGridLinesBetweenTicks &&
+          subGridAlphaMultiplier == other.subGridAlphaMultiplier;
+
+  @override
+  int get hashCode => Object.hash(
+    color,
+    strokeWidth,
+    jitterRatio,
+    showHorizontal,
+    showVertical,
+    horizontalSubGridLinesBetweenTicks,
+    verticalSubGridLinesBetweenTicks,
+    subGridAlphaMultiplier,
+  );
+}
 
 /// A single entry in a chart legend.
 class LegendEntry {
@@ -115,11 +313,63 @@ class BarGroup {
   int get hashCode => Object.hash(label, Object.hashAll(segments));
 }
 
-/// Complete data for rendering a bar chart (stacked or single).
+/// A single x-axis category that may contain one or more side-by-side
+/// bars (grouped bars). Each inner [BarGroup] can still contain stacked
+/// [BarSegment]s — grouping and stacking compose cleanly.
 ///
-/// By default, bars scale from 0 to the tallest bar total. Pass [minY]
-/// and/or [maxY] to override the Y-axis range — for example, to add
-/// headroom above bars for value labels.
+/// For backward compatibility, a `BarChartData.bars` entry that is a
+/// plain [BarGroup] is treated internally as a single-bar category whose
+/// [label] matches the group's label. You only need [BarCategory]
+/// directly when you want more than one bar per x-axis tick.
+class BarCategory {
+  // The `bars` list should be non-empty in practice (an empty category
+  // renders nothing). We can't assert this in the constructor because
+  // const-constructor assertions cannot evaluate `.length` or
+  // `.isNotEmpty` on a parameter of type `List<T>` — the const
+  // evaluator only sees the declared type, not the runtime const-ness
+  // of the passed value. Keeping the constructor `const` matters more
+  // here than the runtime check, since it lets `BarChartData` itself
+  // remain const-constructible when grouped bars are used.
+  const BarCategory({required this.label, required this.bars});
+
+  /// X-axis label for this category (e.g. "Mon", "Q1").
+  final String label;
+
+  /// One or more bars to render side-by-side within this category slot.
+  /// Each bar may contain stacked segments.
+  final List<BarGroup> bars;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BarCategory &&
+          label == other.label &&
+          listEquals(bars, other.bars);
+
+  @override
+  int get hashCode => Object.hash(label, Object.hashAll(bars));
+}
+
+/// Complete data for rendering a bar chart (stacked, grouped, or both).
+///
+/// Two input shapes are supported:
+///
+/// - **Legacy / ungrouped**: pass [bars]. Each [BarGroup] occupies one
+///   x-axis tick and may contain stacked segments. This is the original
+///   API and continues to behave identically.
+/// - **Grouped**: pass [categories]. Each [BarCategory] occupies one
+///   x-axis tick and contains one or more side-by-side bars (each of
+///   which may still be stacked). When [categories] is non-empty it
+///   takes precedence over [bars].
+///
+/// By default, the Y-axis scales from 0 to the **tallest inner bar**
+/// across all categories — so grouped bars sized by the maximum sibling,
+/// not the sum. Pass [minY] and/or [maxY] to override the Y-axis range
+/// (for example, to add headroom above bars for value labels).
+///
+/// Legend semantics are explicit: provide [legend] entries that match
+/// how you intend colors to be interpreted. The chart does not infer
+/// legend identity from grouped structure.
 class BarChartData {
   const BarChartData({
     required this.bars,
@@ -130,12 +380,37 @@ class BarChartData {
     this.minY,
     this.maxY,
     this.yValueFormatter,
+    this.categories = const [],
   });
 
   /// Optional chart title rendered above the chart area.
   final String? title;
 
   final List<BarGroup> bars;
+
+  /// Optional grouped-bar layout. When non-empty, this takes precedence
+  /// over [bars]: each [BarCategory] occupies one x-axis slot and
+  /// contains one or more side-by-side bars (each of which may still be
+  /// stacked). When empty, the chart renders from [bars] as before.
+  ///
+  /// To keep a single API surface, [resolvedCategories] always returns
+  /// the effective category list — either [categories], or a
+  /// one-bar-per-category projection of [bars].
+  final List<BarCategory> categories;
+
+  /// Effective category list used by the renderer. Returns [categories]
+  /// when non-empty; otherwise projects each [BarGroup] in [bars] into a
+  /// single-bar category that preserves the current data shape.
+  List<BarCategory> get resolvedCategories {
+    if (categories.isNotEmpty) return categories;
+    return [
+      for (final b in bars) BarCategory(label: b.label, bars: [b]),
+    ];
+  }
+
+  /// Whether any category in this chart contains more than one bar.
+  bool get hasGroupedBars => categories.any((c) => c.bars.length > 1);
+
   final List<LegendEntry> legend;
 
   /// Optional Y-axis title rendered rotated along the left edge.
@@ -147,14 +422,16 @@ class BarChartData {
   /// Optional Y-axis minimum. Defaults to `0` when null.
   final double? minY;
 
-  /// Optional Y-axis maximum. Defaults to the tallest bar total when null.
+  /// Optional Y-axis maximum. When null, defaults to the tallest inner
+  /// bar's total across all categories (see class-level documentation
+  /// for the full max-not-sum scaling rule).
   final double? maxY;
 
   /// Optional formatter for Y-axis tick labels. When null, the default
   /// neutral numeric formatter is used.
   final AxisValueFormatter? yValueFormatter;
 
-  bool get isEmpty => bars.isEmpty;
+  bool get isEmpty => bars.isEmpty && categories.isEmpty;
 
   @override
   bool operator ==(Object other) =>
@@ -167,7 +444,8 @@ class BarChartData {
           xAxisLabel == other.xAxisLabel &&
           minY == other.minY &&
           maxY == other.maxY &&
-          yValueFormatter == other.yValueFormatter;
+          yValueFormatter == other.yValueFormatter &&
+          listEquals(categories, other.categories);
 
   @override
   int get hashCode => Object.hash(
@@ -179,6 +457,7 @@ class BarChartData {
     minY,
     maxY,
     yValueFormatter,
+    Object.hashAll(categories),
   );
 }
 
@@ -216,6 +495,7 @@ class LineSeriesData {
     required this.name,
     required this.points,
     required this.color,
+    this.showFill = true,
   });
 
   /// Display name for this series. Used for auto-generated legend entries
@@ -225,16 +505,129 @@ class LineSeriesData {
   final List<LinePoint> points;
   final Color color;
 
+  /// Whether to draw the semi-transparent fill below this series' line.
+  /// Defaults to `true` (the existing behavior). Set `false` for an
+  /// unfilled stroke-only series.
+  final bool showFill;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is LineSeriesData &&
           name == other.name &&
           listEquals(points, other.points) &&
-          color == other.color;
+          color == other.color &&
+          showFill == other.showFill;
 
   @override
-  int get hashCode => Object.hash(name, Object.hashAll(points), color);
+  int get hashCode =>
+      Object.hash(name, Object.hashAll(points), color, showFill);
+}
+
+/// A mathematical function used with [FunctionSeriesData] to plot a curve.
+///
+/// Receives an x-value from the chart's numeric x-domain and returns the
+/// corresponding y-value. Non-finite outputs (NaN, +∞, −∞) are treated as
+/// discontinuities and will split the rendered curve into separate runs.
+typedef ChartFunction = double Function(double x);
+
+/// A function-backed line series.
+///
+/// Unlike [LineSeriesData], which carries an explicit list of visible
+/// points, a function series plots a continuous curve across the chart's
+/// numeric x-domain. The chart internally samples [function] to build a
+/// smooth curve while only rendering dots for the x-values listed in
+/// [displayXs].
+///
+/// A function series can only be used when the enclosing [LineChartData]
+/// is in numeric x-mode (i.e. has no categorical [LineChartData.xLabels]).
+///
+/// ### Equality caveat
+///
+/// [FunctionSeriesData] holds a Dart closure in [function]. In Dart,
+/// closures compare equal by **identity**, not by semantic equivalence —
+/// two inline `(x) => x * x` closures in otherwise-identical data objects
+/// will compare unequal. When stable equality matters (e.g. to avoid
+/// unnecessary repaints), prefer top-level or `static` function references
+/// over inline closures.
+class FunctionSeriesData {
+  const FunctionSeriesData({
+    required this.name,
+    required this.color,
+    required this.function,
+    this.displayXs = const [],
+    this.sampleCount = defaultSampleCount,
+    this.showFill = true,
+    this.wobbleAnchorStride = defaultWobbleAnchorStride,
+  }) : assert(sampleCount >= 2, 'sampleCount must be at least 2'),
+       assert(wobbleAnchorStride >= 1, 'wobbleAnchorStride must be >= 1');
+
+  /// Display name for this series. Used for auto-generated legend entries
+  /// in multi-series charts.
+  final String name;
+
+  /// Stroke and dot color for this series.
+  final Color color;
+
+  /// The function to plot. Called with x-values in `[minX, maxX]`.
+  /// Non-finite returns are treated as discontinuities.
+  final ChartFunction function;
+
+  /// Sparse x-values whose corresponding points should be rendered as
+  /// visible dots and participate in point hit testing.
+  ///
+  /// - Empty is allowed → draws curve only, no visible dots, no point hits.
+  /// - Out-of-range values are ignored.
+  /// - Values whose evaluated y is non-finite are skipped.
+  /// - Duplicates are preserved.
+  /// - Original order is preserved and drives `pointIndex` in hit-test output.
+  final List<double> displayXs;
+
+  /// Target number of uniform samples across `[minX, maxX]`. Must be ≥ 2.
+  ///
+  /// The **actual** number of rendered path vertices may be lower because
+  /// non-finite evaluations are skipped and the curve may be split into
+  /// multiple runs at discontinuities.
+  final int sampleCount;
+
+  /// Whether to draw the semi-transparent fill below this series' curve.
+  /// Defaults to `true` (the existing behavior). Set `false` for an
+  /// unfilled stroke-only function series.
+  final bool showFill;
+
+  /// Stride (in samples) between pinned wobble anchors along the curve.
+  /// Every Nth sample is rendered at its true `f(x)` position; samples
+  /// in between get a smoothed jitter offset, producing the hand-drawn
+  /// look without losing the curve's shape.
+  ///
+  /// A smaller stride means more pinned points and tighter, more
+  /// constrained wobble. A larger stride gives wobble more room to
+  /// develop but creates visible facets at each anchor. Must be `>= 1`.
+  /// Default is `10`, calibrated for the default `sampleCount: 120`.
+  final int wobbleAnchorStride;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FunctionSeriesData &&
+          name == other.name &&
+          color == other.color &&
+          function == other.function &&
+          listEquals(displayXs, other.displayXs) &&
+          sampleCount == other.sampleCount &&
+          showFill == other.showFill &&
+          wobbleAnchorStride == other.wobbleAnchorStride;
+
+  @override
+  int get hashCode => Object.hash(
+    name,
+    color,
+    function,
+    Object.hashAll(displayXs),
+    sampleCount,
+    showFill,
+    wobbleAnchorStride,
+  );
 }
 
 /// Complete data for rendering a line chart (single or multi-series).
@@ -258,7 +651,25 @@ class LineChartData {
     this.xAxisLabel,
     this.yValueFormatter,
     this.xValueFormatter,
+    this.axisDisplay = AxisDisplay.edge,
+    this.functionSeries = const [],
   });
+
+  /// Function-backed series. Each entry plots a mathematical function
+  /// across the numeric x-domain.
+  ///
+  /// **Validation contract.** When `functionSeries` is non-empty, the
+  /// chart requires numeric x-mode (no categorical [xLabels]) and a
+  /// valid range (`minX < maxX`). These rules are enforced by the
+  /// resolver at first layout/paint — not as constructor assertions —
+  /// so that [LineChartData] can stay `const`-constructible and
+  /// accept non-canonical empty lists from callers.
+  final List<FunctionSeriesData> functionSeries;
+
+  /// Axis display configuration. Defaults to edge-aligned axes (current
+  /// behavior). Set to enable zero-crossing axes for charts with mixed
+  /// positive/negative values.
+  final AxisDisplay axisDisplay;
 
   /// Optional chart title rendered above the chart area.
   final String? title;
@@ -309,7 +720,8 @@ class LineChartData {
   /// Optional formatter for X-axis tick labels (numeric mode only).
   final AxisValueFormatter? xValueFormatter;
 
-  bool get isEmpty => series.every((s) => s.points.isEmpty);
+  bool get isEmpty =>
+      series.every((s) => s.points.isEmpty) && functionSeries.isEmpty;
 
   @override
   bool operator ==(Object other) =>
@@ -325,7 +737,9 @@ class LineChartData {
           minY == other.minY &&
           maxY == other.maxY &&
           yValueFormatter == other.yValueFormatter &&
-          xValueFormatter == other.xValueFormatter;
+          xValueFormatter == other.xValueFormatter &&
+          axisDisplay == other.axisDisplay &&
+          listEquals(functionSeries, other.functionSeries);
 
   @override
   int get hashCode => Object.hash(
@@ -340,6 +754,8 @@ class LineChartData {
     maxY,
     yValueFormatter,
     xValueFormatter,
+    axisDisplay,
+    Object.hashAll(functionSeries),
   );
 }
 
@@ -385,7 +801,13 @@ class ScatterPlotData {
     this.title,
     this.yValueFormatter,
     this.xValueFormatter,
+    this.axisDisplay = AxisDisplay.edge,
   });
+
+  /// Axis display configuration. Defaults to edge-aligned axes (current
+  /// behavior). Set to enable zero-crossing axes for plots with mixed
+  /// positive/negative values.
+  final AxisDisplay axisDisplay;
 
   /// Optional chart title rendered above the chart area.
   final String? title;
@@ -424,7 +846,8 @@ class ScatterPlotData {
           minY == other.minY &&
           maxY == other.maxY &&
           yValueFormatter == other.yValueFormatter &&
-          xValueFormatter == other.xValueFormatter;
+          xValueFormatter == other.xValueFormatter &&
+          axisDisplay == other.axisDisplay;
 
   @override
   int get hashCode => Object.hash(
@@ -438,5 +861,6 @@ class ScatterPlotData {
     maxY,
     yValueFormatter,
     xValueFormatter,
+    axisDisplay,
   );
 }

@@ -88,7 +88,7 @@ const Color defaultNotebookLineColor = Color(0xFFE0E0E0);
 // ── Chart colors ───────────────────────────────────────────────────────────
 
 const Color chartAxisColor = Color(0xFF555555);
-const Color chartGridColor = Color(0xFFDDDDDD);
+const Color chartGridColor = Color(0xFFC4C4C4);
 const Color chartLabelColor = Color(0xFF777777);
 const Color scatterDotColor = Color(0xFF6B9BD2);
 
@@ -153,7 +153,7 @@ const double chartLegendBottomOffset = 2.0;
 // ── Chart rendering parameters ─────────────────────────────────────────────
 
 const double chartAxisStrokeWidth = 1.5;
-const double chartGridStrokeWidth = 0.5;
+const double chartGridStrokeWidth = 1.0;
 const double chartGridJitterRatio = 0.3;
 
 // ── Wobble shape defaults ──────────────────────────────────────────────────
@@ -165,13 +165,53 @@ const int wobblyCirclePoints = 12;
 
 const int chartAxisSeedOffset = 100;
 const int chartGridSeedOffset = 200;
+
+/// Seed offset for vertical grid lines (numeric-X charts only). Kept
+/// in its own range so vertical and horizontal grid wobble patterns
+/// are independent — prevents the grid from looking like it has a
+/// diagonal bias from correlated randomness.
+const int chartVerticalGridSeedOffset = 300;
+
+/// Seed offsets for sub-grid lines. Each line gets a unique seed via
+/// `base + i * subCount + k` indexing — the bucket needs enough room
+/// for `yDivisions * horizontalSubGridLinesBetweenTicks` horizontal
+/// sub-lines (similarly for vertical). The chosen offsets leave ~600
+/// and ~400 seed slots respectively before colliding with the next
+/// bucket (`barChartSeedOffset = 3000`), which is generous relative
+/// to any realistic grid density.
+const int chartSubGridSeedOffset = 400;
+const int chartVerticalSubGridSeedOffset = 1000;
 const int barChartSeedOffset = 3000;
 const int barSegmentSeedMultiplier = 100;
 const int barSegmentSeedStep = 10;
+
+/// Seed offset added per inner bar within a grouped-bar category. When
+/// the chart has no grouping (a single inner bar per category), the
+/// `innerBarIndex` is always 0 → contributes 0 to the seed → wobble
+/// patterns for stacked-only charts remain bit-identical to pre-grouped
+/// rendering.
+///
+/// **Practical limit:** the seed scheme uses
+/// `categoryIndex*100 + innerBarIndex*1 + segmentIndex*10`. Because
+/// `barInnerSeedMultiplier` (1) divides into `barSegmentSeedStep` (10),
+/// distinct `(innerBarIndex, segmentIndex)` pairs collide once
+/// `innerBarIndex >= 10` (e.g. innerBarIndex=10, segmentIndex=0 collides
+/// with innerBarIndex=0, segmentIndex=1). The pre-existing scheme already
+/// implies a "≤9 segments per bar" limit from the same multiplier choice,
+/// so this just extends the same constraint to "≤9 inner bars per
+/// category" — well above any realistic grouped-bar UX. If you ever need
+/// more, rework the multipliers as a coherent set rather than tweaking
+/// just this one (which would silently change wobble for existing charts).
+const int barInnerSeedMultiplier = 1;
 const int lineChartSeedOffset = 4000;
 const int lineDotSeedOffset = 5000;
 const int lineSeriesSeedMultiplier = 1000;
 const int linePointSeedStep = 10;
+
+/// Per-run seed offset used by the function-series stroke so that
+/// distinct runs of the same logical series (e.g. either side of a 1/x
+/// discontinuity) get independent wobble phases.
+const int lineRunSeedMultiplier = 100;
 const int scatterSeedOffset = 6000;
 const int scatterPointSeedStep = 10;
 
@@ -191,6 +231,9 @@ const double lineDotRadius = 3.0;
 const int lineSegmentCount = 6;
 const int lineDotCirclePoints = 8;
 const double lineDotJitterRatio = 0.5;
+const int defaultSampleCount = 120;
+const int defaultWobbleAnchorStride = 10;
+const double percentageIrregularityCap = 0.05;
 
 // ── Scatter plot rendering ─────────────────────────────────────────────────
 

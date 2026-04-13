@@ -37,7 +37,7 @@ abstract class HandDrawnChartPainter extends CustomPainter {
     this.irregularity = chartIrregularity,
     this.segments = chartSegments,
     this.axisColor = chartAxisColor,
-    this.gridColor = chartGridColor,
+    this.grid = GridConfig.standard,
     this.labelStyle = chartDefaultLabelStyle,
     this.padding = chartDefaultPadding,
     this.xLabels = const [],
@@ -57,8 +57,8 @@ abstract class HandDrawnChartPainter extends CustomPainter {
     this.titleStyle,
     this.legendStyle,
     this.axisStrokeWidth = chartAxisStrokeWidth,
-    this.gridStrokeWidth = chartGridStrokeWidth,
-    this.gridJitterRatio = chartGridJitterRatio,
+    this.axisDisplay = AxisDisplay.edge,
+    this.clipToChartArea = false,
   }) {
     if (yDivisions <= 0) {
       throw ArgumentError.value(yDivisions, 'yDivisions', 'must be positive');
@@ -77,7 +77,15 @@ abstract class HandDrawnChartPainter extends CustomPainter {
   final double irregularity;
   final int segments;
   final Color axisColor;
-  final Color gridColor;
+
+  /// When `true`, subclass data rendering (the `paintData` call) is
+  /// clipped to the plot area so values outside the declared axis
+  /// bounds can't paint across axes, labels, title, or legend. Defaults
+  /// to `false` to preserve existing behavior across all chart types.
+  final bool clipToChartArea;
+
+  /// Grid configuration bundle. See [GridConfig] for all knobs.
+  final GridConfig grid;
   final TextStyle labelStyle;
 
   /// Outer padding around the chart layout bands.
@@ -116,11 +124,21 @@ abstract class HandDrawnChartPainter extends CustomPainter {
   final TextStyle? legendStyle;
 
   final double axisStrokeWidth;
-  final double gridStrokeWidth;
-  final double gridJitterRatio;
+
+  /// Per-axis display configuration. Defaults to edge-aligned axes
+  /// (the existing behavior). When set to zero-crossing, axis lines
+  /// are drawn at the zero position instead of the chart edge — but
+  /// only for numeric charts (line, scatter). Bar charts ignore this.
+  final AxisDisplay axisDisplay;
 
   /// Internal frame layout, set during [paint] via [buildFrame].
   late ChartFrameLayout _frame;
+
+  /// The internal frame layout, valid after [paint] has been called.
+  /// Subclass painters may need it to call into shared geometry helpers
+  /// (e.g. `bar_geometry.dart`) that work in canvas coordinates.
+  @protected
+  ChartFrameLayout get frame => _frame;
 
   /// The main plotting region. Read-only; computed during [paint].
   ///
@@ -164,7 +182,14 @@ abstract class HandDrawnChartPainter extends CustomPainter {
     if (yAxisLabel != null) _paintYAxisLabel(canvas, padded);
     _paintXTicksOrLabels(canvas);
     if (xAxisLabel != null) _paintXAxisTitle(canvas);
-    paintData(canvas, size);
+    if (clipToChartArea) {
+      canvas.save();
+      canvas.clipRect(_frame.chartArea);
+      paintData(canvas, size);
+      canvas.restore();
+    } else {
+      paintData(canvas, size);
+    }
     if (legend.isNotEmpty) _paintLegend(canvas, size);
   }
 
@@ -177,7 +202,7 @@ abstract class HandDrawnChartPainter extends CustomPainter {
         oldDelegate.irregularity != irregularity ||
         oldDelegate.segments != segments ||
         oldDelegate.axisColor != axisColor ||
-        oldDelegate.gridColor != gridColor ||
+        oldDelegate.grid != grid ||
         oldDelegate.labelStyle != labelStyle ||
         oldDelegate.padding != padding ||
         oldDelegate.yMin != yMin ||
@@ -187,6 +212,7 @@ abstract class HandDrawnChartPainter extends CustomPainter {
         oldDelegate.xMax != xMax ||
         oldDelegate.xDivisions != xDivisions ||
         oldDelegate.title != title ||
+        oldDelegate.clipToChartArea != clipToChartArea ||
         oldDelegate.yAxisLabel != yAxisLabel ||
         oldDelegate.xAxisLabel != xAxisLabel ||
         oldDelegate.yValueFormatter != yValueFormatter ||
@@ -194,8 +220,7 @@ abstract class HandDrawnChartPainter extends CustomPainter {
         oldDelegate.titleStyle != titleStyle ||
         oldDelegate.legendStyle != legendStyle ||
         oldDelegate.axisStrokeWidth != axisStrokeWidth ||
-        oldDelegate.gridStrokeWidth != gridStrokeWidth ||
-        oldDelegate.gridJitterRatio != gridJitterRatio ||
+        oldDelegate.axisDisplay != axisDisplay ||
         !listEquals(oldDelegate.xLabels, xLabels) ||
         !listEquals(oldDelegate.legend, legend);
   }
@@ -297,6 +322,44 @@ abstract class HandDrawnChartPainter extends CustomPainter {
     return path;
   }
 
+  /// Builds a wobbly stroke through a pre-sampled polyline, pinning only
+  /// the first and last vertices and applying smoothed jitter to every
+  /// interior sample.
+  ///
+  /// Intended for the function-series anchor-stride renderer: the caller
+  /// hands in a sub-polyline (e.g. samples `[i .. i+stride]` from a
+  /// `pathRun`) and the result is one wobbled "anchor segment" that
+  /// passes through the true sampled values at both ends and wobbles in
+  /// between. Multiple consecutive calls share their endpoint anchors
+  /// (the previous segment's last point is the next segment's first),
+  /// which gives the line continuity at anchors and independent wobble
+  /// phase between them.
+  ///
+  /// Wobble amplitude is automatically capped based off of the straight-
+  /// line distance between the first and last point, so short anchor
+  /// segments don't get overwhelmed by jitter that was tuned for
+  /// longer strokes.
+  Path wobblePolyline(List<Offset> sub, int polySeed, {double? jitter}) {
+    assert(sub.length >= 2, 'wobbleAlongPolyline requires at least 2 points');
+
+    final segs = sub.length - 1;
+    final anchorSpan = (sub.last - sub.first).distance;
+    final irrCap = anchorSpan * percentageIrregularityCap;
+    final effectiveIrr = math.min(jitter ?? irregularity, irrCap);
+
+    final offsets = _smoothedOffsets2D(polySeed, segs, effectiveIrr);
+
+    final path = Path()..moveTo(sub.first.dx, sub.first.dy);
+    for (int i = 1; i <= segs; i++) {
+      if (i == segs) {
+        path.lineTo(sub.last.dx, sub.last.dy);
+      } else {
+        path.lineTo(sub[i].dx + offsets.x[i], sub[i].dy + offsets.y[i]);
+      }
+    }
+    return path;
+  }
+
   /// Builds a wobbly rectangle as one continuous closed path.
   Path wobblyRect(
     Rect rect,
@@ -385,18 +448,29 @@ abstract class HandDrawnChartPainter extends CustomPainter {
       ..strokeWidth = axisStrokeWidth
       ..style = PaintingStyle.stroke;
 
+    // Resolved positions: fall back to edges unless the caller opted
+    // into zero-crossing AND zero is actually visible on that axis.
+    final horizontalY = _frame.resolvedHorizontalAxisY(
+      zeroCrossing: axisDisplay.horizontal == AxisDisplayMode.zeroCrossing,
+    );
+    final verticalX = _frame.resolvedVerticalAxisX(
+      zeroCrossing: axisDisplay.vertical == AxisDisplayMode.zeroCrossing,
+    );
+
+    // Horizontal (X) axis — spans full chart width at the resolved Y.
     canvas.drawPath(
       wobblyLine(
-        chartArea.bottomLeft,
-        chartArea.bottomRight,
+        Offset(chartArea.left, horizontalY),
+        Offset(chartArea.right, horizontalY),
         seed + chartAxisSeedOffset,
       ),
       axisPaint,
     );
+    // Vertical (Y) axis — spans full chart height at the resolved X.
     canvas.drawPath(
       wobblyLine(
-        chartArea.bottomLeft,
-        chartArea.topLeft,
+        Offset(verticalX, chartArea.bottom),
+        Offset(verticalX, chartArea.top),
         seed + chartAxisSeedOffset + 1,
       ),
       axisPaint,
@@ -407,22 +481,105 @@ abstract class HandDrawnChartPainter extends CustomPainter {
 
   void _paintGridLines(Canvas canvas) {
     final gridPaint = Paint()
-      ..color = gridColor
-      ..strokeWidth = gridStrokeWidth
+      ..color = grid.color
+      ..strokeWidth = grid.strokeWidth
       ..style = PaintingStyle.stroke;
 
-    for (int i = 1; i <= yDivisions; i++) {
-      final fraction = i / yDivisions;
-      final y = chartArea.bottom - chartArea.height * fraction;
-      canvas.drawPath(
-        wobblyLine(
-          Offset(chartArea.left, y),
-          Offset(chartArea.right, y),
-          seed + chartGridSeedOffset + i,
-          jitter: irregularity * gridJitterRatio,
-        ),
-        gridPaint,
-      );
+    // Sub-grid lines use the same color with alpha scaled by the
+    // config's multiplier — giving the familiar graph-paper two-tier
+    // look without introducing a second style knob.
+    final subGridPaint = Paint()
+      ..color = grid.color.withValues(
+        alpha: grid.color.a * grid.subGridAlphaMultiplier,
+      )
+      ..strokeWidth = grid.strokeWidth
+      ..style = PaintingStyle.stroke;
+
+    // Horizontal grid lines — one per Y division. Loop runs from 0
+    // (bottom edge) through yDivisions (top edge) so every chart has a
+    // complete grid. In edge mode, the bottom-edge grid line at i=0
+    // sits directly under the X-axis line, which is drawn afterward
+    // and fully obscures it — preserving the original edge-mode
+    // appearance bit-for-bit. In zero-crossing mode, the bottom-edge
+    // grid line is the only thing marking that boundary.
+    if (grid.showHorizontal) {
+      for (int i = 0; i <= yDivisions; i++) {
+        final fraction = i / yDivisions;
+        final y = chartArea.bottom - chartArea.height * fraction;
+        canvas.drawPath(
+          wobblyLine(
+            Offset(chartArea.left, y),
+            Offset(chartArea.right, y),
+            seed + chartGridSeedOffset + i,
+            jitter: irregularity * grid.jitterRatio,
+          ),
+          gridPaint,
+        );
+      }
+
+      // Sub-grid horizontal lines — N extra lines evenly spaced
+      // between each pair of adjacent main grid lines.
+      final subCount = grid.horizontalSubGridLinesBetweenTicks;
+      if (subCount > 0) {
+        for (int i = 0; i < yDivisions; i++) {
+          for (int k = 0; k < subCount; k++) {
+            final fraction = (i + (k + 1) / (subCount + 1)) / yDivisions;
+            final y = chartArea.bottom - chartArea.height * fraction;
+            canvas.drawPath(
+              wobblyLine(
+                Offset(chartArea.left, y),
+                Offset(chartArea.right, y),
+                seed + chartSubGridSeedOffset + i * subCount + k,
+                jitter: irregularity * grid.jitterRatio,
+              ),
+              subGridPaint,
+            );
+          }
+        }
+      }
+    }
+
+    // Vertical grid lines — only for numeric-X charts (line, scatter).
+    // Bar charts use categorical X with no "divisions" concept, so no
+    // vertical grid makes sense there. X positions match the numeric
+    // X tick positions exactly so ticks and grid line up. Same edge
+    // symmetry as the horizontal loop: left-edge grid line at i=0 sits
+    // under the Y-axis line in edge mode (obscured); in zero-crossing
+    // mode, it anchors the chart's left boundary.
+    if (_hasNumericXAxis && grid.showVertical) {
+      for (int i = 0; i <= xDivisions; i++) {
+        final fraction = i / xDivisions;
+        final x = chartArea.left + chartArea.width * fraction;
+        canvas.drawPath(
+          wobblyLine(
+            Offset(x, chartArea.top),
+            Offset(x, chartArea.bottom),
+            seed + chartVerticalGridSeedOffset + i,
+            jitter: irregularity * grid.jitterRatio,
+          ),
+          gridPaint,
+        );
+      }
+
+      // Sub-grid vertical lines.
+      final subCount = grid.verticalSubGridLinesBetweenTicks;
+      if (subCount > 0) {
+        for (int i = 0; i < xDivisions; i++) {
+          for (int k = 0; k < subCount; k++) {
+            final fraction = (i + (k + 1) / (subCount + 1)) / xDivisions;
+            final x = chartArea.left + chartArea.width * fraction;
+            canvas.drawPath(
+              wobblyLine(
+                Offset(x, chartArea.top),
+                Offset(x, chartArea.bottom),
+                seed + chartVerticalSubGridSeedOffset + i * subCount + k,
+                jitter: irregularity * grid.jitterRatio,
+              ),
+              subGridPaint,
+            );
+          }
+        }
+      }
     }
   }
 

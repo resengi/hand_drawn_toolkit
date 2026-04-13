@@ -65,6 +65,44 @@ class ChartFrameLayout {
     final slotWidth = chartArea.width / count;
     return chartArea.left + slotWidth * (index + 0.5);
   }
+
+  // ── Axis-position resolution (zero-crossing support) ───────────────────
+
+  /// Whether `y = 0` lies strictly inside the visible Y range
+  /// (exclusive of the edges — at the edges the resolved position would
+  /// coincide with the edge axis anyway).
+  bool get isZeroVisibleY => yMin < 0 && yMax > 0;
+
+  /// Whether `x = 0` lies strictly inside the visible numeric X range.
+  /// Returns false when the chart has no numeric X range configured.
+  bool get isZeroVisibleX {
+    final lo = xMin;
+    final hi = xMax;
+    if (lo == null || hi == null) return false;
+    return lo < 0 && hi > 0;
+  }
+
+  /// Canvas Y where the horizontal (X) axis line should be drawn.
+  ///
+  /// Returns the zero-crossing position when [zeroCrossing] is true AND
+  /// zero is inside the visible Y range; otherwise returns the chart's
+  /// bottom edge (the existing behavior).
+  double resolvedHorizontalAxisY({required bool zeroCrossing}) {
+    if (zeroCrossing && isZeroVisibleY) return yToCanvas(0);
+    return chartArea.bottom;
+  }
+
+  /// Canvas X where the vertical (Y) axis line should be drawn.
+  ///
+  /// Returns the zero-crossing position when [zeroCrossing] is true AND
+  /// zero is inside the visible numeric X range; otherwise returns the
+  /// chart's left edge (the existing behavior). Zero-crossing on the
+  /// vertical axis requires a numeric X scale — if none is configured,
+  /// falls back to the edge.
+  double resolvedVerticalAxisX({required bool zeroCrossing}) {
+    if (zeroCrossing && isZeroVisibleX) return xToCanvasValue(0);
+    return chartArea.left;
+  }
 }
 
 /// Builds a [ChartFrameLayout] from the painter's configuration.

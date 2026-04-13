@@ -15,7 +15,9 @@ A lightweight Flutter package for rendering hand-drawn, sketchy UI elements: con
 ## Features
 
 - Realistic hand-drawn borders, dividers, and custom path shapes
-- **Charts** — bar (stacked), line (multi-series), and scatter plots with wobbly axes, grid lines, titles, legends, and auto-thinning labels
+- **Charts** — bar (stacked, grouped), line (multi-series + function-backed), and scatter plots with wobbly axes, grid lines, titles, legends, auto-thinning labels, and optional zero-crossing axes
+- **Function-backed line series** — plot mathematical functions like `f(x) = x²` directly without manually generating point lists; sparse visible dots, dense smooth curves, and automatic discontinuity handling
+- **Per-series fill toggle and plot-area clipping** — opt out of the line fill on a per-series basis, and clip data rendering to the plot area to keep stray geometry from bleeding into axes and labels
 - **Tables** — column-aligned data tables with headers, row highlighting, titles, and optional row dividers
 - **Chart interaction foundation** — layout computation and typed hit-testing so consumers can build tap, hover, and drag behaviors without the package owning any interaction logic
 - Tappable status squares with check/dash indicators
@@ -33,7 +35,7 @@ Add the package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  hand_drawn_toolkit: ^0.2.0
+  hand_drawn_toolkit: ^0.3.0
 ```
 
 Then run:
@@ -78,6 +80,24 @@ HandDrawnNotebook(
     ],
   ),
 )
+
+// Plot a mathematical function as a hand-drawn curve:
+double square(double x) => x * x;
+
+HandDrawnLineChart(
+  data: LineChartData(
+    series: const [],
+    minX: -5, maxX: 5, minY: 0, maxY: 25,
+    functionSeries: [
+      FunctionSeriesData(
+        name: 'f(x) = x²',
+        color: Colors.blue,
+        function: square,
+        displayXs: [-4, -2, 0, 2, 4],
+      ),
+    ],
+  ),
+)
 ```
 
 ## Charts
@@ -85,7 +105,7 @@ HandDrawnNotebook(
 The package supports three chart types with intentional restrictions:
 
 - **Bar charts** are categorical on X and numeric on Y. Stacked bar segments must have non-negative values and accumulate from a data baseline of `0.0`. The `minY`/`maxY` parameters control the visible Y-range, not the stacking origin.
-- **Line charts** are numeric on both axes. Points should be sorted by X for coherent rendering. An optional `xLabels` list enables categorical X-axis display.
+- **Line charts** are numeric on both axes and accept two kinds of series side by side: point-based `LineSeriesData` (consumer-supplied points) and function-based `FunctionSeriesData` (mathematical functions sampled across the x-domain). An optional `xLabels` list enables categorical X-axis display, but only when no `functionSeries` are present.
 - **Scatter plots** are numeric on both axes. Each point may have a custom dot radius.
 
 Each chart type has two APIs:
@@ -150,6 +170,26 @@ BarChartData(
 )
 ```
 
+For grouped bar charts (multiple bars per category), populate `categories` instead of `bars`:
+
+```dart
+BarChartData(
+  bars: const [], // unused in grouped mode
+  categories: [
+    BarCategory(label: 'Q1', bars: [
+      BarGroup(label: 'North', segments: [
+        BarSegment(category: 'North', value: 42, color: Colors.blue),
+      ]),
+      BarGroup(label: 'South', segments: [
+        BarSegment(category: 'South', value: 35, color: Colors.orange),
+      ]),
+    ]),
+    // ...
+  ],
+  legend: [...],
+)
+```
+
 To add headroom above bars (e.g. for value labels), override `maxY`:
 
 ```dart
@@ -200,6 +240,7 @@ BarGroup(label: 'Mon', segments: [
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `bars` | `List<BarGroup>` | required | Bar groups with labels and segments |
+| `categories` | `List<BarCategory>` | `[]` | Grouped-bar categories (use instead of `bars` for grouped charts) |
 | `legend` | `List<LegendEntry>` | required | Legend entries |
 | `title` | `String?` | `null` | Chart title above the chart area |
 | `yAxisLabel` | `String?` | `null` | Rotated Y-axis title |
@@ -247,9 +288,20 @@ final data = LineChartData(
 HandDrawnLineChart(data: data, height: 240)
 ```
 
-**Categorical X-axis mode:** When `xLabels` is non-empty, the chart renders string labels instead of auto-generated numeric ticks. Points are still positioned by their numeric `x` values, so use consecutive integers (`0, 1, 2, …`) with a matching-length `xLabels` list for intuitive categorical behavior.
+**Categorical X-axis mode:** When `xLabels` is non-empty, the chart renders string labels instead of auto-generated numeric ticks. Points are still positioned by their numeric `x` values, so use consecutive integers (`0, 1, 2, …`) with a matching-length `xLabels` list for intuitive categorical behavior. Categorical mode is incompatible with `functionSeries` — function series require numeric x-mode.
 
-**Multi-series legend:** When a chart has more than one series, a legend is auto-generated from the series names and colors. Single-series charts omit the legend.
+**Multi-series legend:** When a chart has more than one logical series total (counting both `series` and `functionSeries`), a legend is auto-generated from the series names and colors. Single-series charts omit the legend.
+
+**Per-series fill control:** Use `showFill: false` on a `LineSeriesData` (or `FunctionSeriesData`, see below) to render that series as a stroke-only line without the semi-transparent fill underneath. Useful for overlay series, oscillating curves, or any series where the fill would clutter the chart.
+
+```dart
+LineSeriesData(
+  name: 'Net P/L',
+  color: Colors.purple,
+  showFill: false,  // stroke only, no fill below the line
+  points: [...],
+)
+```
 
 For custom axis formatting (e.g. currency or percentages):
 
@@ -260,6 +312,34 @@ LineChartData(
   // ...
 )
 ```
+
+#### Function-Backed Series
+
+`FunctionSeriesData` plots a Dart function across the chart's x-domain without requiring you to enumerate points manually. The chart samples the function densely to render a smooth curve, while only a sparse list of `displayXs` you provide are rendered as visible dots and made interactive via point hit-testing.
+
+```dart
+double parabola(double x) => x * x;
+
+LineChartData(
+  series: const [],
+  minX: -5, maxX: 5, minY: 0, maxY: 25,
+  functionSeries: [
+    FunctionSeriesData(
+      name: 'f(x) = x²',
+      color: Colors.blue,
+      function: parabola,
+      displayXs: [-4, -2, 0, 2, 4],   // visible dots
+      sampleCount: 120,                // smoothness of the underlying curve
+    ),
+  ],
+)
+```
+
+**Discontinuities** are handled automatically. When `function(x)` returns a non-finite value (`NaN`, `±∞`), the resolver splits the curve into independent runs at that point — no false bridge is drawn across the gap. Each run renders, fills, and hit-tests independently, so a chart of `f(x) = 1/x` cleanly produces two curves with no spurious segment crossing the asymptote.
+
+For asymptotic functions whose tails extend well outside the visible y-range, pair `FunctionSeriesData` with `clipToChartArea: true` on the chart widget (see [Plot-area clipping](#plot-area-clipping)) to keep the runaway tails contained.
+
+**Equality caveat.** `FunctionSeriesData` holds a Dart closure in its `function` field. Closures compare equal by **identity**, not semantic equivalence — two inline `(x) => x * x` literals compare unequal. When stable equality matters (e.g. to avoid unnecessary repaints), prefer top-level or `static` function references over inline closures.
 
 #### LinePoint Properties
 
@@ -275,20 +355,44 @@ LineChartData(
 | `name` | `String` | required | Series name (used in auto-generated legend) |
 | `points` | `List<LinePoint>` | required | Data points (should be sorted by x) |
 | `color` | `Color` | required | Line, dot, and fill color |
+| `showFill` | `bool` | `true` | When `false`, renders only the stroke (no fill below the line) |
+
+#### FunctionSeriesData Properties
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `name` | `String` | required | Series name (used in auto-generated legend) |
+| `color` | `Color` | required | Stroke and dot color |
+| `function` | `ChartFunction` (= `double Function(double x)`) | required | The function to plot. Non-finite returns split the curve. |
+| `displayXs` | `List<double>` | `[]` | Sparse x-values to render as visible dots (empty = curve only). Out-of-range or non-finite-y values are silently skipped; duplicates and order are preserved. |
+| `sampleCount` | `int` | `120` | Target number of uniform samples across `[minX, maxX]`. Must be ≥ 2. Higher = smoother curve. |
+| `showFill` | `bool` | `true` | When `false`, renders only the stroke (no fill below the curve) |
+| `wobbleAnchorStride` | `int` | `10` | Stride (in samples) between pinned wobble anchors. Smaller = tighter wobble; larger = more wobble freedom but more visible facets at anchors. Must be ≥ 1. |
 
 #### LineChartData Properties
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `series` | `List<LineSeriesData>` | required | Line series |
-| `minX` / `maxX` | `double` | required | X-axis range |
+| `series` | `List<LineSeriesData>` | required | Point-based series (pass `const []` for function-only charts) |
+| `functionSeries` | `List<FunctionSeriesData>` | `[]` | Function-backed series. Cannot be combined with non-empty `xLabels`. |
+| `minX` / `maxX` | `double` | required | X-axis range. Function series additionally require `minX < maxX`. |
 | `minY` / `maxY` | `double` | required | Y-axis range |
-| `xLabels` | `List<String>` | `[]` | Categorical X labels (replaces numeric ticks when non-empty) |
+| `xLabels` | `List<String>` | `[]` | Categorical X labels (replaces numeric ticks when non-empty). Cannot be combined with `functionSeries`. |
+| `axisDisplay` | `AxisDisplay` | `AxisDisplay.edge` | Controls edge-aligned vs zero-crossing axis rendering |
 | `title` | `String?` | `null` | Chart title |
 | `yAxisLabel` | `String?` | `null` | Rotated Y-axis title |
 | `xAxisLabel` | `String?` | `null` | X-axis title below tick labels |
 | `yValueFormatter` | `AxisValueFormatter?` | `null` | Custom Y-axis label formatter |
 | `xValueFormatter` | `AxisValueFormatter?` | `null` | Custom X-axis label formatter (numeric mode only) |
+
+##### Validation contract
+
+`LineChartData` is `const`-constructible and intentionally does **not** assert cross-field rules in its constructor. Construction is always cheap and never throws based on field combinations. The two cross-field rules:
+
+- `functionSeries` cannot be combined with non-empty `xLabels`
+- when `functionSeries` is non-empty, `minX < maxX` is required
+
+are validated at first layout/paint by the internal resolver and throw `ArgumentError` with a descriptive message if violated. This means a misconfigured chart will throw the first time it is rendered (loud, early, before reaching production), but explicit empty-list inputs (e.g. `xLabels: []` on a function-only chart) are accepted as semantically valid.
 
 ### Scatter Plot
 
@@ -329,11 +433,31 @@ Each `ScatterPoint` can specify an optional `size` (dot radius in logical pixels
 | `points` | `List<ScatterPoint>` | required | Data points |
 | `minX` / `maxX` | `double` | required | X-axis range |
 | `minY` / `maxY` | `double` | required | Y-axis range |
+| `axisDisplay` | `AxisDisplay` | `AxisDisplay.edge` | Edge-aligned vs zero-crossing axis rendering |
 | `title` | `String?` | `null` | Chart title |
 | `yAxisLabel` | `String?` | `null` | Rotated Y-axis title |
 | `xAxisLabel` | `String?` | `null` | X-axis title below tick labels |
 | `yValueFormatter` | `AxisValueFormatter?` | `null` | Custom Y-axis label formatter |
 | `xValueFormatter` | `AxisValueFormatter?` | `null` | Custom X-axis label formatter |
+
+### Plot-area clipping
+
+All three chart widgets (`HandDrawnBarChart`, `HandDrawnLineChart`, `HandDrawnScatterPlot`) and their painters accept `clipToChartArea: bool` (default `false`). When set to `true`, data rendering is clipped to the chart's plot region — the area inside the axes, excluding title, axis labels, tick labels, and legend.
+
+This is most useful for:
+
+- **Function series with asymptotes** — `f(x) = 1/x` produces y-values far outside the declared `[minY, maxY]` near the discontinuity; clipping keeps the runaway tails inside the plot area.
+- **Outlier scatter points** — points with extreme values can paint across axis labels without clipping.
+- **Bar charts with values that exceed an explicit `maxY`** — rare, but clipping prevents overflow from rendering through the title.
+
+Clipping is implemented inside the painter's `paint()` method around the call to `paintData(...)`, so axes, grid lines, labels, title, and legend (drawn outside `paintData`) remain unclipped regardless of the flag.
+
+```dart
+HandDrawnLineChart(
+  data: discontinuousFunctionChart,
+  clipToChartArea: true,
+)
+```
 
 ### Shared Chart Widget Properties
 
@@ -346,6 +470,7 @@ All chart widgets (`HandDrawnBarChart`, `HandDrawnLineChart`, `HandDrawnScatterP
 | `seed` | `int` | `42` | Deterministic wobble seed |
 | `axisColor` | `Color` | `Color(0xFF555555)` | Axis stroke color |
 | `gridColor` | `Color` | `Color(0xFFDDDDDD)` | Grid line color |
+| `grid` | `GridConfig` | `GridConfig.standard` | Grid configuration (lines, sub-grid, presets) |
 | `labelStyle` | `TextStyle?` | `null` | Axis label text style |
 | `irregularity` | `double` | `3.0` | Wobble magnitude |
 | `segments` | `int` | `12` | Segments per wobbly edge |
@@ -357,6 +482,7 @@ All chart widgets (`HandDrawnBarChart`, `HandDrawnLineChart`, `HandDrawnScatterP
 | `axisStrokeWidth` | `double` | `1.5` | Axis line thickness |
 | `gridStrokeWidth` | `double` | `0.5` | Grid line thickness |
 | `gridJitterRatio` | `double` | `0.3` | Grid wobble relative to axis wobble |
+| `clipToChartArea` | `bool` | `false` | Clip data rendering to the plot area |
 | `emptyStyle` | `TextStyle?` | `null` | Empty-state message style |
 
 ### Chart Layout Bands
@@ -367,7 +493,7 @@ The chart area is divided into vertical bands computed automatically:
 2. **Chart area** — the main plotting region
 3. **X tick label band** — categorical or numeric X labels
 4. **X-axis title band** — optional axis title
-5. **Legend band** — optional color legend (auto-generated for multi-series line charts)
+5. **Legend band** — optional color legend (auto-generated for multi-series line charts, including function series)
 
 When labels are too dense for the available width, the chart automatically thins them — always showing the first and last, with evenly spaced labels in between.
 
@@ -429,28 +555,7 @@ if (hit != null) {
 }
 ```
 
-When segments overlap (stacked bars), the topmost (last-painted) segment wins due to reverse paint order iteration.
-
-#### BarChartLayout Properties
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `size` | `Size` | The size this layout was computed for |
-| `chartArea` | `Rect` | The main plotting region |
-| `segments` | `List<BarSegmentLayout>` | All segments in paint order |
-
-#### BarSegmentLayout Properties
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `barIndex` | `int` | Index of the bar group |
-| `segmentIndex` | `int` | Index of the segment within its bar |
-| `barLabel` | `String` | The bar group's X-axis label |
-| `category` | `String` | The segment's category identifier |
-| `value` | `double` | The segment's data value |
-| `cumulativeStart` | `double` | Cumulative value at segment bottom |
-| `cumulativeEnd` | `double` | Cumulative value at segment top |
-| `bounds` | `Rect` | Logical bounding rectangle |
+When segments overlap (stacked bars), the topmost (last-painted) segment wins due to reverse paint order iteration. For grouped bars, `BarSegmentLayout` also exposes `innerBarIndex` and `innerBarLabel` so you can distinguish which bar within a category was hit.
 
 ### Scatter Plot Interaction
 
@@ -469,23 +574,6 @@ if (hit != null) {
 ```
 
 The effective hit radius is `max(visualRadius, tolerance)`, making small dots easy to tap on mobile. The default tolerance is 16 logical pixels.
-
-#### ScatterPlotLayout Properties
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `size` | `Size` | The size this layout was computed for |
-| `chartArea` | `Rect` | The main plotting region |
-| `points` | `List<ScatterPointLayout>` | All points in data order |
-
-#### ScatterPointLayout Properties
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `pointIndex` | `int` | Index in the data list |
-| `rawPoint` | `ScatterPoint` | The original data point |
-| `center` | `Offset` | Canvas position |
-| `visualRadius` | `double` | Dot radius in logical pixels |
 
 ### Line Chart Interaction
 
@@ -516,66 +604,14 @@ if (hit != null) {
 
 All interpolation uses **logical geometry** (straight data segments), never the wobble/sketch path. This ensures hit results are stable and predictable regardless of rendering style.
 
-#### LineChartLayout Properties
+#### Function-series interaction
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `size` | `Size` | The size this layout was computed for |
-| `chartArea` | `Rect` | The main plotting region |
-| `points` | `List<LinePointLayout>` | All points across all series |
-| `segments` | `List<LineSegmentLayout>` | All logical segments across all series |
+When a series originates from `FunctionSeriesData`, the same hit-test API applies, with two semantic differences worth knowing:
 
-#### LinePointLayout Properties
+- **Point hits target only the sparse `displayXs` dots.** A point hit on a function series gives you a `pointIndex` into the resolved `displayPoints` list (after out-of-range and non-finite filtering), not into the dense underlying sample set. This means dots stay sparse and tappable while the curve itself remains a continuous surface for segment hits.
+- **Segment hits cover the whole sampled curve.** Tapping anywhere along the visible curve produces a `LineSegmentHit` with interpolated `interpolatedX` and `interpolatedY` values from the sampled polyline. For discontinuous functions, taps inside a discontinuity gap simply return `null` — no segment bridges the gap, so there is nothing to hit.
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `seriesIndex` | `int` | Index of the series |
-| `seriesName` | `String?` | Name of the series |
-| `pointIndex` | `int` | Index within the series |
-| `rawPoint` | `LinePoint` | The original data point |
-| `center` | `Offset` | Canvas position |
-
-#### LineSegmentLayout Properties
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `seriesIndex` | `int` | Index of the series |
-| `seriesName` | `String?` | Name of the series |
-| `segmentIndex` | `int` | Index within the series |
-| `rawStartPoint` | `LinePoint` | Data point at segment start |
-| `rawEndPoint` | `LinePoint` | Data point at segment end |
-| `start` | `Offset` | Canvas position of start |
-| `end` | `Offset` | Canvas position of end |
-
-#### LineHitTestResult Sealed Hierarchy
-
-`LineHitTestResult` is a sealed class with two variants:
-
-**`LinePointHit`** — a data point was hit:
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `seriesIndex` | `int` | Series that was hit |
-| `seriesName` | `String?` | Series name |
-| `pointIndex` | `int` | Point index within the series |
-| `point` | `LinePoint` | The original data point |
-| `center` | `Offset` | Canvas position |
-| `distance` | `double` | Distance to the query position |
-
-**`LineSegmentHit`** — a line segment was hit (between two points):
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `seriesIndex` | `int` | Series that was hit |
-| `seriesName` | `String?` | Series name |
-| `segmentIndex` | `int` | Segment index within the series |
-| `startPoint` | `LinePoint` | Data point at segment start |
-| `endPoint` | `LinePoint` | Data point at segment end |
-| `nearestCanvasPoint` | `Offset` | Nearest point on the segment in canvas space |
-| `t` | `double` | Interpolation fraction along the segment [0, 1] |
-| `interpolatedX` | `double` | Interpolated raw X value at the hit position |
-| `interpolatedY` | `double` | Interpolated raw Y value at the hit position |
-| `distance` | `double` | Distance to the query position |
+Series ordering for hit-test indices is: ordinary `series` first (in declaration order), then `functionSeries` (in declaration order). So `seriesIndex` values are stable and predictable in mixed charts.
 
 ## Tables
 
@@ -887,6 +923,20 @@ HandDrawnNotebook(
 
 For text to align with the ruled lines, the `TextStyle.height` must equal `lineHeight / fontSize`.
 
+#### Multiline Notebook Content
+For dynamic-height content like multiline text or editors, use `NotebookSnappedBlock` to ensure the content's total height remains a whole multiple of the notebook grid:
+
+```dart
+HandDrawnNotebook(
+  lineHeight: 28.0,
+  child: NotebookSnappedBlock(
+    lineHeight: 28.0,
+    minRows: 3,
+    child: HandDrawnTextField(maxLines: null),
+  ),
+)
+```
+
 #### Uniform vs Unique Lines
 
 By default, every ruled line uses the same seed and looks identical (`uniformLines: true`). Set it to false to give each line its own wobble pattern:
@@ -930,7 +980,11 @@ CustomPaint(
 
 6. **Chart geometry** — Chart layout is computed from a single canonical frame builder shared by both `paint()` and `computeLayout()`. Coordinate helpers are pure functions of immutable frame data, ensuring layout snapshots always match the rendered output. In debug, the frame builder asserts when the available height is insufficient for the configured title, axis, and legend bands; in release, the plot region is clamped so it can never invert.
 
-7. **Interaction foundation** — Hit-testing uses logical (non-wobbly) geometry so results are stable regardless of rendering style. Point hits take priority over segment hits in line charts, and bar hit-testing iterates in reverse paint order so the topmost segment wins.
+7. **Function-series resolution** — A small internal resolver layer transforms `LineChartData` into a render-ready list of resolved series. Ordinary `LineSeriesData` passes through unchanged; `FunctionSeriesData` is uniformly sampled across `[minX, maxX]`, with non-finite samples splitting the curve into independent runs at each discontinuity. Sparse `displayPoints` are evaluated separately at the user-provided `displayXs`. The painter consumes resolved series uniformly — it doesn't need to know whether a series came from points or a function.
+
+8. **Anchor-stride wobble for function curves** — Function curves use a different wobble strategy than ordinary line series. Rather than wobbling between every consecutive sample (which would over-pin a 120-vertex polyline), the painter walks the polyline in fixed strides, treating every Nth sample as a pinned anchor and wobbling the samples between anchors with a single coherent phase. Wobble amplitude is automatically capped relative to the anchor segment's length so short segments don't get overwhelmed by jitter.
+
+9. **Interaction foundation** — Hit-testing uses logical (non-wobbly) geometry so results are stable regardless of rendering style. Point hits take priority over segment hits in line charts, and bar hit-testing iterates in reverse paint order so the topmost segment wins.
 
 ## Best Practices
 
@@ -956,6 +1010,10 @@ ListView.builder(
 **Recompute chart layouts when size changes** — `computeLayout()` returns a size-bound snapshot. Cache it if size and painter configuration are unchanged, but invalidate when either changes.
 
 **Align text to the notebook grid** by setting `TextStyle.height` to `lineHeight / fontSize`. This ensures each rendered text line occupies exactly one notebook row.
+
+**Hoist function-series functions to top-level or static** — `FunctionSeriesData.function` is compared by closure identity. Two inline `(x) => x * x` literals compare unequal, which can defeat memoization and cause unnecessary repaints. Define the function once at top level (`double parabola(double x) => x * x;`) and pass the reference.
+
+**Reach for `clipToChartArea` when data can leave the plot** — function series with asymptotes, scatter outliers, and any chart whose values can exceed the declared axis range benefit from `clipToChartArea: true`. The flag defaults to `false` so existing charts are unaffected; it's an opt-in safety net for the cases that need it.
 
 ## License
 

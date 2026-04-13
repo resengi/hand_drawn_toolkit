@@ -23,10 +23,11 @@ void _validateScatterRadius(double radius, double? rawSize, int index) {
 class HandDrawnScatterPlotPainter extends HandDrawnChartPainter {
   HandDrawnScatterPlotPainter({
     required this.data,
+    super.clipToChartArea,
     this.dotColor = scatterDotColor,
     super.seed,
     super.axisColor,
-    super.gridColor,
+    super.grid,
     TextStyle? labelStyle,
     super.irregularity,
     super.segments,
@@ -35,8 +36,6 @@ class HandDrawnScatterPlotPainter extends HandDrawnChartPainter {
     super.padding,
     super.titleStyle,
     super.axisStrokeWidth,
-    super.gridStrokeWidth,
-    super.gridJitterRatio,
   }) : super(
          yMin: data.minY,
          yMax: data.maxY,
@@ -48,6 +47,7 @@ class HandDrawnScatterPlotPainter extends HandDrawnChartPainter {
          labelStyle: labelStyle ?? chartDefaultLabelStyle,
          yValueFormatter: data.yValueFormatter,
          xValueFormatter: data.xValueFormatter,
+         axisDisplay: data.axisDisplay,
        );
 
   final ScatterPlotData data;
@@ -135,7 +135,7 @@ class HandDrawnScatterPlot extends StatelessWidget {
     this.dotColor = scatterDotColor,
     this.seed = HandDrawnDefaults.seed,
     this.axisColor = chartAxisColor,
-    this.gridColor = chartGridColor,
+    this.grid = GridConfig.standard,
     this.labelStyle,
     this.irregularity = chartIrregularity,
     this.segments = chartSegments,
@@ -144,9 +144,8 @@ class HandDrawnScatterPlot extends StatelessWidget {
     this.padding = chartDefaultPadding,
     this.titleStyle,
     this.axisStrokeWidth = chartAxisStrokeWidth,
-    this.gridStrokeWidth = chartGridStrokeWidth,
-    this.gridJitterRatio = chartGridJitterRatio,
     this.emptyStyle,
+    this.clipToChartArea = false,
     super.key,
   });
 
@@ -155,7 +154,9 @@ class HandDrawnScatterPlot extends StatelessWidget {
   final Color dotColor;
   final int seed;
   final Color axisColor;
-  final Color gridColor;
+
+  /// Grid configuration bundle. See [GridConfig] for all knobs.
+  final GridConfig grid;
   final TextStyle? labelStyle;
   final double irregularity;
   final int segments;
@@ -164,9 +165,12 @@ class HandDrawnScatterPlot extends StatelessWidget {
   final EdgeInsets padding;
   final TextStyle? titleStyle;
   final double axisStrokeWidth;
-  final double gridStrokeWidth;
-  final double gridJitterRatio;
   final TextStyle? emptyStyle;
+
+  /// When `true`, data rendering is clipped to the chart's plot area so
+  /// outlier points can't paint outside the chart. See
+  /// [HandDrawnScatterPlotPainter.clipToChartArea] for details.
+  final bool clipToChartArea;
 
   @override
   Widget build(BuildContext context) {
@@ -182,7 +186,7 @@ class HandDrawnScatterPlot extends StatelessWidget {
           dotColor: dotColor,
           seed: seed,
           axisColor: axisColor,
-          gridColor: gridColor,
+          grid: grid,
           labelStyle: labelStyle,
           irregularity: irregularity,
           segments: segments,
@@ -191,8 +195,7 @@ class HandDrawnScatterPlot extends StatelessWidget {
           padding: padding,
           titleStyle: titleStyle,
           axisStrokeWidth: axisStrokeWidth,
-          gridStrokeWidth: gridStrokeWidth,
-          gridJitterRatio: gridJitterRatio,
+          clipToChartArea: clipToChartArea,
         ),
       ),
     );

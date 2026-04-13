@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../hand_drawn_constants.dart';
@@ -6,6 +8,7 @@ import 'chart_data.dart';
 import 'chart_interaction.dart';
 import 'chart_widget_helpers.dart';
 import 'hand_drawn_chart_painter.dart';
+import 'line_series_resolver.dart';
 
 /// Painter for hand-drawn line charts.
 ///
@@ -15,9 +18,10 @@ import 'hand_drawn_chart_painter.dart';
 class HandDrawnLineChartPainter extends HandDrawnChartPainter {
   HandDrawnLineChartPainter({
     required this.data,
+    super.clipToChartArea,
     super.seed,
     super.axisColor,
-    super.gridColor,
+    super.grid,
     TextStyle? labelStyle,
     super.irregularity,
     super.segments,
@@ -27,14 +31,14 @@ class HandDrawnLineChartPainter extends HandDrawnChartPainter {
     super.titleStyle,
     super.legendStyle,
     super.axisStrokeWidth,
-    super.gridStrokeWidth,
-    super.gridJitterRatio,
   }) : super(
          xLabels: data.xLabels,
-         legend: data.series.length > 1
+         legend: (data.series.length + data.functionSeries.length) > 1
              ? [
                  for (final s in data.series)
                    LegendEntry(label: s.name, color: s.color),
+                 for (final f in data.functionSeries)
+                   LegendEntry(label: f.name, color: f.color),
                ]
              : const [],
          yMin: data.minY,
@@ -47,6 +51,7 @@ class HandDrawnLineChartPainter extends HandDrawnChartPainter {
          labelStyle: labelStyle ?? chartDefaultLabelStyle,
          yValueFormatter: data.yValueFormatter,
          xValueFormatter: data.xValueFormatter,
+         axisDisplay: data.axisDisplay,
        );
 
   final LineChartData data;
@@ -65,19 +70,18 @@ class HandDrawnLineChartPainter extends HandDrawnChartPainter {
     final allPoints = <LinePointLayout>[];
     final allSegments = <LineSegmentLayout>[];
 
-    for (int s = 0; s < data.series.length; s++) {
-      final series = data.series[s];
-      if (series.points.isEmpty) continue;
+    final resolved = resolveLineSeries(data);
 
-      // Compute canvas positions for each point in this series.
-      final canvasPoints = <Offset>[];
-      for (int i = 0; i < series.points.length; i++) {
-        final pt = series.points[i];
-        final x = frame.xToCanvasValue(pt.x);
-        final y = frame.yToCanvas(pt.y);
-        final center = Offset(x, y);
-        canvasPoints.add(center);
+    for (int s = 0; s < resolved.length; s++) {
+      final series = resolved[s];
 
+      // Point layout from sparse displayPoints (index into displayPoints).
+      for (int i = 0; i < series.displayPoints.length; i++) {
+        final pt = series.displayPoints[i];
+        final center = Offset(
+          frame.xToCanvasValue(pt.x),
+          frame.yToCanvas(pt.y),
+        );
         allPoints.add(
           LinePointLayout(
             seriesIndex: s,
@@ -89,19 +93,29 @@ class HandDrawnLineChartPainter extends HandDrawnChartPainter {
         );
       }
 
-      // Build segments between consecutive points.
-      for (int i = 0; i < canvasPoints.length - 1; i++) {
-        allSegments.add(
-          LineSegmentLayout(
-            seriesIndex: s,
-            seriesName: series.name,
-            segmentIndex: i,
-            rawStartPoint: series.points[i],
-            rawEndPoint: series.points[i + 1],
-            start: canvasPoints[i],
-            end: canvasPoints[i + 1],
-          ),
-        );
+      // Segment layout from every pathRun. segmentIndex is flat across
+      // runs within a series; discontinuities appear as gaps in the
+      // segment stream rather than as bridging segments.
+      int segIdx = 0;
+      for (final run in series.pathRuns) {
+        if (run.length < 2) continue;
+        final canvas = [
+          for (final p in run)
+            Offset(frame.xToCanvasValue(p.x), frame.yToCanvas(p.y)),
+        ];
+        for (int i = 0; i < run.length - 1; i++) {
+          allSegments.add(
+            LineSegmentLayout(
+              seriesIndex: s,
+              seriesName: series.name,
+              segmentIndex: segIdx++,
+              rawStartPoint: run[i],
+              rawEndPoint: run[i + 1],
+              start: canvas[i],
+              end: canvas[i + 1],
+            ),
+          );
+        }
       }
     }
 
@@ -115,73 +129,119 @@ class HandDrawnLineChartPainter extends HandDrawnChartPainter {
 
   /// Paints line series with a semi-transparent fill below each line.
   ///
-  /// The fill area extends from the data line down to the bottom of the
-  /// chart area (`chartArea.bottom`), not to a zero baseline. When `minY`
-  /// is negative, the fill will cover the full area beneath the line
-  /// including the negative region. This is the intended aesthetic for
-  /// the hand-drawn style.
+  /// By default the fill area extends from the data line down to the
+  /// bottom of the chart area (`chartArea.bottom`). When the chart has
+  /// opted into a zero-crossing horizontal axis
+  /// (`data.axisDisplay.horizontal == AxisDisplayMode.zeroCrossing`)
+  /// AND zero is inside the visible Y range, the fill instead anchors
+  /// to the zero baseline — so positive lobes fill downward to zero and
+  /// negative lobes fill upward to zero. This matches the visual
+  /// relationship a moved-axis chart implies.
   @override
   void paintData(Canvas canvas, Size size) {
-    for (int s = 0; s < data.series.length; s++) {
-      final series = data.series[s];
-      if (series.points.isEmpty) continue;
+    // Resolve the fill baseline once per paint. Falls back to the chart
+    // bottom whenever zero-crossing is off OR zero isn't inside the
+    // visible Y range — both of which preserve the original behavior.
+    final useZeroBaseline =
+        data.axisDisplay.horizontal == AxisDisplayMode.zeroCrossing &&
+        frame.isZeroVisibleY;
+    final fillBaselineY = useZeroBaseline ? yToCanvas(0) : chartArea.bottom;
 
-      final points = <Offset>[];
-      for (int i = 0; i < series.points.length; i++) {
-        final pt = series.points[i];
-        final x = xToCanvasValue(pt.x);
-        final y = yToCanvas(pt.y);
-        points.add(Offset(x, y));
-      }
+    final resolved = resolveLineSeries(data);
 
-      // Semi-transparent fill below the line.
-      if (points.length >= 2) {
-        final fillPath = Path()..moveTo(points.first.dx, chartArea.bottom);
-        for (final p in points) {
-          fillPath.lineTo(p.dx, p.dy);
+    for (int s = 0; s < resolved.length; s++) {
+      final series = resolved[s];
+
+      // Per-run rendering: each pathRun becomes an independent fill +
+      // stroke. Ordinary series always have a single run; function series
+      // may have multiple when the function has discontinuities.
+      for (int r = 0; r < series.pathRuns.length; r++) {
+        final run = series.pathRuns[r];
+        if (run.isEmpty) continue;
+
+        final points = [
+          for (final p in run) Offset(xToCanvasValue(p.x), yToCanvas(p.y)),
+        ];
+
+        if (series.showFill && points.length >= 2) {
+          final fillPath = Path();
+          if (useZeroBaseline) {
+            _appendSignSplitFill(
+              fillPath,
+              run,
+              points,
+              fillBaselineY,
+              xToCanvasValue,
+            );
+          } else {
+            fillPath.moveTo(points.first.dx, fillBaselineY);
+            for (final p in points) {
+              fillPath.lineTo(p.dx, p.dy);
+            }
+            fillPath.lineTo(points.last.dx, fillBaselineY);
+            fillPath.close();
+          }
+
+          canvas.drawPath(
+            fillPath,
+            Paint()
+              ..color = series.color.withValues(alpha: lineFillAlpha)
+              ..style = PaintingStyle.fill,
+          );
         }
-        fillPath.lineTo(points.last.dx, chartArea.bottom);
-        fillPath.close();
 
-        canvas.drawPath(
-          fillPath,
-          Paint()
-            ..color = series.color.withValues(alpha: lineFillAlpha)
-            ..style = PaintingStyle.fill,
-        );
+        final linePaint = Paint()
+          ..color = series.color
+          ..strokeWidth = lineStrokeWidth
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round;
+
+        if (series.renderMode == ResolvedLineRenderMode.segmentedStroke) {
+          for (int i = 0; i < points.length - 1; i++) {
+            final lineSeed =
+                seed +
+                lineChartSeedOffset +
+                s * lineSeriesSeedMultiplier +
+                i * linePointSeedStep;
+            canvas.drawPath(
+              wobblyLine(
+                points[i],
+                points[i + 1],
+                lineSeed,
+                segmentCount: lineSegmentCount,
+              ),
+              linePaint,
+            );
+          }
+        } else if (points.length >= 2) {
+          // Anchor-stride wobble: walk the sampled polyline in fixed
+          // strides, treating every Nth sample as a pinned anchor and
+          // wobbling the samples in between. Each anchor segment shares
+          // its endpoint with the next, so the line stays continuous,
+          // but each segment's wobble phase is independent (per-segment
+          // seed) and amplitude is auto-capped to the segment's length.
+          final stride = series.wobbleAnchorStride;
+          for (int i = 0; i < points.length - 1; i += stride) {
+            final endIdx = math.min(i + stride, points.length - 1);
+            final sub = points.sublist(i, endIdx + 1);
+            final anchorSeed =
+                seed +
+                lineChartSeedOffset +
+                s * lineSeriesSeedMultiplier +
+                r * lineRunSeedMultiplier +
+                i * linePointSeedStep;
+            canvas.drawPath(wobblePolyline(sub, anchorSeed), linePaint);
+          }
+        }
       }
 
-      // Wobbly line segments.
-      final linePaint = Paint()
-        ..color = series.color
-        ..strokeWidth = lineStrokeWidth
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round;
-
-      for (int i = 0; i < points.length - 1; i++) {
-        final lineSeed =
-            seed +
-            lineChartSeedOffset +
-            s * lineSeriesSeedMultiplier +
-            i * linePointSeedStep;
-        canvas.drawPath(
-          wobblyLine(
-            points[i],
-            points[i + 1],
-            lineSeed,
-            segmentCount: lineSegmentCount,
-          ),
-          linePaint,
-        );
-      }
-
-      // Wobbly circles at each data point.
       final dotPaint = Paint()
         ..color = series.color
         ..style = PaintingStyle.fill;
-
-      for (int i = 0; i < points.length; i++) {
+      for (int i = 0; i < series.displayPoints.length; i++) {
+        final pt = series.displayPoints[i];
+        final center = Offset(xToCanvasValue(pt.x), yToCanvas(pt.y));
         final dotSeed =
             seed +
             lineDotSeedOffset +
@@ -189,7 +249,7 @@ class HandDrawnLineChartPainter extends HandDrawnChartPainter {
             i * linePointSeedStep;
         canvas.drawPath(
           wobblyCircle(
-            points[i],
+            center,
             lineDotRadius,
             dotSeed,
             jitter: irregularity * lineDotJitterRatio,
@@ -214,7 +274,7 @@ class HandDrawnLineChart extends StatelessWidget {
     this.height = HandDrawnDefaults.chartHeight,
     this.seed = HandDrawnDefaults.seed,
     this.axisColor = chartAxisColor,
-    this.gridColor = chartGridColor,
+    this.grid = GridConfig.standard,
     this.labelStyle,
     this.irregularity = chartIrregularity,
     this.segments = chartSegments,
@@ -224,9 +284,8 @@ class HandDrawnLineChart extends StatelessWidget {
     this.titleStyle,
     this.legendStyle,
     this.axisStrokeWidth = chartAxisStrokeWidth,
-    this.gridStrokeWidth = chartGridStrokeWidth,
-    this.gridJitterRatio = chartGridJitterRatio,
     this.emptyStyle,
+    this.clipToChartArea = false,
     super.key,
   });
 
@@ -234,7 +293,9 @@ class HandDrawnLineChart extends StatelessWidget {
   final double height;
   final int seed;
   final Color axisColor;
-  final Color gridColor;
+
+  /// Grid configuration bundle. See [GridConfig] for all knobs.
+  final GridConfig grid;
   final TextStyle? labelStyle;
   final double irregularity;
   final int segments;
@@ -244,9 +305,12 @@ class HandDrawnLineChart extends StatelessWidget {
   final TextStyle? titleStyle;
   final TextStyle? legendStyle;
   final double axisStrokeWidth;
-  final double gridStrokeWidth;
-  final double gridJitterRatio;
   final TextStyle? emptyStyle;
+
+  /// When `true`, data rendering is clipped to the chart's plot area so
+  /// values outside `[minY, maxY]` can't paint outside the chart. See
+  /// [HandDrawnLineChartPainter.clipToChartArea] for details.
+  final bool clipToChartArea;
 
   @override
   Widget build(BuildContext context) {
@@ -261,7 +325,7 @@ class HandDrawnLineChart extends StatelessWidget {
           data: data!,
           seed: seed,
           axisColor: axisColor,
-          gridColor: gridColor,
+          grid: grid,
           labelStyle: labelStyle,
           irregularity: irregularity,
           segments: segments,
@@ -271,10 +335,107 @@ class HandDrawnLineChart extends StatelessWidget {
           titleStyle: titleStyle,
           legendStyle: legendStyle,
           axisStrokeWidth: axisStrokeWidth,
-          gridStrokeWidth: gridStrokeWidth,
-          gridJitterRatio: gridJitterRatio,
+          clipToChartArea: clipToChartArea,
         ),
       ),
     );
   }
+}
+
+// Builds a fill path that respects the y=0 baseline by emitting a
+// separate closed sub-region per contiguous run of same-sign data.
+//
+// Zero-endpoint handling:
+//   * A data point at exactly y==0 acts as a natural boundary and does
+//     not trigger interpolation — its canvas position is already on the
+//     baseline. The current region closes at that point; the next
+//     region opens from the same point.
+//   * A segment with BOTH endpoints at y==0 contributes nothing to
+//     fill (zero-height strip) and is skipped.
+//   * A segment strictly flipping sign (y0*y1 < 0) gets an
+//     interpolated crossing X inserted as the closing vertex of the
+//     current region and opening vertex of the next.
+void _appendSignSplitFill(
+  Path fillPath,
+  List<LinePoint> dataPoints,
+  List<Offset> canvasPoints,
+  double baselineY,
+  double Function(double) xToCanvasValue,
+) {
+  // Sign: -1, 0, +1. A "region" collects consecutive points whose
+  // sign is not strictly opposite to the region's sign.
+  int signOf(double y) => y == 0 ? 0 : (y > 0 ? 1 : -1);
+
+  // Current region buffer of canvas-space vertices.
+  final region = <Offset>[];
+  int regionSign = 0;
+
+  void flushRegion() {
+    if (region.length < 2) {
+      region.clear();
+      return;
+    }
+    fillPath.moveTo(region.first.dx, baselineY);
+    for (final p in region) {
+      fillPath.lineTo(p.dx, p.dy);
+    }
+    fillPath.lineTo(region.last.dx, baselineY);
+    fillPath.close();
+    region.clear();
+  }
+
+  for (int i = 0; i < dataPoints.length; i++) {
+    final y = dataPoints[i].y;
+    final sign = signOf(y);
+    final canvasPt = canvasPoints[i];
+
+    if (region.isEmpty) {
+      region.add(canvasPt);
+      regionSign = sign;
+      continue;
+    }
+
+    final prevY = dataPoints[i - 1].y;
+    final prevSign = signOf(prevY);
+
+    if (prevSign * sign < 0) {
+      // Strict sign flip — interpolate crossing X in data space,
+      // emit crossing as closing vertex, flush, reopen from crossing.
+      final t = prevY / (prevY - y); // 0..1 along the segment
+      final crossingDataX =
+          dataPoints[i - 1].x + (dataPoints[i].x - dataPoints[i - 1].x) * t;
+      final crossingCanvasX = xToCanvasValue(crossingDataX);
+      final crossingPt = Offset(crossingCanvasX, baselineY);
+
+      region.add(crossingPt);
+      flushRegion();
+      region.add(crossingPt);
+      region.add(canvasPt);
+      regionSign = sign;
+    } else if (prevSign == 0 && sign != 0) {
+      // Previous point was exactly at zero and we're leaving it. The
+      // previous point already sits on the baseline. Flush whatever
+      // region we had (which may be just a boundary point + earlier
+      // content), then start the new region from the same zero point.
+      flushRegion();
+      region.add(canvasPoints[i - 1]);
+      region.add(canvasPt);
+      regionSign = sign;
+    } else if (sign == 0 && prevSign != 0) {
+      // Arriving at an exact-zero point. Include it as the closing
+      // boundary of the current region, flush, then hold the zero
+      // point as a seed for the next region (will be extended on the
+      // next iteration).
+      region.add(canvasPt);
+      flushRegion();
+      region.add(canvasPt);
+      regionSign = 0;
+    } else {
+      // Same sign (or one of them is zero on a zero-to-zero segment).
+      region.add(canvasPt);
+      if (regionSign == 0) regionSign = sign;
+    }
+  }
+
+  flushRegion();
 }

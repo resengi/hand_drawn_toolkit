@@ -389,7 +389,12 @@ void main() {
 
     testWidgets('bar chart passes gridColor to painter', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnBarChart(data: _barData(), gridColor: Colors.blue)),
+        _wrap(
+          HandDrawnBarChart(
+            data: _barData(),
+            grid: const GridConfig(color: Colors.blue),
+          ),
+        ),
       );
       final painter =
           tester
@@ -398,7 +403,7 @@ void main() {
                   )
                   .painter
               as HandDrawnBarChartPainter;
-      expect(painter.gridColor, Colors.blue);
+      expect(painter.grid.color, Colors.blue);
     });
 
     testWidgets('bar chart passes custom labelStyle to painter', (
@@ -430,7 +435,7 @@ void main() {
                   .painter
               as HandDrawnBarChartPainter;
       expect(painter.axisColor, const Color(0xFF555555));
-      expect(painter.gridColor, const Color(0xFFDDDDDD));
+      expect(painter.grid.color, const Color(0xFFC4C4C4));
     });
 
     // ── Line chart ─────────────────────────────────────────────────────
@@ -451,7 +456,12 @@ void main() {
 
     testWidgets('line chart passes gridColor to painter', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnLineChart(data: _lineData(), gridColor: Colors.blue)),
+        _wrap(
+          HandDrawnLineChart(
+            data: _lineData(),
+            grid: const GridConfig(color: Colors.blue),
+          ),
+        ),
       );
       final painter =
           tester
@@ -460,7 +470,7 @@ void main() {
                   )
                   .painter
               as HandDrawnLineChartPainter;
-      expect(painter.gridColor, Colors.blue);
+      expect(painter.grid.color, Colors.blue);
     });
 
     testWidgets('line chart passes custom labelStyle to painter', (
@@ -492,7 +502,7 @@ void main() {
                   .painter
               as HandDrawnLineChartPainter;
       expect(painter.axisColor, const Color(0xFF555555));
-      expect(painter.gridColor, const Color(0xFFDDDDDD));
+      expect(painter.grid.color, const Color(0xFFC4C4C4));
     });
 
     // ── Scatter plot ───────────────────────────────────────────────────
@@ -516,7 +526,10 @@ void main() {
     testWidgets('scatter plot passes gridColor to painter', (tester) async {
       await tester.pumpWidget(
         _wrap(
-          HandDrawnScatterPlot(data: _scatterData(), gridColor: Colors.blue),
+          HandDrawnScatterPlot(
+            data: _scatterData(),
+            grid: const GridConfig(color: Colors.blue),
+          ),
         ),
       );
       final painter =
@@ -526,7 +539,7 @@ void main() {
                   )
                   .painter
               as HandDrawnScatterPlotPainter;
-      expect(painter.gridColor, Colors.blue);
+      expect(painter.grid.color, Colors.blue);
     });
 
     testWidgets('scatter plot passes custom labelStyle to painter', (
@@ -560,7 +573,7 @@ void main() {
                   .painter
               as HandDrawnScatterPlotPainter;
       expect(painter.axisColor, const Color(0xFF555555));
-      expect(painter.gridColor, const Color(0xFFDDDDDD));
+      expect(painter.grid.color, const Color(0xFFC4C4C4));
       expect(painter.dotColor, const Color(0xFF6B9BD2));
     });
   });
@@ -662,7 +675,12 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnLineChart(data: _lineData(), gridStrokeWidth: 2.0)),
+        _wrap(
+          HandDrawnLineChart(
+            data: _lineData(),
+            grid: const GridConfig(strokeWidth: 2.0),
+          ),
+        ),
       );
       final painter =
           tester
@@ -671,14 +689,19 @@ void main() {
                   )
                   .painter
               as HandDrawnLineChartPainter;
-      expect(painter.gridStrokeWidth, 2.0);
+      expect(painter.grid.strokeWidth, 2.0);
     });
 
     testWidgets('scatter plot forwards gridJitterRatio to painter', (
       tester,
     ) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnScatterPlot(data: _scatterData(), gridJitterRatio: 0.8)),
+        _wrap(
+          HandDrawnScatterPlot(
+            data: _scatterData(),
+            grid: const GridConfig(jitterRatio: 0.8),
+          ),
+        ),
       );
       final painter =
           tester
@@ -687,7 +710,7 @@ void main() {
                   )
                   .painter
               as HandDrawnScatterPlotPainter;
-      expect(painter.gridJitterRatio, 0.8);
+      expect(painter.grid.jitterRatio, 0.8);
     });
   });
 

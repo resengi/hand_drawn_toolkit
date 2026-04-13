@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+// ── Wrappers ──────────────────────────────────────────────────────────────
+
 /// Wraps [child] in a [MaterialApp] + [Scaffold] for widget tests.
 Widget testApp(Widget child) => MaterialApp(home: Scaffold(body: child));
 
@@ -23,3 +25,12 @@ Future<List<FlutterErrorDetails>> captureFlutterErrors(
   }
   return captured;
 }
+
+// ── Shared test constants ─────────────────────────────────────────────────
+
+/// Canonical canvas size for painter / layout tests across the suite.
+///
+/// All chart test files use the same size so that painters produce
+/// directly-comparable layouts and assertions on chart area dimensions
+/// don't drift between files. Prefer this over a file-local `_size`.
+const Size kChartTestSize = Size(400, 300);
