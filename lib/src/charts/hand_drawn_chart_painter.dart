@@ -58,6 +58,7 @@ abstract class HandDrawnChartPainter extends CustomPainter {
     this.legendStyle,
     this.axisStrokeWidth = chartAxisStrokeWidth,
     this.axisDisplay = AxisDisplay.edge,
+    this.clipToChartArea = false,
   }) {
     if (yDivisions <= 0) {
       throw ArgumentError.value(yDivisions, 'yDivisions', 'must be positive');
@@ -76,6 +77,12 @@ abstract class HandDrawnChartPainter extends CustomPainter {
   final double irregularity;
   final int segments;
   final Color axisColor;
+
+  /// When `true`, subclass data rendering (the `paintData` call) is
+  /// clipped to the plot area so values outside the declared axis
+  /// bounds can't paint across axes, labels, title, or legend. Defaults
+  /// to `false` to preserve existing behavior across all chart types.
+  final bool clipToChartArea;
 
   /// Grid configuration bundle. See [GridConfig] for all knobs.
   final GridConfig grid;
@@ -175,7 +182,14 @@ abstract class HandDrawnChartPainter extends CustomPainter {
     if (yAxisLabel != null) _paintYAxisLabel(canvas, padded);
     _paintXTicksOrLabels(canvas);
     if (xAxisLabel != null) _paintXAxisTitle(canvas);
-    paintData(canvas, size);
+    if (clipToChartArea) {
+      canvas.save();
+      canvas.clipRect(_frame.chartArea);
+      paintData(canvas, size);
+      canvas.restore();
+    } else {
+      paintData(canvas, size);
+    }
     if (legend.isNotEmpty) _paintLegend(canvas, size);
   }
 
@@ -198,6 +212,7 @@ abstract class HandDrawnChartPainter extends CustomPainter {
         oldDelegate.xMax != xMax ||
         oldDelegate.xDivisions != xDivisions ||
         oldDelegate.title != title ||
+        oldDelegate.clipToChartArea != clipToChartArea ||
         oldDelegate.yAxisLabel != yAxisLabel ||
         oldDelegate.xAxisLabel != xAxisLabel ||
         oldDelegate.yValueFormatter != yValueFormatter ||
@@ -302,6 +317,44 @@ abstract class HandDrawnChartPainter extends CustomPainter {
         path.lineTo(to.dx, to.dy);
       } else {
         path.lineTo(x + offsets.x[i], y + offsets.y[i]);
+      }
+    }
+    return path;
+  }
+
+  /// Builds a wobbly stroke through a pre-sampled polyline, pinning only
+  /// the first and last vertices and applying smoothed jitter to every
+  /// interior sample.
+  ///
+  /// Intended for the function-series anchor-stride renderer: the caller
+  /// hands in a sub-polyline (e.g. samples `[i .. i+stride]` from a
+  /// `pathRun`) and the result is one wobbled "anchor segment" that
+  /// passes through the true sampled values at both ends and wobbles in
+  /// between. Multiple consecutive calls share their endpoint anchors
+  /// (the previous segment's last point is the next segment's first),
+  /// which gives the line continuity at anchors and independent wobble
+  /// phase between them.
+  ///
+  /// Wobble amplitude is automatically capped based off of the straight-
+  /// line distance between the first and last point, so short anchor
+  /// segments don't get overwhelmed by jitter that was tuned for
+  /// longer strokes.
+  Path wobblePolyline(List<Offset> sub, int polySeed, {double? jitter}) {
+    assert(sub.length >= 2, 'wobbleAlongPolyline requires at least 2 points');
+
+    final segs = sub.length - 1;
+    final anchorSpan = (sub.last - sub.first).distance;
+    final irrCap = anchorSpan * percentageIrregularityCap;
+    final effectiveIrr = math.min(jitter ?? irregularity, irrCap);
+
+    final offsets = _smoothedOffsets2D(polySeed, segs, effectiveIrr);
+
+    final path = Path()..moveTo(sub.first.dx, sub.first.dy);
+    for (int i = 1; i <= segs; i++) {
+      if (i == segs) {
+        path.lineTo(sub.last.dx, sub.last.dy);
+      } else {
+        path.lineTo(sub[i].dx + offsets.x[i], sub[i].dy + offsets.y[i]);
       }
     }
     return path;

@@ -16,6 +16,7 @@ import 'hand_drawn_chart_painter.dart';
 class HandDrawnBarChartPainter extends HandDrawnChartPainter {
   HandDrawnBarChartPainter({
     required this.data,
+    super.clipToChartArea,
     super.seed,
     super.axisColor,
     super.grid,
@@ -221,6 +222,7 @@ class HandDrawnBarChart extends StatelessWidget {
     this.legendStyle,
     this.axisStrokeWidth = chartAxisStrokeWidth,
     this.emptyStyle,
+    this.clipToChartArea = false,
     super.key,
   });
 
@@ -240,6 +242,11 @@ class HandDrawnBarChart extends StatelessWidget {
   final TextStyle? legendStyle;
   final double axisStrokeWidth;
   final TextStyle? emptyStyle;
+
+  /// When `true`, data rendering is clipped to the chart's plot area so
+  /// bars can't paint outside the chart. See
+  /// [HandDrawnBarChartPainter.clipToChartArea] for details.
+  final bool clipToChartArea;
 
   @override
   Widget build(BuildContext context) {
@@ -263,6 +270,7 @@ class HandDrawnBarChart extends StatelessWidget {
           titleStyle: titleStyle,
           legendStyle: legendStyle,
           axisStrokeWidth: axisStrokeWidth,
+          clipToChartArea: clipToChartArea,
         ),
       ),
     );

@@ -455,6 +455,57 @@ class _JournalPageState extends State<JournalPage> {
               ),
               const SizedBox(height: 24),
 
+              _sectionHeading('Function Chart'),
+              const SizedBox(height: 4),
+              const Text(
+                'FunctionSeriesData samples a function across the numeric x-domain. '
+                '`displayXs` controls where visible dots are drawn — the curve itself '
+                'stays smooth between them, rendered as one coherent hand-drawn stroke.',
+                style: TextStyle(fontSize: 13, height: 1.55, color: _inkLight),
+              ),
+              const SizedBox(height: 12),
+              HandDrawnLineChart(
+                data: _sampleParabolaData(),
+                grid: GridConfig.standard,
+                height: 260,
+                seed: 24,
+              ),
+              const SizedBox(height: 24),
+
+              _sectionHeading('Multi-Function Chart'),
+              const SizedBox(height: 4),
+              const Text(
+                'Multiple functions render on one chart with auto-generated legend '
+                'entries, exactly like multi-series line charts.',
+                style: TextStyle(fontSize: 13, height: 1.55, color: _inkLight),
+              ),
+              const SizedBox(height: 12),
+              HandDrawnLineChart(
+                data: _sampleFunctionComparisonData(),
+                grid: GridConfig.standard,
+                height: 280,
+                seed: 25,
+              ),
+              const SizedBox(height: 24),
+
+              _sectionHeading('Discontinuous Function'),
+              const SizedBox(height: 4),
+              const Text(
+                'Non-finite evaluations split the curve into independent runs. No '
+                'false bridge is drawn across x = 0 — each side is drawn as its own '
+                'hand-drawn stroke with its own fill.',
+                style: TextStyle(fontSize: 13, height: 1.55, color: _inkLight),
+              ),
+              const SizedBox(height: 12),
+              HandDrawnLineChart(
+                data: _sampleDiscontinuousFunctionData(),
+                grid: _subGrid,
+                height: 280,
+                seed: 26,
+                clipToChartArea: true,
+              ),
+              const SizedBox(height: 24),
+
               _sectionHeading('Scatter Plot'),
               const SizedBox(height: 12),
               HandDrawnScatterPlot(
@@ -669,6 +720,63 @@ class _JournalPageState extends State<JournalPage> {
                 seed: 23,
                 grid: _subGrid,
                 onHit: (l) => _setHit('line_negxy', l),
+              ),
+              const SizedBox(height: 24),
+
+              _sectionHeading(
+                'Function Chart — tap a dot or anywhere along the curve',
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Point hits target only the sparse visible dots. Segment hits target '
+                'anywhere along the sampled curve.',
+                style: TextStyle(fontSize: 13, height: 1.55, color: _inkLight),
+              ),
+              const SizedBox(height: 4),
+              _hitLabel(_hits['line_function']),
+              const SizedBox(height: 8),
+              _InteractiveLineChart(
+                data: _sampleParabolaData(),
+                seed: 24,
+                grid: GridConfig.standard,
+                onHit: (l) => _setHit('line_function', l),
+              ),
+              const SizedBox(height: 24),
+
+              _sectionHeading('Multi-Function Chart — tap a series'),
+              const SizedBox(height: 4),
+              const Text(
+                'Same point-vs-segment hit semantics as the single-function chart, '
+                'but hits also report which series was tapped.',
+                style: TextStyle(fontSize: 13, height: 1.55, color: _inkLight),
+              ),
+              const SizedBox(height: 4),
+              _hitLabel(_hits['line_function_multi']),
+              const SizedBox(height: 8),
+              _InteractiveLineChart(
+                data: _sampleFunctionComparisonData(),
+                seed: 25,
+                grid: GridConfig.standard,
+                onHit: (l) => _setHit('line_function_multi', l),
+              ),
+              const SizedBox(height: 24),
+
+              _sectionHeading('Discontinuous Function — tap either side'),
+              const SizedBox(height: 4),
+              const Text(
+                "There's no segment spanning the discontinuity — taps near x = 0 "
+                'fall through, while each side responds independently.',
+                style: TextStyle(fontSize: 13, height: 1.55, color: _inkLight),
+              ),
+              const SizedBox(height: 4),
+              _hitLabel(_hits['line_discontinuous']),
+              const SizedBox(height: 8),
+              _InteractiveLineChart(
+                data: _sampleDiscontinuousFunctionData(),
+                seed: 26,
+                grid: _subGrid,
+                onHit: (l) => _setHit('line_discontinuous', l),
+                clipToChartArea: true,
               ),
               const SizedBox(height: 24),
 
@@ -1062,6 +1170,7 @@ LineChartData _sampleNegYLineData() {
       LineSeriesData(
         name: 'Net',
         color: Color(0xFF7B68C4),
+        showFill: false,
         points: [
           LinePoint(x: 0, y: 25),
           LinePoint(x: 1, y: -15),
@@ -1124,6 +1233,7 @@ LineChartData _sampleNegXYLineData() {
       LineSeriesData(
         name: 'Path',
         color: Color(0xFFE8943A),
+        showFill: false,
         points: [
           LinePoint(x: -8, y: -2),
           LinePoint(x: -6, y: 2),
@@ -1138,6 +1248,91 @@ LineChartData _sampleNegXYLineData() {
           LinePoint(x: -3, y: -8),
           LinePoint(x: -6, y: -6),
         ],
+      ),
+    ],
+  );
+}
+
+// Top-level function definitions. Using top-level functions rather than
+// inline closures keeps FunctionSeriesData equality stable across widget
+// rebuilds, so LineChartData == / hashCode behave as expected.
+double _parabola(double x) => x * x;
+double _cubic(double x) => 0.1 * x * x * x - x;
+double _reciprocal(double x) => 1 / x;
+
+LineChartData _sampleParabolaData() {
+  return const LineChartData(
+    title: 'Parabola: f(x) = x²',
+    xAxisLabel: 'x',
+    yAxisLabel: 'f(x)',
+    minX: -5,
+    maxX: 5,
+    minY: 0,
+    maxY: 25,
+    axisDisplay: AxisDisplay(vertical: AxisDisplayMode.zeroCrossing),
+    series: [],
+    functionSeries: [
+      FunctionSeriesData(
+        name: 'f(x) = x²',
+        color: Color(0xFF6B9BD2),
+        function: _parabola,
+        displayXs: [-4, -2, 0, 2, 4],
+      ),
+    ],
+  );
+}
+
+LineChartData _sampleFunctionComparisonData() {
+  return const LineChartData(
+    title: 'Two Functions on One Chart',
+    xAxisLabel: 'x',
+    yAxisLabel: 'f(x)',
+    minX: -5,
+    maxX: 5,
+    minY: -10,
+    maxY: 25,
+    axisDisplay: AxisDisplay(
+      horizontal: AxisDisplayMode.zeroCrossing,
+      vertical: AxisDisplayMode.zeroCrossing,
+    ),
+    series: [],
+    functionSeries: [
+      FunctionSeriesData(
+        name: 'f(x) = x²',
+        color: Color(0xFF6B9BD2),
+        function: _parabola,
+        displayXs: [-4, -2, 0, 2, 4],
+      ),
+      FunctionSeriesData(
+        name: 'g(x) = 0.1x³ − x',
+        color: Color(0xFFE8943A),
+        function: _cubic,
+        displayXs: [-4, -2, 0, 2, 4],
+      ),
+    ],
+  );
+}
+
+LineChartData _sampleDiscontinuousFunctionData() {
+  return const LineChartData(
+    title: 'Discontinuity: f(x) = 1/x',
+    xAxisLabel: 'x',
+    yAxisLabel: 'f(x)',
+    minX: -4,
+    maxX: 4,
+    minY: -5,
+    maxY: 5,
+    axisDisplay: AxisDisplay(
+      horizontal: AxisDisplayMode.zeroCrossing,
+      vertical: AxisDisplayMode.zeroCrossing,
+    ),
+    series: [],
+    functionSeries: [
+      FunctionSeriesData(
+        name: 'f(x) = 1/x',
+        color: Color(0xFF7B68C4),
+        function: _reciprocal,
+        displayXs: [-3, -2, -1, 1, 2, 3],
       ),
     ],
   );
@@ -1309,12 +1504,14 @@ class _InteractiveLineChart extends StatelessWidget {
     required this.onHit,
     this.seed = 20,
     this.grid = GridConfig.standard,
+    this.clipToChartArea = true,
   });
 
   final LineChartData data;
   final ValueChanged<String?> onHit;
   final int seed;
   final GridConfig grid;
+  final bool clipToChartArea;
 
   @override
   Widget build(BuildContext context) {
@@ -1322,6 +1519,7 @@ class _InteractiveLineChart extends StatelessWidget {
       data: data,
       seed: seed,
       grid: grid,
+      clipToChartArea: clipToChartArea,
     );
     return LayoutBuilder(
       builder: (context, constraints) {

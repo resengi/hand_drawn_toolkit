@@ -3,7 +3,12 @@ import 'dart:ui' show Color;
 import 'package:flutter/foundation.dart' show listEquals;
 
 import '../hand_drawn_constants.dart'
-    show chartGridColor, chartGridStrokeWidth, chartGridJitterRatio;
+    show
+        chartGridColor,
+        chartGridJitterRatio,
+        chartGridStrokeWidth,
+        defaultSampleCount,
+        defaultWobbleAnchorStride;
 
 /// Generic color mapping keyed by category name (e.g., "completed",
 /// "skipped", "primary").
@@ -490,6 +495,7 @@ class LineSeriesData {
     required this.name,
     required this.points,
     required this.color,
+    this.showFill = true,
   });
 
   /// Display name for this series. Used for auto-generated legend entries
@@ -499,16 +505,129 @@ class LineSeriesData {
   final List<LinePoint> points;
   final Color color;
 
+  /// Whether to draw the semi-transparent fill below this series' line.
+  /// Defaults to `true` (the existing behavior). Set `false` for an
+  /// unfilled stroke-only series.
+  final bool showFill;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is LineSeriesData &&
           name == other.name &&
           listEquals(points, other.points) &&
-          color == other.color;
+          color == other.color &&
+          showFill == other.showFill;
 
   @override
-  int get hashCode => Object.hash(name, Object.hashAll(points), color);
+  int get hashCode =>
+      Object.hash(name, Object.hashAll(points), color, showFill);
+}
+
+/// A mathematical function used with [FunctionSeriesData] to plot a curve.
+///
+/// Receives an x-value from the chart's numeric x-domain and returns the
+/// corresponding y-value. Non-finite outputs (NaN, +∞, −∞) are treated as
+/// discontinuities and will split the rendered curve into separate runs.
+typedef ChartFunction = double Function(double x);
+
+/// A function-backed line series.
+///
+/// Unlike [LineSeriesData], which carries an explicit list of visible
+/// points, a function series plots a continuous curve across the chart's
+/// numeric x-domain. The chart internally samples [function] to build a
+/// smooth curve while only rendering dots for the x-values listed in
+/// [displayXs].
+///
+/// A function series can only be used when the enclosing [LineChartData]
+/// is in numeric x-mode (i.e. has no categorical [LineChartData.xLabels]).
+///
+/// ### Equality caveat
+///
+/// [FunctionSeriesData] holds a Dart closure in [function]. In Dart,
+/// closures compare equal by **identity**, not by semantic equivalence —
+/// two inline `(x) => x * x` closures in otherwise-identical data objects
+/// will compare unequal. When stable equality matters (e.g. to avoid
+/// unnecessary repaints), prefer top-level or `static` function references
+/// over inline closures.
+class FunctionSeriesData {
+  const FunctionSeriesData({
+    required this.name,
+    required this.color,
+    required this.function,
+    this.displayXs = const [],
+    this.sampleCount = defaultSampleCount,
+    this.showFill = true,
+    this.wobbleAnchorStride = defaultWobbleAnchorStride,
+  }) : assert(sampleCount >= 2, 'sampleCount must be at least 2'),
+       assert(wobbleAnchorStride >= 1, 'wobbleAnchorStride must be >= 1');
+
+  /// Display name for this series. Used for auto-generated legend entries
+  /// in multi-series charts.
+  final String name;
+
+  /// Stroke and dot color for this series.
+  final Color color;
+
+  /// The function to plot. Called with x-values in `[minX, maxX]`.
+  /// Non-finite returns are treated as discontinuities.
+  final ChartFunction function;
+
+  /// Sparse x-values whose corresponding points should be rendered as
+  /// visible dots and participate in point hit testing.
+  ///
+  /// - Empty is allowed → draws curve only, no visible dots, no point hits.
+  /// - Out-of-range values are ignored.
+  /// - Values whose evaluated y is non-finite are skipped.
+  /// - Duplicates are preserved.
+  /// - Original order is preserved and drives `pointIndex` in hit-test output.
+  final List<double> displayXs;
+
+  /// Target number of uniform samples across `[minX, maxX]`. Must be ≥ 2.
+  ///
+  /// The **actual** number of rendered path vertices may be lower because
+  /// non-finite evaluations are skipped and the curve may be split into
+  /// multiple runs at discontinuities.
+  final int sampleCount;
+
+  /// Whether to draw the semi-transparent fill below this series' curve.
+  /// Defaults to `true` (the existing behavior). Set `false` for an
+  /// unfilled stroke-only function series.
+  final bool showFill;
+
+  /// Stride (in samples) between pinned wobble anchors along the curve.
+  /// Every Nth sample is rendered at its true `f(x)` position; samples
+  /// in between get a smoothed jitter offset, producing the hand-drawn
+  /// look without losing the curve's shape.
+  ///
+  /// A smaller stride means more pinned points and tighter, more
+  /// constrained wobble. A larger stride gives wobble more room to
+  /// develop but creates visible facets at each anchor. Must be `>= 1`.
+  /// Default is `10`, calibrated for the default `sampleCount: 120`.
+  final int wobbleAnchorStride;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FunctionSeriesData &&
+          name == other.name &&
+          color == other.color &&
+          function == other.function &&
+          listEquals(displayXs, other.displayXs) &&
+          sampleCount == other.sampleCount &&
+          showFill == other.showFill &&
+          wobbleAnchorStride == other.wobbleAnchorStride;
+
+  @override
+  int get hashCode => Object.hash(
+    name,
+    color,
+    function,
+    Object.hashAll(displayXs),
+    sampleCount,
+    showFill,
+    wobbleAnchorStride,
+  );
 }
 
 /// Complete data for rendering a line chart (single or multi-series).
@@ -533,7 +652,19 @@ class LineChartData {
     this.yValueFormatter,
     this.xValueFormatter,
     this.axisDisplay = AxisDisplay.edge,
+    this.functionSeries = const [],
   });
+
+  /// Function-backed series. Each entry plots a mathematical function
+  /// across the numeric x-domain.
+  ///
+  /// **Validation contract.** When `functionSeries` is non-empty, the
+  /// chart requires numeric x-mode (no categorical [xLabels]) and a
+  /// valid range (`minX < maxX`). These rules are enforced by the
+  /// resolver at first layout/paint — not as constructor assertions —
+  /// so that [LineChartData] can stay `const`-constructible and
+  /// accept non-canonical empty lists from callers.
+  final List<FunctionSeriesData> functionSeries;
 
   /// Axis display configuration. Defaults to edge-aligned axes (current
   /// behavior). Set to enable zero-crossing axes for charts with mixed
@@ -589,7 +720,8 @@ class LineChartData {
   /// Optional formatter for X-axis tick labels (numeric mode only).
   final AxisValueFormatter? xValueFormatter;
 
-  bool get isEmpty => series.every((s) => s.points.isEmpty);
+  bool get isEmpty =>
+      series.every((s) => s.points.isEmpty) && functionSeries.isEmpty;
 
   @override
   bool operator ==(Object other) =>
@@ -606,7 +738,8 @@ class LineChartData {
           maxY == other.maxY &&
           yValueFormatter == other.yValueFormatter &&
           xValueFormatter == other.xValueFormatter &&
-          axisDisplay == other.axisDisplay;
+          axisDisplay == other.axisDisplay &&
+          listEquals(functionSeries, other.functionSeries);
 
   @override
   int get hashCode => Object.hash(
@@ -622,6 +755,7 @@ class LineChartData {
     yValueFormatter,
     xValueFormatter,
     axisDisplay,
+    Object.hashAll(functionSeries),
   );
 }
 

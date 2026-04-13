@@ -624,4 +624,110 @@ void main() {
       expect(a, isNot(equals(b)));
     });
   });
+
+  // ── Function series integration with LineChartData ───────────────────
+
+  group('LineChartData + FunctionSeriesData', () {
+    double sq(double x) => x * x;
+
+    test('isEmpty is false for function-only chart', () {
+      final data = LineChartData(
+        series: const [],
+        minX: 0,
+        maxX: 1,
+        minY: 0,
+        maxY: 1,
+        functionSeries: [
+          FunctionSeriesData(
+            name: 'f',
+            color: const Color(0xFF000000),
+            function: sq,
+          ),
+        ],
+      );
+      expect(data.isEmpty, isFalse);
+    });
+
+    test('isEmpty is true only when both lists are effectively empty', () {
+      const data = LineChartData(
+        series: [],
+        minX: 0,
+        maxX: 1,
+        minY: 0,
+        maxY: 1,
+      );
+      expect(data.isEmpty, isTrue);
+    });
+
+    test('equality includes functionSeries', () {
+      final a = LineChartData(
+        series: const [],
+        minX: 0,
+        maxX: 1,
+        minY: 0,
+        maxY: 1,
+        functionSeries: [
+          FunctionSeriesData(
+            name: 'f',
+            color: const Color(0xFF000000),
+            function: sq,
+          ),
+        ],
+      );
+      final b = LineChartData(
+        series: const [],
+        minX: 0,
+        maxX: 1,
+        minY: 0,
+        maxY: 1,
+        functionSeries: [
+          FunctionSeriesData(
+            name: 'f',
+            color: const Color(0xFF000000),
+            function: sq,
+          ),
+        ],
+      );
+      // Same top-level function reference → FunctionSeriesData equal,
+      // which makes the two LineChartData values equal.
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test(
+      'inline closures make FunctionSeriesData unequal (documented caveat)',
+      () {
+        final a = LineChartData(
+          series: const [],
+          minX: 0,
+          maxX: 1,
+          minY: 0,
+          maxY: 1,
+          functionSeries: [
+            FunctionSeriesData(
+              name: 'f',
+              color: const Color(0xFF000000),
+              function: (x) => x * x,
+            ),
+          ],
+        );
+        final b = LineChartData(
+          series: const [],
+          minX: 0,
+          maxX: 1,
+          minY: 0,
+          maxY: 1,
+          functionSeries: [
+            FunctionSeriesData(
+              name: 'f',
+              color: const Color(0xFF000000),
+              function: (x) => x * x,
+            ),
+          ],
+        );
+        // Two distinct inline closures compare by identity in Dart → unequal.
+        expect(a, isNot(equals(b)));
+      },
+    );
+  });
 }

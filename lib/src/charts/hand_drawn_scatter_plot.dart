@@ -23,6 +23,7 @@ void _validateScatterRadius(double radius, double? rawSize, int index) {
 class HandDrawnScatterPlotPainter extends HandDrawnChartPainter {
   HandDrawnScatterPlotPainter({
     required this.data,
+    super.clipToChartArea,
     this.dotColor = scatterDotColor,
     super.seed,
     super.axisColor,
@@ -144,6 +145,7 @@ class HandDrawnScatterPlot extends StatelessWidget {
     this.titleStyle,
     this.axisStrokeWidth = chartAxisStrokeWidth,
     this.emptyStyle,
+    this.clipToChartArea = false,
     super.key,
   });
 
@@ -164,6 +166,11 @@ class HandDrawnScatterPlot extends StatelessWidget {
   final TextStyle? titleStyle;
   final double axisStrokeWidth;
   final TextStyle? emptyStyle;
+
+  /// When `true`, data rendering is clipped to the chart's plot area so
+  /// outlier points can't paint outside the chart. See
+  /// [HandDrawnScatterPlotPainter.clipToChartArea] for details.
+  final bool clipToChartArea;
 
   @override
   Widget build(BuildContext context) {
@@ -188,6 +195,7 @@ class HandDrawnScatterPlot extends StatelessWidget {
           padding: padding,
           titleStyle: titleStyle,
           axisStrokeWidth: axisStrokeWidth,
+          clipToChartArea: clipToChartArea,
         ),
       ),
     );

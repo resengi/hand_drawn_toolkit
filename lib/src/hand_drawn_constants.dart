@@ -207,6 +207,11 @@ const int lineChartSeedOffset = 4000;
 const int lineDotSeedOffset = 5000;
 const int lineSeriesSeedMultiplier = 1000;
 const int linePointSeedStep = 10;
+
+/// Per-run seed offset used by the function-series stroke so that
+/// distinct runs of the same logical series (e.g. either side of a 1/x
+/// discontinuity) get independent wobble phases.
+const int lineRunSeedMultiplier = 100;
 const int scatterSeedOffset = 6000;
 const int scatterPointSeedStep = 10;
 
@@ -226,6 +231,9 @@ const double lineDotRadius = 3.0;
 const int lineSegmentCount = 6;
 const int lineDotCirclePoints = 8;
 const double lineDotJitterRatio = 0.5;
+const int defaultSampleCount = 120;
+const int defaultWobbleAnchorStride = 10;
+const double percentageIrregularityCap = 0.05;
 
 // ── Scatter plot rendering ─────────────────────────────────────────────────
 
