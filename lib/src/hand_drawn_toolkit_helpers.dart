@@ -1,6 +1,9 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:flutter/painting.dart'
+    show TextDirection, TextPainter, TextSpan, TextStyle;
+
 /// Generates jittered [Path] objects that simulate hand-drawn strokes.
 ///
 /// Each helper method produces a [Path] sized to a given [Size]. The jitter is
@@ -162,4 +165,26 @@ class HandDrawnHelpers {
     p.close();
     return p;
   }
+}
+
+// ── Shared free helpers ─────────────────────────────────────────────────────
+
+/// Lays out [text] in [style] with default LTR direction and returns
+/// the resulting [TextPainter], ready for measurement or paint.
+///
+/// When [maxWidth] is finite, the text painter wraps onto multiple
+/// lines as needed; the resulting `TextPainter.height` reflects the
+/// wrapped height. The default `double.infinity` preserves the
+/// historical "single-line, unbounded width" behavior for callers
+/// that don't need wrapping.
+TextPainter layoutText(
+  String text,
+  TextStyle style, {
+  double maxWidth = double.infinity,
+}) {
+  final tp = TextPainter(
+    text: TextSpan(text: text, style: style),
+    textDirection: TextDirection.ltr,
+  )..layout(maxWidth: maxWidth);
+  return tp;
 }

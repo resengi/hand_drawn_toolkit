@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../hand_drawn_constants.dart';
 import '../hand_drawn_toolkit_defaults.dart';
+import '../hand_drawn_toolkit_helpers.dart';
 import 'bar_geometry.dart';
 import 'chart_data.dart';
 import 'chart_interaction.dart';
@@ -10,9 +11,11 @@ import 'hand_drawn_chart_painter.dart';
 
 /// Painter for hand-drawn stacked bar charts.
 ///
-/// Bar segments accumulate from a data baseline of `0.0`. The [yMin] and
-/// [yMax] parameters (from [BarChartData]) define the visible Y-range,
-/// not the stacking origin.
+/// Bar segments accumulate from a data baseline of `0.0` — positive
+/// segments stack upward, negative segments stack downward, and a
+/// single bar may mix the two. The [yMin] and [yMax] parameters (from
+/// [BarChartData]) define the visible Y-range, not the stacking
+/// origin.
 class HandDrawnBarChartPainter extends HandDrawnChartPainter {
   HandDrawnBarChartPainter({
     required this.data,
@@ -28,6 +31,8 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
     super.titleStyle,
     super.legendStyle,
     super.axisStrokeWidth,
+    super.xLabelConfig,
+    super.legendConfig,
   }) : super(
          // Project from resolvedCategories so grouped and legacy inputs
          // both produce correct X-axis labels. For legacy `bars` input
@@ -35,15 +40,16 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
          // BarGroup with the original label, so behavior is unchanged.
          xLabels: [for (final c in data.resolvedCategories) c.label],
          legend: data.legend,
-         yMin: data.minY ?? 0,
+         yMin: data.minY ?? _computeMinY(data),
          yMax: data.maxY ?? _computeMaxY(data),
          yAxisLabel: data.yAxisLabel,
          xAxisLabel: data.xAxisLabel,
          title: data.title,
          labelStyle: labelStyle ?? chartDefaultLabelStyle,
          yValueFormatter: data.yValueFormatter,
+         axisDisplay: data.axisDisplay,
        ) {
-    // Release-safe validation: reject negative segment values in all
+    // Release-safe validation: reject non-finite segment values in all
     // build modes. BarSegment's own assert catches this in debug mode at
     // the point of construction; this guard ensures invalid data never
     // reaches paintData in release builds. Iterates resolvedCategories
@@ -51,9 +57,9 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
     for (final category in data.resolvedCategories) {
       for (final bar in category.bars) {
         for (final segment in bar.segments) {
-          if (segment.value < 0) {
+          if (!segment.value.isFinite) {
             throw ArgumentError(
-              'BarSegment.value must be non-negative, got ${segment.value} '
+              'BarSegment.value must be finite, got ${segment.value} '
               'in bar "${bar.label}" of category "${category.label}".',
             );
           }
@@ -64,27 +70,65 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
 
   final BarChartData data;
 
-  /// Computes the default Y-axis maximum from inner-bar totals across
-  /// every category.
+  /// Computes the default Y-axis maximum from inner-bar **positive**
+  /// stack totals across every category.
   ///
   /// Per the grouped-bar plan, the chart scales by the **maximum** inner
   /// bar height (not the sum across siblings) — siblings sit side-by-side,
-  /// so the Y-axis only needs to cover the tallest one. For ungrouped
-  /// charts this collapses to `max(BarGroup.total)` because the legacy
-  /// projection produces one inner bar per category, preserving the
-  /// pre-grouped default exactly.
+  /// so the Y-axis only needs to cover the tallest one. With signed
+  /// segments allowed, "tallest" means the largest positive stack
+  /// total — i.e. summing only the positive segments within each inner
+  /// bar. Negative-only or all-zero data falls back to a sensible
+  /// non-zero upper bound so the plot rect never collapses.
   ///
-  /// Note: `BarGroup.total` is not mutated or reinterpreted — it remains
-  /// the pure sum of segment values. The "max vs sum" decision lives
-  /// here at the chart-rendering level, where it belongs.
+  /// For ungrouped, all-positive charts this collapses to the legacy
+  /// `max(BarGroup.total)` value because positive-only sums equal the
+  /// arithmetic total in that regime, preserving the pre-signed-bar
+  /// default exactly.
   static double _computeMaxY(BarChartData data) {
     double max = 0;
     for (final category in data.resolvedCategories) {
       for (final innerBar in category.bars) {
-        if (innerBar.total > max) max = innerBar.total;
+        final positive = _positiveStackTotal(innerBar);
+        if (positive > max) max = positive;
       }
     }
     return max == 0 ? 1 : max;
+  }
+
+  /// Computes the default Y-axis minimum from inner-bar **negative**
+  /// stack totals.
+  ///
+  /// Symmetric to [_computeMaxY]: with signed segments, the lowest
+  /// extent each inner bar reaches below the zero baseline is the sum
+  /// of its negative segments. Returns `0` when no inner bar has any
+  /// negative segments, so all-positive charts default to a `minY` of
+  /// zero.
+  static double _computeMinY(BarChartData data) {
+    double min = 0;
+    for (final category in data.resolvedCategories) {
+      for (final innerBar in category.bars) {
+        final negative = _negativeStackTotal(innerBar);
+        if (negative < min) min = negative;
+      }
+    }
+    return min;
+  }
+
+  static double _positiveStackTotal(BarGroup bar) {
+    double sum = 0;
+    for (final s in bar.segments) {
+      if (s.value > 0) sum += s.value;
+    }
+    return sum;
+  }
+
+  static double _negativeStackTotal(BarGroup bar) {
+    double sum = 0;
+    for (final s in bar.segments) {
+      if (s.value < 0) sum += s.value;
+    }
+    return sum;
   }
 
   @override
@@ -168,18 +212,30 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
     );
 
     for (final s in specs) {
-      // Deterministic per-segment seed. For ungrouped charts (the
-      // legacy projection where every innerBarIndex is 0) the inner
-      // term contributes nothing, so wobble patterns are bit-identical
-      // to the pre-grouped renderer. For grouped charts each side-by-
-      // side bar gets distinct wobble.
+      // Skip zero-area segments. They're kept in the layout list so
+      // segment indices stay stable for hit testing, but painting a
+      // wobbly border around a degenerate rect produces an ink-blob
+      // artifact — and `Rect.contains` already excludes zero-area
+      // rects from hit detection, so user-visible behavior on
+      // hover/click is unchanged.
+      if (s.rect.width <= 0 || s.rect.height <= 0) continue;
+
+      // Deterministic per-segment seed. The inner-bar term lets
+      // grouped (side-by-side) bars get distinct wobble; for charts
+      // without grouping the term contributes zero and adjacent
+      // segments still get distinct wobble via the segment-index term.
       final barSeed =
           seed +
           barChartSeedOffset +
           s.categoryIndex * barSegmentSeedMultiplier +
           s.innerBarIndex * barInnerSeedMultiplier +
           s.segmentIndex * barSegmentSeedStep;
-      final path = wobblyRect(s.rect, barSeed);
+      final helpers = HandDrawnHelpers(
+        seed: barSeed,
+        segments: wobblyRectSegments,
+        irregularity: irregularity,
+      );
+      final path = helpers.rectBorder(s.rect.size).shift(s.rect.topLeft);
 
       final segment = s.segment;
       final fillPaint = Paint()
@@ -223,6 +279,8 @@ class HandDrawnBarChart extends StatelessWidget {
     this.axisStrokeWidth = chartAxisStrokeWidth,
     this.emptyStyle,
     this.clipToChartArea = false,
+    this.xLabelConfig = ChartLabelConfig.horizontal,
+    this.legendConfig = ChartLegendConfig.inlineBottom,
     super.key,
   });
 
@@ -248,6 +306,18 @@ class HandDrawnBarChart extends StatelessWidget {
   /// [HandDrawnBarChartPainter.clipToChartArea] for details.
   final bool clipToChartArea;
 
+  /// X-axis tick label configuration (rotation, thinning sensitivity).
+  /// Defaults to horizontal labels. See [ChartLabelConfig] for usage
+  /// and named presets.
+  final ChartLabelConfig xLabelConfig;
+
+  /// Legend layout configuration. Defaults to
+  /// [ChartLegendConfig.inlineBottom] — a single inline row at the
+  /// bottom of the chart, no box, hard-truncates on overflow. See
+  /// [ChartLegendConfig] for external boxed presets and the
+  /// standalone-widget composition pattern.
+  final ChartLegendConfig legendConfig;
+
   @override
   Widget build(BuildContext context) {
     return buildChartBody(
@@ -271,6 +341,8 @@ class HandDrawnBarChart extends StatelessWidget {
           legendStyle: legendStyle,
           axisStrokeWidth: axisStrokeWidth,
           clipToChartArea: clipToChartArea,
+          xLabelConfig: xLabelConfig,
+          legendConfig: legendConfig,
         ),
       ),
     );

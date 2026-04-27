@@ -14,7 +14,14 @@ import 'line_series_resolver.dart';
 ///
 /// Points are positioned using [LinePoint.x] within the `minX`–`maxX` range.
 /// Supports both numeric and categorical X-axis modes.
-/// Auto-generates legend for multi-series charts.
+///
+/// Legend entries follow [ChartLegendEntries.fromLineChartData] — when
+/// the data contains multiple series (point + function combined),
+/// entries are auto-generated from each series' name and color. With
+/// one or zero series the chart renders no legend by default. The
+/// helper is the single source of truth, so a standalone
+/// [HandDrawnLegend] fed the same data renders the exact same
+/// entries.
 class HandDrawnLineChartPainter extends HandDrawnChartPainter {
   HandDrawnLineChartPainter({
     required this.data,
@@ -31,16 +38,11 @@ class HandDrawnLineChartPainter extends HandDrawnChartPainter {
     super.titleStyle,
     super.legendStyle,
     super.axisStrokeWidth,
+    super.xLabelConfig,
+    super.legendConfig,
   }) : super(
          xLabels: data.xLabels,
-         legend: (data.series.length + data.functionSeries.length) > 1
-             ? [
-                 for (final s in data.series)
-                   LegendEntry(label: s.name, color: s.color),
-                 for (final f in data.functionSeries)
-                   LegendEntry(label: f.name, color: f.color),
-               ]
-             : const [],
+         legend: ChartLegendEntries.fromLineChartData(data),
          yMin: data.minY,
          yMax: data.maxY,
          xMin: data.minX,
@@ -286,6 +288,8 @@ class HandDrawnLineChart extends StatelessWidget {
     this.axisStrokeWidth = chartAxisStrokeWidth,
     this.emptyStyle,
     this.clipToChartArea = false,
+    this.xLabelConfig = ChartLabelConfig.horizontal,
+    this.legendConfig = ChartLegendConfig.inlineBottom,
     super.key,
   });
 
@@ -312,6 +316,18 @@ class HandDrawnLineChart extends StatelessWidget {
   /// [HandDrawnLineChartPainter.clipToChartArea] for details.
   final bool clipToChartArea;
 
+  /// X-axis tick label configuration (rotation, thinning sensitivity).
+  /// Defaults to horizontal labels. See [ChartLabelConfig] for usage
+  /// and named presets.
+  final ChartLabelConfig xLabelConfig;
+
+  /// Legend layout configuration. Defaults to
+  /// [ChartLegendConfig.inlineBottom] — a single inline row at the
+  /// bottom of the chart, no box, hard-truncates on overflow. See
+  /// [ChartLegendConfig] for external boxed presets and the
+  /// standalone-widget composition pattern.
+  final ChartLegendConfig legendConfig;
+
   @override
   Widget build(BuildContext context) {
     return buildChartBody(
@@ -336,6 +352,8 @@ class HandDrawnLineChart extends StatelessWidget {
           legendStyle: legendStyle,
           axisStrokeWidth: axisStrokeWidth,
           clipToChartArea: clipToChartArea,
+          xLabelConfig: xLabelConfig,
+          legendConfig: legendConfig,
         ),
       ),
     );

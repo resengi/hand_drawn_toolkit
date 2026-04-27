@@ -36,6 +36,9 @@ class HandDrawnScatterPlotPainter extends HandDrawnChartPainter {
     super.padding,
     super.titleStyle,
     super.axisStrokeWidth,
+    super.xLabelConfig,
+    super.legendConfig,
+    super.legendStyle,
   }) : super(
          yMin: data.minY,
          yMax: data.maxY,
@@ -48,6 +51,7 @@ class HandDrawnScatterPlotPainter extends HandDrawnChartPainter {
          yValueFormatter: data.yValueFormatter,
          xValueFormatter: data.xValueFormatter,
          axisDisplay: data.axisDisplay,
+         legend: data.legend,
        );
 
   final ScatterPlotData data;
@@ -146,6 +150,9 @@ class HandDrawnScatterPlot extends StatelessWidget {
     this.axisStrokeWidth = chartAxisStrokeWidth,
     this.emptyStyle,
     this.clipToChartArea = false,
+    this.xLabelConfig = ChartLabelConfig.horizontal,
+    this.legendConfig = ChartLegendConfig.inlineBottom,
+    this.legendStyle,
     super.key,
   });
 
@@ -172,6 +179,22 @@ class HandDrawnScatterPlot extends StatelessWidget {
   /// [HandDrawnScatterPlotPainter.clipToChartArea] for details.
   final bool clipToChartArea;
 
+  /// X-axis tick label configuration (rotation, thinning sensitivity).
+  /// Defaults to horizontal labels. See [ChartLabelConfig] for usage
+  /// and named presets.
+  final ChartLabelConfig xLabelConfig;
+
+  /// Legend layout configuration. Defaults to
+  /// [ChartLegendConfig.inlineBottom] — a single inline row at the
+  /// bottom of the chart, no box, hard-truncates on overflow. See
+  /// [ChartLegendConfig] for external boxed presets and the
+  /// standalone-widget composition pattern.
+  final ChartLegendConfig legendConfig;
+
+  /// Optional text style override for legend entry labels. When null,
+  /// derives from [labelStyle] at the chart's legend font size.
+  final TextStyle? legendStyle;
+
   @override
   Widget build(BuildContext context) {
     return buildChartBody(
@@ -196,6 +219,9 @@ class HandDrawnScatterPlot extends StatelessWidget {
           titleStyle: titleStyle,
           axisStrokeWidth: axisStrokeWidth,
           clipToChartArea: clipToChartArea,
+          xLabelConfig: xLabelConfig,
+          legendConfig: legendConfig,
+          legendStyle: legendStyle,
         ),
       ),
     );

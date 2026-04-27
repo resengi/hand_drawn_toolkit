@@ -133,7 +133,7 @@ void main() {
       expect(layout.chartArea.height, greaterThan(0));
     });
 
-    test('segment count matches non-zero segments', () {
+    test('segment count matches input segment count', () {
       final layout = _barPainter().computeLayout(kChartTestSize);
 
       // 3 bars × 1 segment each = 3 segments

@@ -38,7 +38,7 @@ HandDrawnBarChartPainter _painter(BarChartData data) =>
     HandDrawnBarChartPainter(data: data);
 
 void main() {
-  // ── Backward-compat (regression) ─────────────────────────────────────
+  // ── Backward-compat ──────────────────────────────────────────────────
 
   group('Legacy bars input — backward compat', () {
     test('every layout segment has innerBarIndex == 0', () {
@@ -267,7 +267,12 @@ void main() {
   // ── Edge cases ───────────────────────────────────────────────────────
 
   group('Edge cases', () {
-    test('zero-value segments are skipped', () {
+    test('zero-value segments preserve layout entries', () {
+      // Zero-value segments still produce a rect entry — just with
+      // zero height — so segment indices and hit-test metadata stay
+      // stable across data shapes that contain zero placeholders.
+      // Hit testing on a zero-height rect naturally returns false
+      // because Rect.contains excludes the bottom edge.
       final data = BarChartData(
         bars: [
           _bar('B', [0, 10, 0, 5]),
@@ -275,9 +280,47 @@ void main() {
         legend: const [LegendEntry(label: 'cat', color: _color)],
       );
       final layout = _painter(data).computeLayout(kChartTestSize);
-      // Only the two non-zero segments should produce rects.
-      expect(layout.segments, hasLength(2));
-      expect(layout.segments.map((s) => s.value).toList(), [10, 5]);
+      expect(layout.segments, hasLength(4));
+      expect(layout.segments.map((s) => s.value).toList(), [0, 10, 0, 5]);
+      // The two zero-valued entries have zero-height rects.
+      expect(layout.segments[0].bounds.height, 0);
+      expect(layout.segments[2].bounds.height, 0);
+      // The non-zero entries still have positive height.
+      expect(layout.segments[1].bounds.height, greaterThan(0));
+      expect(layout.segments[3].bounds.height, greaterThan(0));
+    });
+
+    test('mixed-sign stack: positives stack up, negatives stack down', () {
+      // A single bar with segments [10, -4, 6, -3] should produce two
+      // independent accumulators:
+      //   positive stack: 0 → 10 → 16
+      //   negative stack: 0 → -4 → -7
+      final data = BarChartData(
+        bars: [
+          _bar('B', [10, -4, 6, -3]),
+        ],
+        legend: const [LegendEntry(label: 'cat', color: _color)],
+      );
+      final layout = _painter(data).computeLayout(kChartTestSize);
+
+      expect(layout.segments, hasLength(4));
+
+      // Segment 0 (value 10): positive accumulator 0 → 10.
+      expect(layout.segments[0].cumulativeStart, 0);
+      expect(layout.segments[0].cumulativeEnd, 10);
+
+      // Segment 1 (value -4): negative accumulator 0 → -4. The
+      // positive accumulator is untouched.
+      expect(layout.segments[1].cumulativeStart, 0);
+      expect(layout.segments[1].cumulativeEnd, -4);
+
+      // Segment 2 (value 6): positive accumulator 10 → 16.
+      expect(layout.segments[2].cumulativeStart, 10);
+      expect(layout.segments[2].cumulativeEnd, 16);
+
+      // Segment 3 (value -3): negative accumulator -4 → -7.
+      expect(layout.segments[3].cumulativeStart, -4);
+      expect(layout.segments[3].cumulativeEnd, -7);
     });
 
     test('uneven inner-bar counts across categories render without crash', () {

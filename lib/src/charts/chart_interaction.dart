@@ -95,10 +95,10 @@ class BarSegmentLayout {
   /// The segment's original data value.
   final double value;
 
-  /// Cumulative value at the bottom of this segment.
+  /// Cumulative value before this segment is added to its accumulator.
   final double cumulativeStart;
 
-  /// Cumulative value at the top of this segment.
+  /// Cumulative value after this segment is added.
   final double cumulativeEnd;
 
   /// The logical (non-wobbly) bounding rectangle of this segment.

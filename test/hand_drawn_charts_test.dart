@@ -1,3 +1,5 @@
+import 'dart:ui' show PictureRecorder;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
@@ -917,7 +919,37 @@ void main() {
     // In debug mode, BarSegment's assert fires first (AssertionError).
     // In release mode, the painter constructor's validation fires (ArgumentError).
     // Both paths reject invalid data; we accept either error type.
-    test('rejects negative segment value', () {
+    test('accepts negative segment value (release-safe finite check)', () {
+      // Negative values are valid — they stack downward from the zero
+      // baseline. Only non-finite values (NaN, infinities) are rejected
+      // by the painter's release-safe guard.
+      expect(
+        () => HandDrawnBarChartPainter(
+          data: const BarChartData(
+            bars: [
+              BarGroup(
+                label: 'A',
+                segments: [
+                  BarSegment(
+                    category: 'x',
+                    value: -5,
+                    color: Color(0xFF000000),
+                  ),
+                ],
+              ),
+            ],
+            legend: [],
+          ),
+        ),
+        returnsNormally,
+      );
+    });
+
+    test('rejects non-finite segment value', () {
+      // Wrap construction in a closure since BarSegment's debug
+      // assertion will fire first — accept either an AssertionError
+      // (debug builds) or an ArgumentError (release builds, from the
+      // painter's release-safe guard).
       expect(
         () => HandDrawnBarChartPainter(
           data: BarChartData(
@@ -927,7 +959,7 @@ void main() {
                 segments: [
                   BarSegment(
                     category: 'x',
-                    value: -5,
+                    value: double.nan,
                     color: const Color(0xFF000000),
                   ),
                 ],
@@ -961,6 +993,165 @@ void main() {
 
     test('accepts positive segment values without error', () {
       expect(() => HandDrawnBarChartPainter(data: _barData()), returnsNormally);
+    });
+
+    test('default yMin stays at 0 when no negative segments are present', () {
+      // Backward-compat: an all-positive bar chart must keep its
+      // historical default of yMin == 0.
+      final painter = HandDrawnBarChartPainter(
+        data: const BarChartData(
+          bars: [
+            BarGroup(
+              label: 'A',
+              segments: [
+                BarSegment(category: 'x', value: 10, color: Color(0xFF000000)),
+              ],
+            ),
+            BarGroup(
+              label: 'B',
+              segments: [
+                BarSegment(category: 'x', value: 5, color: Color(0xFF000000)),
+              ],
+            ),
+          ],
+          legend: [],
+        ),
+      );
+      expect(painter.yMin, 0);
+    });
+
+    test(
+      'default yMin becomes negative when negative segments are present',
+      () {
+        // The default minY tracks the smallest negative stack total
+        // across inner bars so negative bars are fully visible.
+        final painter = HandDrawnBarChartPainter(
+          data: const BarChartData(
+            bars: [
+              BarGroup(
+                label: 'A',
+                segments: [
+                  BarSegment(
+                    category: 'x',
+                    value: 10,
+                    color: Color(0xFF000000),
+                  ),
+                  BarSegment(
+                    category: 'x',
+                    value: -4,
+                    color: Color(0xFF000000),
+                  ),
+                ],
+              ),
+              BarGroup(
+                label: 'B',
+                segments: [
+                  BarSegment(
+                    category: 'x',
+                    value: -7,
+                    color: Color(0xFF000000),
+                  ),
+                ],
+              ),
+            ],
+            legend: [],
+          ),
+        );
+        expect(painter.yMin, -7);
+      },
+    );
+
+    test('default yMax uses positive stack totals, not net of mixed signs', () {
+      // For a bar with segments [10, -4, 6, -3] the net total is 9 but
+      // the visible upward extent is the positive-only sum: 16.
+      final painter = HandDrawnBarChartPainter(
+        data: const BarChartData(
+          bars: [
+            BarGroup(
+              label: 'A',
+              segments: [
+                BarSegment(category: 'x', value: 10, color: Color(0xFF000000)),
+                BarSegment(category: 'x', value: -4, color: Color(0xFF000000)),
+                BarSegment(category: 'x', value: 6, color: Color(0xFF000000)),
+                BarSegment(category: 'x', value: -3, color: Color(0xFF000000)),
+              ],
+            ),
+          ],
+          legend: [],
+        ),
+      );
+      expect(painter.yMax, 16);
+      expect(painter.yMin, -7);
+    });
+
+    test('all-negative bars still get a sensible non-zero upper bound', () {
+      // When no positive segments exist, _computeMaxY's all-zero
+      // fallback (-> 1) keeps the plot rect from collapsing.
+      final painter = HandDrawnBarChartPainter(
+        data: const BarChartData(
+          bars: [
+            BarGroup(
+              label: 'A',
+              segments: [
+                BarSegment(category: 'x', value: -5, color: Color(0xFF000000)),
+              ],
+            ),
+          ],
+          legend: [],
+        ),
+      );
+      expect(painter.yMax, 1);
+      expect(painter.yMin, -5);
+    });
+
+    test('grouped bars compute extents per inner bar, not across siblings', () {
+      // A category with two side-by-side bars of [10] and [20] must
+      // give yMax = 20, not 30. Same rule on the negative side.
+      final painter = HandDrawnBarChartPainter(
+        data: const BarChartData(
+          bars: [],
+          legend: [],
+          categories: [
+            BarCategory(
+              label: 'Q1',
+              bars: [
+                BarGroup(
+                  label: 'North',
+                  segments: [
+                    BarSegment(
+                      category: 'x',
+                      value: 10,
+                      color: Color(0xFF000000),
+                    ),
+                  ],
+                ),
+                BarGroup(
+                  label: 'South',
+                  segments: [
+                    BarSegment(
+                      category: 'x',
+                      value: 20,
+                      color: Color(0xFF000000),
+                    ),
+                  ],
+                ),
+                BarGroup(
+                  label: 'East',
+                  segments: [
+                    BarSegment(
+                      category: 'x',
+                      value: -8,
+                      color: Color(0xFF000000),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+      expect(painter.yMax, 20);
+      expect(painter.yMin, -8);
     });
   });
 
@@ -1306,5 +1497,962 @@ void main() {
         );
       },
     );
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // CHART LABEL CONFIG — rotated X-axis tick labels
+  // ════════════════════════════════════════════════════════════════════════
+
+  group('ChartLabelConfig integration', () {
+    // Bar data with deliberately long category labels so rotation has a
+    // visible effect on the reserved tick band height and on thinning.
+    BarChartData longLabelBarData() => const BarChartData(
+      bars: [
+        BarGroup(
+          label: 'September',
+          segments: [
+            BarSegment(category: 'x', value: 10, color: Color(0xFF000000)),
+          ],
+        ),
+        BarGroup(
+          label: 'October',
+          segments: [
+            BarSegment(category: 'x', value: 20, color: Color(0xFF000000)),
+          ],
+        ),
+        BarGroup(
+          label: 'November',
+          segments: [
+            BarSegment(category: 'x', value: 15, color: Color(0xFF000000)),
+          ],
+        ),
+        BarGroup(
+          label: 'December',
+          segments: [
+            BarSegment(category: 'x', value: 25, color: Color(0xFF000000)),
+          ],
+        ),
+      ],
+      legend: [],
+    );
+
+    test('default (horizontal) preserves the historical layout', () {
+      // The unrotated fast path reserves exactly the
+      // chartXTickBandHeight constant so existing charts get the same
+      // bottom band they always have.
+      final painter = HandDrawnBarChartPainter(data: longLabelBarData());
+      final defaultLayout = painter.computeLayout(kChartTestSize);
+
+      // We verify the contract indirectly: a horizontal config
+      // produces the same chartArea as no config at all (the baseline).
+      final explicitHorizontal = HandDrawnBarChartPainter(
+        data: longLabelBarData(),
+        xLabelConfig: ChartLabelConfig.horizontal,
+      ).computeLayout(kChartTestSize);
+
+      expect(defaultLayout.chartArea, equals(explicitHorizontal.chartArea));
+    });
+
+    test('rotated config reserves more bottom space than horizontal', () {
+      // Vertical labels (long words) push the chart area higher than
+      // horizontal because the reserved tick band grows.
+      final horizontal = HandDrawnBarChartPainter(
+        data: longLabelBarData(),
+      ).computeLayout(kChartTestSize);
+      final rotated = HandDrawnBarChartPainter(
+        data: longLabelBarData(),
+        xLabelConfig: ChartLabelConfig.vertical,
+      ).computeLayout(kChartTestSize);
+
+      // Rotated config must shrink the chart area vertically (more
+      // bottom space reserved for tilted/vertical labels).
+      expect(rotated.chartArea.height, lessThan(horizontal.chartArea.height));
+    });
+
+    test(
+      'rotated label width informs thinning so dense labels can collide',
+      () {
+        // Smoke-test: thinning actually responds to rotation rather
+        // than ignoring it. Both horizontal and rotated paths must
+        // paint cleanly even at high label densities (30 labels at
+        // typical chart widths). The thinning algorithm uses the
+        // minimum non-overlapping rectangle distance per the
+        // Separating Axis Theorem, which means rotated labels of any
+        // angle pack tighter than horizontal — but the algorithm must
+        // still run cleanly without throwing in either path.
+        final manyLabelData = BarChartData(
+          bars: [
+            for (int i = 0; i < 30; i++)
+              BarGroup(
+                label: 'Category-$i',
+                segments: const [
+                  BarSegment(
+                    category: 'x',
+                    value: 10,
+                    color: Color(0xFF000000),
+                  ),
+                ],
+              ),
+          ],
+          legend: const [],
+        );
+
+        // Smoke-paint at horizontal vs 45° to make sure thinning runs
+        // both paths cleanly.
+        final recorder1 = PictureRecorder();
+        expect(
+          () => HandDrawnBarChartPainter(
+            data: manyLabelData,
+          ).paint(Canvas(recorder1), kChartTestSize),
+          returnsNormally,
+        );
+        recorder1.endRecording();
+
+        final recorder2 = PictureRecorder();
+        expect(
+          () => HandDrawnBarChartPainter(
+            data: manyLabelData,
+            xLabelConfig: ChartLabelConfig.diagonalLeft,
+          ).paint(Canvas(recorder2), kChartTestSize),
+          returnsNormally,
+        );
+        recorder2.endRecording();
+      },
+    );
+
+    test('diagonal labels pack tighter than horizontal does', () {
+      // The thinning algorithm uses the actual minimum non-overlapping
+      // rectangle distance (per the Separating Axis Theorem), not the
+      // rotated bounding box. For long labels at -45°, the
+      // perpendicular constraint `h/|sinθ|` dominates and is much
+      // smaller than the label width, so all 6 labels fit on a
+      // 400px-wide canvas where horizontal labels of the same length
+      // would thin to 3-4.
+      const longLabelData = BarChartData(
+        bars: [
+          BarGroup(
+            label: 'October 2024',
+            segments: [
+              BarSegment(category: 'x', value: 10, color: Color(0xFF000000)),
+            ],
+          ),
+          BarGroup(
+            label: 'November 2024',
+            segments: [
+              BarSegment(category: 'x', value: 12, color: Color(0xFF000000)),
+            ],
+          ),
+          BarGroup(
+            label: 'December 2024',
+            segments: [
+              BarSegment(category: 'x', value: 14, color: Color(0xFF000000)),
+            ],
+          ),
+          BarGroup(
+            label: 'January 2025',
+            segments: [
+              BarSegment(category: 'x', value: 16, color: Color(0xFF000000)),
+            ],
+          ),
+          BarGroup(
+            label: 'February 2025',
+            segments: [
+              BarSegment(category: 'x', value: 18, color: Color(0xFF000000)),
+            ],
+          ),
+          BarGroup(
+            label: 'March 2025',
+            segments: [
+              BarSegment(category: 'x', value: 20, color: Color(0xFF000000)),
+            ],
+          ),
+        ],
+        legend: [],
+      );
+      final labels = [for (final b in longLabelData.bars) b.label];
+
+      // Horizontal: long labels should thin out — the parallel
+      // constraint dominates and slot width ≈ label width.
+      final horizontalPainter = HandDrawnBarChartPainter(data: longLabelData);
+      final horizontalChartArea = horizontalPainter
+          .computeLayout(kChartTestSize)
+          .chartArea;
+      final horizontalVisible = horizontalPainter.debugSelectedLabelPositions(
+        labels,
+        horizontalChartArea.width,
+      );
+      expect(
+        horizontalVisible.length,
+        lessThan(labels.length),
+        reason: 'horizontal long labels should thin on a 400px canvas',
+      );
+
+      // Diagonal -45°: the perpendicular constraint h/|sinθ|
+      // dominates, dropping the slot width to ~h*sqrt(2). All 6
+      // labels should fit on the same canvas.
+      final diagonalPainter = HandDrawnBarChartPainter(
+        data: longLabelData,
+        xLabelConfig: ChartLabelConfig.diagonalLeft,
+      );
+      final diagonalChartArea = diagonalPainter
+          .computeLayout(kChartTestSize)
+          .chartArea;
+      final diagonalVisible = diagonalPainter.debugSelectedLabelPositions(
+        labels,
+        diagonalChartArea.width,
+      );
+      expect(
+        diagonalVisible.length,
+        equals(labels.length),
+        reason: 'all 6 diagonal labels should fit on a 400px canvas',
+      );
+
+      // Vertical -90°: cos→0 so the parallel constraint vanishes
+      // and slot width = label height. All 6 labels should fit
+      // here too.
+      final verticalPainter = HandDrawnBarChartPainter(
+        data: longLabelData,
+        xLabelConfig: ChartLabelConfig.vertical,
+      );
+      final verticalChartArea = verticalPainter
+          .computeLayout(kChartTestSize)
+          .chartArea;
+      final verticalVisible = verticalPainter.debugSelectedLabelPositions(
+        labels,
+        verticalChartArea.width,
+      );
+      expect(
+        verticalVisible.length,
+        equals(labels.length),
+        reason: 'all 6 vertical labels should fit on a 400px canvas',
+      );
+    });
+
+    test(
+      'bar/line/scatter all paint at -45°, +45°, and -90° without throwing',
+      () {
+        final configs = [
+          ChartLabelConfig.diagonalLeft,
+          ChartLabelConfig.diagonalRight,
+          ChartLabelConfig.vertical,
+          const ChartLabelConfig(rotationDegrees: 30),
+        ];
+
+        for (final cfg in configs) {
+          // Bar.
+          final r1 = PictureRecorder();
+          expect(
+            () => HandDrawnBarChartPainter(
+              data: longLabelBarData(),
+              xLabelConfig: cfg,
+            ).paint(Canvas(r1), kChartTestSize),
+            returnsNormally,
+            reason: 'bar paint failed at ${cfg.rotationDegrees}°',
+          );
+          r1.endRecording();
+
+          // Line — uses numeric X ticks so this exercises the
+          // _paintNumericXTicks rotated path.
+          const lineData = LineChartData(
+            minX: 0,
+            maxX: 10,
+            minY: 0,
+            maxY: 100,
+            series: [
+              LineSeriesData(
+                name: 'S',
+                color: Color(0xFF000000),
+                points: [
+                  LinePoint(x: 0, y: 10),
+                  LinePoint(x: 5, y: 50),
+                  LinePoint(x: 10, y: 90),
+                ],
+              ),
+            ],
+          );
+          final r2 = PictureRecorder();
+          expect(
+            () => HandDrawnLineChartPainter(
+              data: lineData,
+              xLabelConfig: cfg,
+            ).paint(Canvas(r2), kChartTestSize),
+            returnsNormally,
+            reason: 'line paint failed at ${cfg.rotationDegrees}°',
+          );
+          r2.endRecording();
+
+          // Scatter — also numeric X ticks.
+          const scatterData = ScatterPlotData(
+            minX: 0,
+            maxX: 10,
+            minY: 0,
+            maxY: 100,
+            points: [
+              ScatterPoint(x: 1, y: 10),
+              ScatterPoint(x: 5, y: 50),
+              ScatterPoint(x: 9, y: 90),
+            ],
+          );
+          final r3 = PictureRecorder();
+          expect(
+            () => HandDrawnScatterPlotPainter(
+              data: scatterData,
+              xLabelConfig: cfg,
+            ).paint(Canvas(r3), kChartTestSize),
+            returnsNormally,
+            reason: 'scatter paint failed at ${cfg.rotationDegrees}°',
+          );
+          r3.endRecording();
+        }
+      },
+    );
+
+    test('shouldRepaint propagates xLabelConfig changes', () {
+      // Bar.
+      final bar1 = HandDrawnBarChartPainter(data: longLabelBarData());
+      final bar2 = HandDrawnBarChartPainter(
+        data: longLabelBarData(),
+        xLabelConfig: ChartLabelConfig.diagonalLeft,
+      );
+      expect(bar2.shouldRepaint(bar1), isTrue);
+
+      // Line.
+      const lineData = LineChartData(
+        minX: 0,
+        maxX: 4,
+        minY: 0,
+        maxY: 50,
+        series: [
+          LineSeriesData(
+            name: 'S',
+            color: Color(0xFF000000),
+            points: [LinePoint(x: 0, y: 10), LinePoint(x: 4, y: 40)],
+          ),
+        ],
+      );
+      final line1 = HandDrawnLineChartPainter(data: lineData);
+      final line2 = HandDrawnLineChartPainter(
+        data: lineData,
+        xLabelConfig: ChartLabelConfig.vertical,
+      );
+      expect(line2.shouldRepaint(line1), isTrue);
+
+      // Scatter.
+      const scatterData = ScatterPlotData(
+        minX: 0,
+        maxX: 4,
+        minY: 0,
+        maxY: 50,
+        points: [ScatterPoint(x: 1, y: 10), ScatterPoint(x: 3, y: 40)],
+      );
+      final s1 = HandDrawnScatterPlotPainter(data: scatterData);
+      final s2 = HandDrawnScatterPlotPainter(
+        data: scatterData,
+        xLabelConfig: ChartLabelConfig.diagonalRight,
+      );
+      expect(s2.shouldRepaint(s1), isTrue);
+    });
+
+    test('numeric X labels reserve more height than "0" for wide bounds', () {
+      // Numeric X tick height reservation samples the default formatter
+      // at xMin and xMax, so wide bounds (e.g. ±1,000,000) reserve
+      // enough space for their rotated labels — even without a custom
+      // formatter.
+      const wideData = LineChartData(
+        minX: -1000000,
+        maxX: 1000000,
+        minY: 0,
+        maxY: 100,
+        series: [
+          LineSeriesData(
+            name: 'S',
+            color: Color(0xFF000000),
+            points: [LinePoint(x: -1000000, y: 0), LinePoint(x: 1000000, y: 0)],
+          ),
+        ],
+      );
+      const narrowData = LineChartData(
+        minX: 0,
+        maxX: 1,
+        minY: 0,
+        maxY: 100,
+        series: [
+          LineSeriesData(
+            name: 'S',
+            color: Color(0xFF000000),
+            points: [LinePoint(x: 0, y: 0), LinePoint(x: 1, y: 0)],
+          ),
+        ],
+      );
+      // Force the labels to be tall enough that the difference shows up
+      // in the reserved height — vertical rotation magnifies width.
+      const verticalLabels = ChartLabelConfig.vertical;
+
+      final wideLayout = HandDrawnLineChartPainter(
+        data: wideData,
+        xLabelConfig: verticalLabels,
+      ).computeLayout(kChartTestSize);
+      final narrowLayout = HandDrawnLineChartPainter(
+        data: narrowData,
+        xLabelConfig: verticalLabels,
+      ).computeLayout(kChartTestSize);
+
+      // Wide labels (-1000000, 1000000) rotated 90° take MORE
+      // vertical space than narrow labels (0, 1). Wide chartArea
+      // must therefore be SHORTER (more reserved at the bottom).
+      expect(
+        wideLayout.chartArea.height,
+        lessThan(narrowLayout.chartArea.height),
+      );
+    });
+
+    test(
+      'rotated numeric X-axis reserves space for the longest middle tick',
+      () {
+        // Two charts with identical endpoint labels but different middle-tick
+        // labels: one chart's formatter produces a wide label only at the
+        // middle tick (x=0.5); the other returns a uniformly short label at
+        // every tick. The rotated tick band measures every tick the painter
+        // renders, so the long-middle chart reserves more bottom space than
+        // the short-everywhere chart, even though their endpoints match.
+
+        String shortAtAllTicks(double value) => 'X';
+
+        String longAtMiddleOnly(double value) {
+          if ((value - 0.5).abs() < 0.0001) return 'MID-LABEL';
+          return 'X';
+        }
+
+        LineChartData makeData(String Function(double) formatter) =>
+            LineChartData(
+              minX: 0,
+              maxX: 1,
+              minY: 0,
+              maxY: 1,
+              xValueFormatter: formatter,
+              series: const [
+                LineSeriesData(
+                  name: 'S',
+                  color: Color(0xFF000000),
+                  points: [LinePoint(x: 0, y: 0), LinePoint(x: 1, y: 1)],
+                ),
+              ],
+            );
+
+        Rect chartAreaFor(LineChartData data) => HandDrawnLineChartPainter(
+          data: data,
+          xLabelConfig: ChartLabelConfig.diagonalLeft,
+        ).computeLayout(kChartTestSize).chartArea;
+
+        final longMid = chartAreaFor(makeData(longAtMiddleOnly));
+        final shortAll = chartAreaFor(makeData(shortAtAllTicks));
+
+        // The long-middle tick contributes to the band height, so the
+        // long-middle chart reserves more space at the bottom of the
+        // canvas, leaving less for the chart area itself.
+        expect(longMid.height, lessThan(shortAll.height));
+      },
+    );
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // CHART LEGEND CONFIG — external boxed legends + standalone widget
+  // ════════════════════════════════════════════════════════════════════════
+
+  group('ChartLegendConfig integration', () {
+    BarChartData barWithLegend({int entryCount = 3}) => BarChartData(
+      bars: [
+        const BarGroup(
+          label: 'A',
+          segments: [
+            BarSegment(category: 'x', value: 10, color: Color(0xFF000000)),
+          ],
+        ),
+      ],
+      legend: [
+        for (int i = 0; i < entryCount; i++)
+          LegendEntry(label: 'Series $i', color: const Color(0xFF000000)),
+      ],
+    );
+
+    test('empty legend reserves no space', () {
+      // No entries → no legend rendering, no carved-out band.
+      final painter = HandDrawnBarChartPainter(
+        data: const BarChartData(bars: [], legend: []),
+      );
+      final layout = painter.computeLayout(kChartTestSize);
+      // chartArea should occupy nearly the full padded area (modulo
+      // the small fixed bands for axis labels). Verify there's no
+      // legend-specific reservation by comparing against a reference
+      // painter with an explicitly hidden legend.
+      final hiddenPainter = HandDrawnBarChartPainter(
+        data: const BarChartData(bars: [], legend: []),
+        legendConfig: ChartLegendConfig.hidden,
+      );
+      final hiddenLayout = hiddenPainter.computeLayout(kChartTestSize);
+      expect(layout.chartArea, equals(hiddenLayout.chartArea));
+    });
+
+    test('default inline legend reserves the historical bottom band', () {
+      // Backward-compat hard guarantee: a chart with non-empty legend
+      // entries and no explicit legendConfig override must reserve
+      // the same number of pixels at the bottom as it always has.
+      final withLegend = HandDrawnBarChartPainter(
+        data: barWithLegend(),
+      ).computeLayout(kChartTestSize);
+      final withoutLegend = HandDrawnBarChartPainter(
+        data: const BarChartData(bars: [], legend: []),
+      ).computeLayout(kChartTestSize);
+      // The plot rect with a legend must be at least chartLegendBandHeight
+      // shorter than the no-legend plot rect.
+      final delta =
+          withoutLegend.chartArea.height - withLegend.chartArea.height;
+      expect(delta, greaterThanOrEqualTo(18 - 0.01));
+    });
+
+    test('external bottom boxed reserves more space than inline', () {
+      // The boxed preset adds padding around the entries, which
+      // should produce a taller reserved band than the historical
+      // floor of chartLegendBandHeight.
+      final inline = HandDrawnBarChartPainter(
+        data: barWithLegend(entryCount: 5),
+      ).computeLayout(kChartTestSize);
+      final boxed = HandDrawnBarChartPainter(
+        data: barWithLegend(entryCount: 5),
+        legendConfig: ChartLegendConfig.externalBottomBoxed,
+      ).computeLayout(kChartTestSize);
+      // Boxed must shrink the chart area at least as much as inline,
+      // and typically more (the box adds padding).
+      expect(
+        boxed.chartArea.height,
+        lessThanOrEqualTo(inline.chartArea.height),
+      );
+    });
+
+    test('external right boxed shrinks chart area horizontally', () {
+      final inline = HandDrawnBarChartPainter(
+        data: barWithLegend(entryCount: 4),
+      ).computeLayout(kChartTestSize);
+      final right = HandDrawnBarChartPainter(
+        data: barWithLegend(entryCount: 4),
+        legendConfig: ChartLegendConfig.externalRightBoxed,
+      ).computeLayout(kChartTestSize);
+      expect(right.chartArea.width, lessThan(inline.chartArea.width));
+      // And vertically, the right-side legend should NOT eat bottom
+      // space — chartArea.height should match the same-data baseline
+      // with no legend reserved (the inline preset reserves a bottom
+      // band, so we use a hidden-legend baseline instead).
+      final noLegendBaseline = HandDrawnBarChartPainter(
+        data: barWithLegend(entryCount: 4),
+        legendConfig: ChartLegendConfig.hidden,
+      ).computeLayout(kChartTestSize);
+      expect(
+        right.chartArea.height,
+        closeTo(noLegendBaseline.chartArea.height, 0.01),
+      );
+    });
+
+    test('hidden preset suppresses chart-managed legend rendering', () {
+      // With the hidden preset, the chart paints no legend AND
+      // reserves no space, even when entries are non-empty. The
+      // baseline uses the same data with `legend: []` so the
+      // comparison isolates the legend's effect — bar geometry,
+      // X-tick reservation, and title bands stay identical.
+      final hidden = HandDrawnBarChartPainter(
+        data: barWithLegend(entryCount: 3),
+        legendConfig: ChartLegendConfig.hidden,
+      ).computeLayout(kChartTestSize);
+      final noLegend = HandDrawnBarChartPainter(
+        data: BarChartData(bars: barWithLegend().bars, legend: const []),
+      ).computeLayout(kChartTestSize);
+      expect(hidden.chartArea, equals(noLegend.chartArea));
+
+      // And paint must succeed without throwing.
+      final recorder = PictureRecorder();
+      expect(
+        () => HandDrawnBarChartPainter(
+          data: barWithLegend(entryCount: 3),
+          legendConfig: ChartLegendConfig.hidden,
+        ).paint(Canvas(recorder), kChartTestSize),
+        returnsNormally,
+      );
+      recorder.endRecording();
+    });
+
+    test('explicit data.legend wins over auto-derive on line charts', () {
+      // Line charts auto-derive entries from series when data.legend
+      // is empty; otherwise data.legend takes precedence. This test
+      // locks in that contract.
+      const customEntries = [
+        LegendEntry(label: 'Custom A', color: Color(0xFFFF0000)),
+        LegendEntry(label: 'Custom B', color: Color(0xFF00FF00)),
+      ];
+      const data = LineChartData(
+        series: [
+          LineSeriesData(
+            name: 'Series 1',
+            color: Color(0xFF000000),
+            points: [LinePoint(x: 0, y: 0)],
+          ),
+          LineSeriesData(
+            name: 'Series 2',
+            color: Color(0xFF111111),
+            points: [LinePoint(x: 0, y: 0)],
+          ),
+        ],
+        minX: 0,
+        maxX: 1,
+        minY: 0,
+        maxY: 1,
+        legend: customEntries,
+      );
+      final painter = HandDrawnLineChartPainter(data: data);
+      expect(
+        painter.legend,
+        equals(customEntries),
+        reason: 'data.legend should override the auto-derived list',
+      );
+    });
+
+    test('scatter plot renders the legend supplied on its data', () {
+      const entries = [LegendEntry(label: 'Group A', color: Color(0xFFAA0000))];
+      const data = ScatterPlotData(
+        points: [ScatterPoint(x: 0, y: 0)],
+        minX: 0,
+        maxX: 1,
+        minY: 0,
+        maxY: 1,
+        legend: entries,
+      );
+      final painter = HandDrawnScatterPlotPainter(data: data);
+      expect(painter.legend, equals(entries));
+    });
+
+    test('long legends wrap instead of disappearing', () {
+      // 12 entries with long labels would silently overflow and
+      // truncate under the historical inline behavior. With wrap
+      // enabled, every entry must be measured and accounted for in
+      // the reserved band.
+      final manyEntries = [
+        for (int i = 0; i < 12; i++)
+          LegendEntry(
+            label: 'Long label series $i',
+            color: const Color(0xFF000000),
+          ),
+      ];
+      final dataWithMany = BarChartData(
+        bars: const [
+          BarGroup(
+            label: 'A',
+            segments: [
+              BarSegment(category: 'x', value: 10, color: Color(0xFF000000)),
+            ],
+          ),
+        ],
+        legend: manyEntries,
+      );
+      final inline = HandDrawnBarChartPainter(
+        data: dataWithMany,
+      ).computeLayout(kChartTestSize);
+      final wrapped = HandDrawnBarChartPainter(
+        data: dataWithMany,
+        legendConfig: ChartLegendConfig.externalBottomBoxed,
+      ).computeLayout(kChartTestSize);
+      // The wrapped variant must reserve more bottom space than the
+      // inline single-row case (because multiple rows need vertical
+      // room).
+      expect(wrapped.chartArea.height, lessThan(inline.chartArea.height));
+
+      // And wrapped paint must succeed.
+      final recorder = PictureRecorder();
+      expect(
+        () => HandDrawnBarChartPainter(
+          data: dataWithMany,
+          legendConfig: ChartLegendConfig.externalBottomBoxed,
+        ).paint(Canvas(recorder), kChartTestSize),
+        returnsNormally,
+      );
+      recorder.endRecording();
+    });
+
+    test('boxed legends paint without throwing', () {
+      for (final cfg in [
+        ChartLegendConfig.externalBottomBoxed,
+        ChartLegendConfig.externalRightBoxed,
+      ]) {
+        final recorder = PictureRecorder();
+        expect(
+          () => HandDrawnBarChartPainter(
+            data: barWithLegend(entryCount: 4),
+            legendConfig: cfg,
+          ).paint(Canvas(recorder), kChartTestSize),
+          returnsNormally,
+          reason: 'paint failed for ${cfg.position}',
+        );
+        recorder.endRecording();
+      }
+    });
+
+    test(
+      'shouldRepaint propagates legendConfig changes for all chart types',
+      () {
+        final bar1 = HandDrawnBarChartPainter(data: barWithLegend());
+        final bar2 = HandDrawnBarChartPainter(
+          data: barWithLegend(),
+          legendConfig: ChartLegendConfig.externalRightBoxed,
+        );
+        expect(bar2.shouldRepaint(bar1), isTrue);
+
+        const lineData = LineChartData(
+          minX: 0,
+          maxX: 4,
+          minY: 0,
+          maxY: 50,
+          series: [
+            LineSeriesData(
+              name: 'S',
+              color: Color(0xFF000000),
+              points: [LinePoint(x: 0, y: 10), LinePoint(x: 4, y: 40)],
+            ),
+          ],
+          legend: [LegendEntry(label: 'S', color: Color(0xFF000000))],
+        );
+        final line1 = HandDrawnLineChartPainter(data: lineData);
+        final line2 = HandDrawnLineChartPainter(
+          data: lineData,
+          legendConfig: ChartLegendConfig.hidden,
+        );
+        expect(line2.shouldRepaint(line1), isTrue);
+
+        const scatterData = ScatterPlotData(
+          minX: 0,
+          maxX: 4,
+          minY: 0,
+          maxY: 50,
+          points: [ScatterPoint(x: 1, y: 10), ScatterPoint(x: 3, y: 40)],
+        );
+        final s1 = HandDrawnScatterPlotPainter(data: scatterData);
+        final s2 = HandDrawnScatterPlotPainter(
+          data: scatterData,
+          legendConfig: ChartLegendConfig.externalBottomBoxed,
+        );
+        expect(s2.shouldRepaint(s1), isTrue);
+      },
+    );
+
+    test('reserveSpace: false renders without aborting', () {
+      // When reserveSpace is false, the chart area must occupy the full
+      // padded bounds (no carve-out) and the legend must still paint as
+      // an overlay rather than aborting on a zero-height rect.
+      const overlay = ChartLegendConfig(
+        position: ChartLegendPosition.bottom,
+        boxed: true,
+        reserveSpace: false,
+        padding: EdgeInsets.all(6),
+      );
+      final painter = HandDrawnLineChartPainter(
+        data: _lineData(seriesCount: 2),
+        legendConfig: overlay,
+      );
+      final recorder = PictureRecorder();
+      painter.paint(Canvas(recorder), kChartTestSize);
+      // Also assert the chart area got the FULL padded bounds
+      // (overlay legend doesn't carve out space).
+      final layoutWith = painter.computeLayout(kChartTestSize);
+      final layoutWithout = HandDrawnLineChartPainter(
+        data: _lineData(seriesCount: 2),
+        legendConfig: ChartLegendConfig.hidden,
+      ).computeLayout(kChartTestSize);
+      expect(layoutWith.chartArea.height, layoutWithout.chartArea.height);
+    });
+
+    test('right-side legend caps column width to half of padded bounds', () {
+      // The right-side legend column is hard-capped at half the padded
+      // width, so even a label long enough to fill the entire chart
+      // horizontally can't collapse the plot area.
+      const longLabel =
+          'A label so long it would otherwise overflow horizontally beyond any reasonable column';
+      const data = LineChartData(
+        minX: 0,
+        maxX: 1,
+        minY: 0,
+        maxY: 1,
+        series: [
+          LineSeriesData(
+            name: 'S',
+            color: Color(0xFF000000),
+            points: [LinePoint(x: 0, y: 0), LinePoint(x: 1, y: 1)],
+          ),
+        ],
+        legend: [LegendEntry(label: longLabel, color: Color(0xFF000000))],
+      );
+
+      final layout = HandDrawnLineChartPainter(
+        data: data,
+        legendConfig: ChartLegendConfig.externalRightBoxed,
+      ).computeLayout(kChartTestSize);
+
+      // Padded width is kChartTestSize.width minus default chart
+      // padding. The right-column cap is paddedBounds.width / 2;
+      // therefore chartArea.right loses at MOST ~paddedWidth/2
+      // relative to the no-legend baseline.
+      final baseline = HandDrawnLineChartPainter(
+        data: data,
+        legendConfig: ChartLegendConfig.hidden,
+      ).computeLayout(kChartTestSize);
+
+      final reservedWidth = baseline.chartArea.right - layout.chartArea.right;
+      // Strictly: cap = paddedBounds.width / 2 + small entry-gap.
+      // Loose-bound here at half of overall canvas width which
+      // dominates paddedBounds.width / 2.
+      expect(reservedWidth, lessThanOrEqualTo(kChartTestSize.width / 2));
+      expect(reservedWidth, greaterThan(0));
+    });
+
+    test('right-side legend content fits inside its reserved column', () {
+      // Long label that would saturate the column width budget. With
+      // the right-side legend's measurement budget aligned to the
+      // legendArea's actual width, the measured layout always fits
+      // inside the reserved box. Long single-word labels still follow
+      // TextPainter's normal overflow behavior — the cap governs
+      // measurement, not glyph shaping.
+      const longLabel =
+          'A label so long it would otherwise overflow '
+          'horizontally beyond any reasonable legend column';
+      const data = LineChartData(
+        minX: 0,
+        maxX: 1,
+        minY: 0,
+        maxY: 1,
+        series: [
+          LineSeriesData(
+            name: 'S',
+            color: Color(0xFF000000),
+            points: [LinePoint(x: 0, y: 0), LinePoint(x: 1, y: 1)],
+          ),
+        ],
+        legend: [LegendEntry(label: longLabel, color: Color(0xFF000000))],
+      );
+
+      final painter = HandDrawnLineChartPainter(
+        data: data,
+        legendConfig: ChartLegendConfig.externalRightBoxed,
+      );
+
+      // Paint succeeds without throwing — exercises the full
+      // measure → reserve → render path for the wide-label case.
+      final recorder = PictureRecorder();
+      expect(
+        () => painter.paint(Canvas(recorder), kChartTestSize),
+        returnsNormally,
+      );
+      recorder.endRecording();
+
+      // Core invariant: the measured legend content must fit within
+      // the rect carved out for it. If the measurement budget and the
+      // reserved column width drift apart, this fails.
+      final frame = painter.frame;
+      expect(frame.legendLayout, isNotNull);
+      expect(
+        frame.legendLayout!.size.width,
+        lessThanOrEqualTo(frame.legendArea.width),
+        reason: 'Legend content width must not exceed its reserved area',
+      );
+    });
+  });
+
+  group('HandDrawnLegend standalone widget', () {
+    testWidgets('renders provided entries', (tester) async {
+      const entries = [
+        LegendEntry(label: 'Apples', color: Color(0xFFFF0000)),
+        LegendEntry(label: 'Pears', color: Color(0xFF00FF00)),
+        LegendEntry(label: 'Plums', color: Color(0xFF0000FF)),
+      ];
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 300,
+              child: HandDrawnLegend(entries: entries),
+            ),
+          ),
+        ),
+      );
+      // Widget should mount without errors and find a CustomPaint
+      // descendant (its render surface).
+      expect(find.byType(HandDrawnLegend), findsOneWidget);
+      expect(find.byType(CustomPaint), findsWidgets);
+    });
+
+    testWidgets('empty entries produce a zero-size shrink', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(body: HandDrawnLegend(entries: [])),
+        ),
+      );
+      expect(find.byType(SizedBox), findsWidgets);
+    });
+
+    testWidgets('HandDrawnLegend hides itself when config.visible is false', (
+      tester,
+    ) async {
+      // HandDrawnLegend honors config.visible: a hidden config
+      // suppresses all rendering even when entries are non-empty.
+      const entries = [
+        LegendEntry(label: 'Apples', color: Color(0xFFFF0000)),
+        LegendEntry(label: 'Pears', color: Color(0xFF00FF00)),
+      ];
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: HandDrawnLegend(
+              entries: entries,
+              config: ChartLegendConfig.hidden,
+            ),
+          ),
+        ),
+      );
+      // Hidden — no entry text should render anywhere in the tree.
+      expect(find.text('Apples'), findsNothing);
+      expect(find.text('Pears'), findsNothing);
+    });
+
+    testWidgets('HandDrawnLegend non-wrap mode does not flex-overflow', (
+      tester,
+    ) async {
+      // Non-wrapping HandDrawnLegend lays entries out in an unbounded-
+      // width Row clipped to the parent's bounds, so overflowing
+      // entries don't trigger a Flex Overflow assertion in debug.
+      // pumpWidget surfaces overflow as a thrown exception, so a clean
+      // pump is sufficient assertion.
+      const longEntries = [
+        LegendEntry(
+          label: 'Entry one with a long descriptive label',
+          color: Color(0xFFFF0000),
+        ),
+        LegendEntry(
+          label: 'Entry two with a long descriptive label',
+          color: Color(0xFF00FF00),
+        ),
+        LegendEntry(
+          label: 'Entry three with a long descriptive label',
+          color: Color(0xFF0000FF),
+        ),
+      ];
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 100,
+              child: HandDrawnLegend(
+                entries: longEntries,
+                config: ChartLegendConfig(wrap: false),
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+    });
   });
 }

@@ -16,6 +16,8 @@ A lightweight Flutter package for rendering hand-drawn, sketchy UI elements: con
 
 - Realistic hand-drawn borders, dividers, and custom path shapes
 - **Charts** — bar (stacked, grouped), line (multi-series + function-backed), and scatter plots with wobbly axes, grid lines, titles, legends, auto-thinning labels, and optional zero-crossing axes
+- **Signed bar charts** — bar segments may be positive or negative; positive segments stack upward from the zero baseline, negative segments stack downward, and a single bar may mix the two
+- **Rotated tick labels and configurable legends** — opt into diagonal or vertical X-axis labels via `ChartLabelConfig`, and choose between inline, external boxed, right-side, or fully suppressed legends via `ChartLegendConfig`. A standalone `HandDrawnLegend` widget composes legends outside the chart's layout.
 - **Function-backed line series** — plot mathematical functions like `f(x) = x²` directly without manually generating point lists; sparse visible dots, dense smooth curves, and automatic discontinuity handling
 - **Per-series fill toggle and plot-area clipping** — opt out of the line fill on a per-series basis, and clip data rendering to the plot area to keep stray geometry from bleeding into axes and labels
 - **Tables** — column-aligned data tables with headers, row highlighting, titles, and optional row dividers
@@ -104,7 +106,7 @@ HandDrawnLineChart(
 
 The package supports three chart types with intentional restrictions:
 
-- **Bar charts** are categorical on X and numeric on Y. Stacked bar segments must have non-negative values and accumulate from a data baseline of `0.0`. The `minY`/`maxY` parameters control the visible Y-range, not the stacking origin.
+- **Bar charts** are categorical on X and numeric on Y. Stacked bar segments may be positive, negative, or zero; positive segments accumulate upward from the data baseline of `0.0`, negative segments accumulate downward, and a single bar may mix the two. The `minY`/`maxY` parameters control the visible Y-range, not the stacking origin.
 - **Line charts** are numeric on both axes and accept two kinds of series side by side: point-based `LineSeriesData` (consumer-supplied points) and function-based `FunctionSeriesData` (mathematical functions sampled across the x-domain). An optional `xLabels` list enables categorical X-axis display, but only when no `functionSeries` are present.
 - **Scatter plots** are numeric on both axes. Each point may have a custom dot radius.
 
@@ -205,7 +207,7 @@ BarChartData(
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `category` | `String` | required | Category identifier (used in legend and hit results) |
-| `value` | `double` | required | Segment height value (must be non-negative) |
+| `value` | `double` | required | Segment value (must be finite). Positive segments stack upward from `0`; negative segments stack downward |
 | `color` | `Color` | required | Stroke color (also used as fill base when `fillColor` is null) |
 | `fillColor` | `Color?` | `null` | Fill color. When null, falls back to `color` |
 | `fillAlpha` | `double?` | `0.15` | Fill opacity. Use `0.0` for empty, `1.0` for solid |
@@ -241,13 +243,14 @@ BarGroup(label: 'Mon', segments: [
 |-----------|------|---------|-------------|
 | `bars` | `List<BarGroup>` | required | Bar groups with labels and segments |
 | `categories` | `List<BarCategory>` | `[]` | Grouped-bar categories (use instead of `bars` for grouped charts) |
-| `legend` | `List<LegendEntry>` | required | Legend entries |
+| `legend` | `List<LegendEntry>` | `[]` | Legend entries |
 | `title` | `String?` | `null` | Chart title above the chart area |
 | `yAxisLabel` | `String?` | `null` | Rotated Y-axis title |
 | `xAxisLabel` | `String?` | `null` | X-axis title below tick labels |
-| `minY` | `double?` | `0` | Y-axis minimum |
-| `maxY` | `double?` | auto | Y-axis maximum (defaults to tallest bar total) |
+| `minY` | `double?` | auto | Y-axis minimum. `0` when all segments are non-negative; otherwise the smallest negative stack total |
+| `maxY` | `double?` | auto | Y-axis maximum (defaults to the largest positive stack total across inner bars) |
 | `yValueFormatter` | `AxisValueFormatter?` | `null` | Custom Y-axis label formatter |
+| `axisDisplay` | `AxisDisplay` | `AxisDisplay.edge` | Edge-aligned vs zero-crossing X axis. The `vertical` setting is a no-op on bar charts (X is categorical) |
 
 ### Line Chart
 
@@ -459,6 +462,85 @@ HandDrawnLineChart(
 )
 ```
 
+### Rotated X-axis labels
+
+For long category names or wide numeric labels, opt into rotation via `ChartLabelConfig`. Four named presets cover the common cases:
+
+```dart
+HandDrawnBarChart(
+  data: data,
+  xLabelConfig: ChartLabelConfig.diagonalLeft,   // -45°
+)
+
+// Other presets:
+ChartLabelConfig.horizontal     // 0° (default)
+ChartLabelConfig.diagonalRight  // +45°
+ChartLabelConfig.vertical       // -90°
+
+// Or specify any angle:
+const ChartLabelConfig(rotationDegrees: -30)
+```
+
+The X tick label band's reserved height grows automatically with rotation, so rotated labels never spill into the X-axis title band below them. Label thinning honors the rotated label's actual rectangle — vertical and diagonal rotations both let labels pack tighter than horizontal because their narrower dimension fronts the X axis.
+
+`ChartLabelConfig.minVisibleGap` controls how aggressively dense labels are thinned (default `8.0`).
+
+### Legend layout
+
+Legend rendering is controlled by `ChartLegendConfig`. The default preserves the historical inline-bottom behavior; opt into external boxed legends or suppress the chart-managed legend entirely:
+
+```dart
+// Inline single row at the bottom (default — historical behavior).
+HandDrawnLineChart(data: data)
+
+// External boxed legend below the chart, wrapping as needed.
+HandDrawnLineChart(
+  data: data,
+  legendConfig: ChartLegendConfig.externalBottomBoxed,
+)
+
+// External boxed legend on the right; the plot area shrinks to make room.
+HandDrawnLineChart(
+  data: data,
+  legendConfig: ChartLegendConfig.externalRightBoxed,
+)
+
+// Suppress the chart-managed legend entirely (use with HandDrawnLegend).
+HandDrawnLineChart(
+  data: data,
+  legendConfig: ChartLegendConfig.hidden,
+)
+```
+
+The four named presets cover almost every use case. For full control, construct `ChartLegendConfig` directly with `position`, `boxed`, `wrap`, `padding`, `spacing`, `runSpacing`, and `reserveSpace`.
+
+### Standalone `HandDrawnLegend` widget
+
+When you want to position a legend independently of any chart — above two side-by-side charts, in a sidebar, between a chart and a tooltip layer — pair `ChartLegendConfig.hidden` on the chart with a standalone `HandDrawnLegend`:
+
+```dart
+Column(
+  children: [
+    HandDrawnLegend(entries: barData.legend),
+    SizedBox(
+      height: 240,
+      child: HandDrawnBarChart(
+        data: barData,
+        legendConfig: ChartLegendConfig.hidden,
+      ),
+    ),
+  ],
+)
+```
+
+For line charts, where the legend is auto-derived from the series list, use `ChartLegendEntries.fromLineChartData(data)` so the standalone legend renders the exact same entries the chart would have:
+
+```dart
+HandDrawnLegend(entries: ChartLegendEntries.fromLineChartData(lineData))
+```
+
+`HandDrawnLegend` accepts the same `ChartLegendConfig` to control its layout (boxed/unboxed, wrap, position, padding). Defaults to `ChartLegendConfig.externalBottomBoxed` since standalone legends are most often placed in their own boxed container.
+
 ### Shared Chart Widget Properties
 
 All chart widgets (`HandDrawnBarChart`, `HandDrawnLineChart`, `HandDrawnScatterPlot`) accept these common parameters:
@@ -469,8 +551,7 @@ All chart widgets (`HandDrawnBarChart`, `HandDrawnLineChart`, `HandDrawnScatterP
 | `height` | `double` | `220` | Widget height |
 | `seed` | `int` | `42` | Deterministic wobble seed |
 | `axisColor` | `Color` | `Color(0xFF555555)` | Axis stroke color |
-| `gridColor` | `Color` | `Color(0xFFDDDDDD)` | Grid line color |
-| `grid` | `GridConfig` | `GridConfig.standard` | Grid configuration (lines, sub-grid, presets) |
+| `grid` | `GridConfig` | `GridConfig.standard` | Grid configuration. See `GridConfig` for color, stroke width, jitter ratio, sub-grid alpha, and on/off toggles per axis. |
 | `labelStyle` | `TextStyle?` | `null` | Axis label text style |
 | `irregularity` | `double` | `3.0` | Wobble magnitude |
 | `segments` | `int` | `12` | Segments per wobbly edge |
@@ -480,8 +561,8 @@ All chart widgets (`HandDrawnBarChart`, `HandDrawnLineChart`, `HandDrawnScatterP
 | `titleStyle` | `TextStyle?` | `null` | Chart title style override |
 | `legendStyle` | `TextStyle?` | `null` | Legend label style override |
 | `axisStrokeWidth` | `double` | `1.5` | Axis line thickness |
-| `gridStrokeWidth` | `double` | `0.5` | Grid line thickness |
-| `gridJitterRatio` | `double` | `0.3` | Grid wobble relative to axis wobble |
+| `xLabelConfig` | `ChartLabelConfig` | `ChartLabelConfig.horizontal` | X-axis label rotation and thinning sensitivity |
+| `legendConfig` | `ChartLegendConfig` | `ChartLegendConfig.inlineBottom` | Legend visibility, position (bottom or right), boxed/unboxed, and wrapping behavior |
 | `clipToChartArea` | `bool` | `false` | Clip data rendering to the plot area |
 | `emptyStyle` | `TextStyle?` | `null` | Empty-state message style |
 
@@ -494,6 +575,8 @@ The chart area is divided into vertical bands computed automatically:
 3. **X tick label band** — categorical or numeric X labels
 4. **X-axis title band** — optional axis title
 5. **Legend band** — optional color legend (auto-generated for multi-series line charts, including function series)
+
+When the legend is configured for the right-side position via `ChartLegendConfig.externalRightBoxed`, it carves out a column from the plot area's *width* instead of stacking below it. When labels are rotated via `ChartLabelConfig`, the X tick band's height grows to accommodate the rotated bounding boxes.
 
 When labels are too dense for the available width, the chart automatically thins them — always showing the first and last, with evenly spaced labels in between.
 
@@ -1014,6 +1097,10 @@ ListView.builder(
 **Hoist function-series functions to top-level or static** — `FunctionSeriesData.function` is compared by closure identity. Two inline `(x) => x * x` literals compare unequal, which can defeat memoization and cause unnecessary repaints. Define the function once at top level (`double parabola(double x) => x * x;`) and pass the reference.
 
 **Reach for `clipToChartArea` when data can leave the plot** — function series with asymptotes, scatter outliers, and any chart whose values can exceed the declared axis range benefit from `clipToChartArea: true`. The flag defaults to `false` so existing charts are unaffected; it's an opt-in safety net for the cases that need it.
+
+**Rotate long category labels rather than crowding them.** For 8+ categories with multi-word labels, `ChartLabelConfig.diagonalLeft` (-45°) or `ChartLabelConfig.vertical` (-90°) keeps every label readable without thinning. The X tick band's reserved height adjusts automatically.
+
+**Use external legends for charts with many series.** The default inline legend hard-truncates entries that don't fit on a single row. For 5+ series, switch to `ChartLegendConfig.externalBottomBoxed` (wraps to additional rows) or `ChartLegendConfig.externalRightBoxed` (vertical column).
 
 ## License
 

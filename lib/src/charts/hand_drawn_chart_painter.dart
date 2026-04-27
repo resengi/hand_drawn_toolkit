@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show listEquals;
+import 'package:flutter/foundation.dart' show listEquals, visibleForTesting;
 import 'package:flutter/material.dart';
 
 import '../hand_drawn_constants.dart';
@@ -58,6 +58,8 @@ abstract class HandDrawnChartPainter extends CustomPainter {
     this.legendStyle,
     this.axisStrokeWidth = chartAxisStrokeWidth,
     this.axisDisplay = AxisDisplay.edge,
+    this.xLabelConfig = ChartLabelConfig.horizontal,
+    this.legendConfig = ChartLegendConfig.inlineBottom,
     this.clipToChartArea = false,
   }) {
     if (yDivisions <= 0) {
@@ -97,12 +99,12 @@ abstract class HandDrawnChartPainter extends CustomPainter {
   final EdgeInsets padding;
   final List<String> xLabels;
 
-  /// Legend entries rendered below the chart area.
+  /// Legend entries for this chart.
   ///
-  /// Entries are laid out left-to-right in a single row. When chart width
-  /// cannot fit all entries, later entries are silently omitted. For best
-  /// results, use concise labels, keep entries to 4–6, and ensure adequate
-  /// chart width.
+  /// Layout, position, and styling are controlled via [legendConfig].
+  /// To render entries without the chart painting its own legend
+  /// (e.g. when composing a standalone [HandDrawnLegend]), pass
+  /// [ChartLegendConfig.hidden].
   final List<LegendEntry> legend;
   final String? title;
   final String? yAxisLabel;
@@ -125,19 +127,52 @@ abstract class HandDrawnChartPainter extends CustomPainter {
 
   final double axisStrokeWidth;
 
-  /// Per-axis display configuration. Defaults to edge-aligned axes
-  /// (the existing behavior). When set to zero-crossing, axis lines
-  /// are drawn at the zero position instead of the chart edge — but
-  /// only for numeric charts (line, scatter). Bar charts ignore this.
+  /// Per-axis display configuration. Defaults to edge-aligned axes.
+  /// When set to zero-crossing, an axis line is drawn at the zero
+  /// position instead of the chart edge — but only when zero is
+  /// strictly inside the visible range for that axis. The horizontal
+  /// setting applies to all numeric Y-range chart types (line,
+  /// scatter, and bar). The vertical setting requires a numeric X
+  /// scale and is therefore a no-op on bar charts (whose X axis is
+  /// categorical) and on line charts that don't configure
+  /// `xMin`/`xMax`.
   final AxisDisplay axisDisplay;
+
+  /// Per-axis tick label configuration (currently the X tick label
+  /// band — rotation, thinning sensitivity, and so on). Defaults to
+  /// horizontal labels. See [ChartLabelConfig] for usage.
+  final ChartLabelConfig xLabelConfig;
+
+  /// Legend layout configuration — visibility, position (bottom or
+  /// right), boxed/unboxed, wrapping, padding, spacing. Defaults to
+  /// [ChartLegendConfig.inlineBottom] (a single inline row at the
+  /// bottom of the chart, no box, hard-truncates on overflow). Opt
+  /// into external boxed legends with
+  /// [ChartLegendConfig.externalBottomBoxed] / `.externalRightBoxed`,
+  /// or suppress the chart-managed legend entirely with
+  /// [ChartLegendConfig.hidden] when composing your own
+  /// [HandDrawnLegend] widget.
+  final ChartLegendConfig legendConfig;
 
   /// Internal frame layout, set during [paint] via [buildFrame].
   late ChartFrameLayout _frame;
+
+  /// Cached wobbly-box path for the legend, retained across paints
+  /// when the legend rect hasn't changed. Generating the wobbly path
+  /// involves seeded RNG and segment construction — repeating it
+  /// every paint would be wasteful for charts inside scrolling lists.
+  Path? _cachedLegendBox;
+
+  /// The legend rect that [_cachedLegendBox] was generated for. Used
+  /// as the cache key — when the live rect's LTRB matches this, the
+  /// cached path is reused; otherwise we regenerate.
+  Rect? _cachedLegendRect;
 
   /// The internal frame layout, valid after [paint] has been called.
   /// Subclass painters may need it to call into shared geometry helpers
   /// (e.g. `bar_geometry.dart`) that work in canvas coordinates.
   @protected
+  @visibleForTesting
   ChartFrameLayout get frame => _frame;
 
   /// The main plotting region. Read-only; computed during [paint].
@@ -162,10 +197,15 @@ abstract class HandDrawnChartPainter extends CustomPainter {
       title: title,
       titleStyle: titleStyle,
       labelStyle: labelStyle,
+      legendTextStyle: _effectiveLegendStyle,
       xAxisLabel: xAxisLabel,
       xLabels: xLabels,
       hasNumericXAxis: _hasNumericXAxis,
-      hasLegend: legend.isNotEmpty,
+      legendEntries: legend,
+      legendConfig: legendConfig,
+      xLabelConfig: xLabelConfig,
+      xValueFormatter: xValueFormatter,
+      xDivisions: xDivisions,
     );
   }
 
@@ -190,7 +230,7 @@ abstract class HandDrawnChartPainter extends CustomPainter {
     } else {
       paintData(canvas, size);
     }
-    if (legend.isNotEmpty) _paintLegend(canvas, size);
+    if (legend.isNotEmpty && legendConfig.visible) _paintLegend(canvas);
   }
 
   /// Override in subclasses to paint chart-specific content.
@@ -221,6 +261,8 @@ abstract class HandDrawnChartPainter extends CustomPainter {
         oldDelegate.legendStyle != legendStyle ||
         oldDelegate.axisStrokeWidth != axisStrokeWidth ||
         oldDelegate.axisDisplay != axisDisplay ||
+        oldDelegate.xLabelConfig != xLabelConfig ||
+        oldDelegate.legendConfig != legendConfig ||
         !listEquals(oldDelegate.xLabels, xLabels) ||
         !listEquals(oldDelegate.legend, legend);
   }
@@ -228,14 +270,6 @@ abstract class HandDrawnChartPainter extends CustomPainter {
   bool get _hasNumericXAxis => xMin != null && xMax != null;
 
   // ── Text helper ──────────────────────────────────────────────────────
-
-  TextPainter _layoutText(String text, TextStyle style) {
-    final tp = TextPainter(
-      text: TextSpan(text: text, style: style),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    return tp;
-  }
 
   /// Resolved title style: caller override or derived from [labelStyle].
   TextStyle get _effectiveTitleStyle =>
@@ -253,19 +287,12 @@ abstract class HandDrawnChartPainter extends CustomPainter {
 
   String formatYValue(double value) {
     if (yValueFormatter != null) return yValueFormatter!(value);
-    return _defaultFormat(value);
+    return defaultNumericFormatter(value);
   }
 
   String formatXValue(double value) {
     if (xValueFormatter != null) return xValueFormatter!(value);
-    return _defaultFormat(value);
-  }
-
-  /// Neutral numeric formatter. No domain assumptions.
-  static String _defaultFormat(double value) {
-    if (value == value.roundToDouble()) return value.toInt().toString();
-    if (value.abs() < 100) return value.toStringAsFixed(1);
-    return value.round().toString();
+    return defaultNumericFormatter(value);
   }
 
   // ── Wobble shared helpers ────────────────────────────────────────────
@@ -358,50 +385,6 @@ abstract class HandDrawnChartPainter extends CustomPainter {
       }
     }
     return path;
-  }
-
-  /// Builds a wobbly rectangle as one continuous closed path.
-  Path wobblyRect(
-    Rect rect,
-    int rectSeed, {
-    double? jitter,
-    int segmentCount = wobblyRectSegments,
-  }) {
-    final irr = jitter ?? irregularity;
-    final tl = rect.topLeft;
-    final tr = rect.topRight;
-    final br = rect.bottomRight;
-    final bl = rect.bottomLeft;
-
-    final path = Path()..moveTo(tl.dx, tl.dy);
-    _addEdge(path, tl, tr, rectSeed, irr, segmentCount);
-    _addEdge(path, tr, br, rectSeed + 1, irr, segmentCount);
-    _addEdge(path, br, bl, rectSeed + 2, irr, segmentCount);
-    _addEdge(path, bl, tl, rectSeed + 3, irr, segmentCount);
-    path.close();
-    return path;
-  }
-
-  /// Appends one edge to [path] without starting a new sub-path.
-  void _addEdge(
-    Path path,
-    Offset from,
-    Offset to,
-    int edgeSeed,
-    double irr,
-    int segs,
-  ) {
-    final offsets = _smoothedOffsets2D(edgeSeed, segs, irr);
-    for (int i = 1; i <= segs; i++) {
-      final t = i / segs;
-      final x = from.dx + (to.dx - from.dx) * t;
-      final y = from.dy + (to.dy - from.dy) * t;
-      if (i == segs) {
-        path.lineTo(to.dx, to.dy);
-      } else {
-        path.lineTo(x + offsets.x[i], y + offsets.y[i]);
-      }
-    }
   }
 
   /// Builds a wobbly circle path by jittering the radius at each point.
@@ -586,7 +569,7 @@ abstract class HandDrawnChartPainter extends CustomPainter {
   // ── Title ────────────────────────────────────────────────────────────
 
   void _paintTitle(Canvas canvas, Rect padded) {
-    final tp = _layoutText(title!, _effectiveTitleStyle);
+    final tp = layoutText(title!, _effectiveTitleStyle);
     tp.paint(
       canvas,
       Offset(padded.left + (padded.width - tp.width) / 2, padded.top),
@@ -596,7 +579,7 @@ abstract class HandDrawnChartPainter extends CustomPainter {
   // ── Y-axis label ────────────────────────────────────────────────────
 
   void _paintYAxisLabel(Canvas canvas, Rect padded) {
-    final tp = _layoutText(yAxisLabel!, labelStyle);
+    final tp = layoutText(yAxisLabel!, labelStyle);
     canvas.save();
     final x = padded.left - tp.height - chartYAxisLabelOffset;
     final y = chartArea.top + (chartArea.height + tp.width) / 2;
@@ -614,7 +597,7 @@ abstract class HandDrawnChartPainter extends CustomPainter {
       final value = yMin + (yMax - yMin) * fraction;
       final y = chartArea.bottom - chartArea.height * fraction;
 
-      final tp = _layoutText(formatYValue(value), labelStyle);
+      final tp = layoutText(formatYValue(value), labelStyle);
       tp.paint(
         canvas,
         Offset(chartArea.left - tp.width - chartYLabelGap, y - tp.height / 2),
@@ -640,6 +623,8 @@ abstract class HandDrawnChartPainter extends CustomPainter {
       ..color = axisColor
       ..strokeWidth = chartTickStrokeWidth;
 
+    final isRotated = xLabelConfig.isRotated;
+
     for (int i = 0; i < xLabels.length; i++) {
       final x = xPositionForLabel(i, xLabels.length);
 
@@ -650,11 +635,21 @@ abstract class HandDrawnChartPainter extends CustomPainter {
       );
 
       if (positions.contains(i)) {
-        final tp = _layoutText(xLabels[i], labelStyle);
-        tp.paint(
-          canvas,
-          Offset(x - tp.width / 2, chartArea.bottom + chartTickLabelGap),
-        );
+        final tp = layoutText(xLabels[i], labelStyle);
+        if (isRotated) {
+          _paintRotatedXLabel(
+            canvas: canvas,
+            tp: tp,
+            tickX: x,
+            tickTopY: chartArea.bottom + chartTickLabelGap,
+            angleDegrees: xLabelConfig.rotationDegrees,
+          );
+        } else {
+          tp.paint(
+            canvas,
+            Offset(x - tp.width / 2, chartArea.bottom + chartTickLabelGap),
+          );
+        }
       }
     }
   }
@@ -682,6 +677,7 @@ abstract class HandDrawnChartPainter extends CustomPainter {
         formatXValue(xMin! + (xMax! - xMin!) * (i / xDivisions)),
     ];
     final visible = _selectLabelPositions(labels, chartArea.width);
+    final isRotated = xLabelConfig.isRotated;
 
     for (int i = 0; i <= xDivisions; i++) {
       final fraction = i / xDivisions;
@@ -694,20 +690,64 @@ abstract class HandDrawnChartPainter extends CustomPainter {
       );
 
       if (visible.contains(i)) {
-        final tp = _layoutText(labels[i], labelStyle);
-        tp.paint(
-          canvas,
-          Offset(x - tp.width / 2, chartArea.bottom + chartTickLabelGap),
-        );
+        final tp = layoutText(labels[i], labelStyle);
+        if (isRotated) {
+          _paintRotatedXLabel(
+            canvas: canvas,
+            tp: tp,
+            tickX: x,
+            tickTopY: chartArea.bottom + chartTickLabelGap,
+            angleDegrees: xLabelConfig.rotationDegrees,
+          );
+        } else {
+          tp.paint(
+            canvas,
+            Offset(x - tp.width / 2, chartArea.bottom + chartTickLabelGap),
+          );
+        }
       }
     }
+  }
+
+  /// Paints an X tick label rotated around its tick anchor.
+  ///
+  /// The pivot is `(tickX, tickTopY)` — the top of where the unrotated
+  /// label would otherwise sit. The text bounding box is anchored so
+  /// the corner closest to the tick stays pinned at that pivot:
+  ///
+  /// - For [angleDegrees] ≤ 0 (the typical case for long-label
+  ///   diagonals like -45° and -90° vertical) we anchor the unrotated
+  ///   upper-right corner at the pivot, so the text fans down and to
+  ///   the left of the tick.
+  /// - For positive angles we anchor the unrotated upper-left corner,
+  ///   so the text fans down and to the right.
+  ///
+  /// In both cases the pivot itself sits [chartTickLabelGap] below the
+  /// tick line, which preserves the same vertical gap-to-tick that the
+  /// horizontal path produces — labels never sit on top of their ticks
+  /// regardless of rotation.
+  void _paintRotatedXLabel({
+    required Canvas canvas,
+    required TextPainter tp,
+    required double tickX,
+    required double tickTopY,
+    required double angleDegrees,
+  }) {
+    final theta = angleDegrees * math.pi / 180.0;
+    final dx = angleDegrees <= 0 ? -tp.width : 0.0;
+
+    canvas.save();
+    canvas.translate(tickX, tickTopY);
+    canvas.rotate(theta);
+    tp.paint(canvas, Offset(dx, 0));
+    canvas.restore();
   }
 
   // ── X-axis title ─────────────────────────────────────────────────────
 
   void _paintXAxisTitle(Canvas canvas) {
     final xTickH = _frame.xTickHeight;
-    final tp = _layoutText(xAxisLabel!, labelStyle);
+    final tp = layoutText(xAxisLabel!, labelStyle);
     tp.paint(
       canvas,
       Offset(
@@ -722,13 +762,34 @@ abstract class HandDrawnChartPainter extends CustomPainter {
   List<int> _selectLabelPositions(List<String> labels, double width) {
     if (labels.length <= 2) return List.generate(labels.length, (i) => i);
 
-    double maxW = 0;
+    // Minimum non-overlapping horizontal distance between adjacent
+    // rotated labels, derived via the Separating Axis Theorem applied
+    // to two same-orientation rectangles. Reduces to `w` at θ=0
+    // (horizontal labels) and to `h` at θ=±90° (vertical labels). For
+    // diagonal angles, the perpendicular-projection term `h/|sinθ|`
+    // typically dominates, giving much tighter packing than a
+    // bounding-box approach would — which is what we want, since
+    // diagonal labels' bounding boxes interleave their empty corners
+    // without the text actually overlapping.
+    final theta = xLabelConfig.rotationRadians;
+    final cosT = math.cos(theta).abs();
+    final sinT = math.sin(theta).abs();
+
+    double maxLabelW = 0;
+    double maxLabelH = 0;
     for (final label in labels) {
-      final tp = _layoutText(label, labelStyle);
-      if (tp.width > maxW) maxW = tp.width;
+      final tp = layoutText(label, labelStyle);
+      if (tp.width > maxLabelW) maxLabelW = tp.width;
+      if (tp.height > maxLabelH) maxLabelH = tp.height;
     }
 
-    final slotWidth = maxW + chartLabelThinningGap;
+    // Explicit zero-guards: at θ=0 only the parallel constraint
+    // applies; at θ=±π/2 only the perpendicular constraint applies.
+    final parallelLimit = cosT == 0 ? double.infinity : maxLabelW / cosT;
+    final perpendicularLimit = sinT == 0 ? double.infinity : maxLabelH / sinT;
+    final visualWidth = math.min(parallelLimit, perpendicularLimit);
+
+    final slotWidth = visualWidth + xLabelConfig.minVisibleGap;
     if (slotWidth <= 0) return [0, labels.length - 1];
     final maxLabels = (width / slotWidth).floor().clamp(2, labels.length);
     if (maxLabels >= labels.length) {
@@ -746,27 +807,83 @@ abstract class HandDrawnChartPainter extends CustomPainter {
     return result;
   }
 
+  /// Test-only accessor for the label thinning algorithm. Returns the
+  /// indices into [labels] of the labels that would render visibly given
+  /// the chart-area [width] in logical pixels and the painter's current
+  /// [xLabelConfig] and [labelStyle]. Not part of the public API; used
+  /// by tests that need to verify thinning behavior.
+  @visibleForTesting
+  List<int> debugSelectedLabelPositions(List<String> labels, double width) =>
+      _selectLabelPositions(labels, width);
+
   // ── Legend ────────────────────────────────────────────────────────────
 
-  void _paintLegend(Canvas canvas, Size size) {
-    double x = chartArea.left;
-    final maxX = chartArea.right;
-    final y = size.height - padding.bottom - chartLegendBottomOffset;
+  void _paintLegend(Canvas canvas) {
+    final layout = _frame.legendLayout;
+    final rect = _frame.legendArea;
+    if (layout == null || layout.origins.isEmpty || rect.isEmpty) return;
 
-    for (final entry in legend) {
-      final tp = _layoutText(entry.label, _effectiveLegendStyle);
+    // Optional wobbly box border around the legend rect. The path is
+    // cached across paints — regenerated only when the rect changes
+    // (Dart's Rect equality is value-based on LTRB, so this works
+    // without explicit hashing). This is material when the chart
+    // sits inside a scrolling list: re-running the seeded RNG and
+    // segment construction every frame would otherwise stutter.
+    if (legendConfig.boxed) {
+      if (_cachedLegendBox == null || _cachedLegendRect != rect) {
+        final helpers = HandDrawnHelpers(
+          seed: seed + chartLegendBoxSeedOffset,
+          segments: wobblyRectSegments,
+          irregularity: irregularity,
+        );
+        _cachedLegendBox = helpers.rectBorder(rect.size).shift(rect.topLeft);
+        _cachedLegendRect = rect;
+      }
+      final boxPaint = Paint()
+        ..color = axisColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = chartTickStrokeWidth
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+      canvas.drawPath(_cachedLegendBox!, boxPaint);
+    }
 
-      final entryWidth = chartLegendTextOffset + tp.width + chartLegendEntryGap;
-      if (x + entryWidth > maxX && x > chartArea.left) break;
+    // Anchor inside the rect: indent by padding when boxed; otherwise
+    // vertical-center the content within the available rect height so
+    // the legend sits midway in its reserved band.
+    final innerLeft =
+        rect.left + (legendConfig.boxed ? legendConfig.padding.left : 0.0);
+    final innerTop = legendConfig.boxed
+        ? rect.top + legendConfig.padding.top
+        : rect.top + (rect.height - layout.size.height) / 2;
+
+    // Walk the pre-computed entry origins and paint each one. Index i
+    // ties each laid-out entry back to its `legend` entry — order is
+    // preserved by `layoutLegend`, and truncated layouts contain a
+    // strict prefix of `legend`.
+    for (int i = 0; i < layout.origins.length; i++) {
+      final (painter, origin) = layout.origins[i];
+      final entry = legend[i];
+      final entryX = innerLeft + origin.dx;
+      final entryY = innerTop + origin.dy;
+      // For right-position legends, painters may have wrapped onto
+      // multiple lines and report a height larger than rowHeight
+      // (which is the floor: max single-line height or dot
+      // diameter). Take the max so the dot sits at the vertical
+      // center of the actual entry's row, not the floor's row.
+      final entryRowHeight = math.max(layout.rowHeight, painter.height);
+      final centerY = entryY + entryRowHeight / 2;
 
       final dotPaint = Paint()..color = entry.color;
       canvas.drawCircle(
-        Offset(x + chartLegendDotOffset, y),
+        Offset(entryX + chartLegendDotOffset, centerY),
         chartLegendDotRadius,
         dotPaint,
       );
-      tp.paint(canvas, Offset(x + chartLegendTextOffset, y - tp.height / 2));
-      x += entryWidth;
+      painter.paint(
+        canvas,
+        Offset(entryX + chartLegendTextOffset, centerY - painter.height / 2),
+      );
     }
   }
 
@@ -783,11 +900,4 @@ abstract class HandDrawnChartPainter extends CustomPainter {
   /// Delegates to the internal frame layout for consistency with
   /// `computeLayout()`.
   double xToCanvasValue(double value) => _frame.xToCanvasValue(value);
-
-  /// Converts a point index to canvas X coordinate (for categorical axes).
-  @Deprecated('Use xToCanvasValue or xPositionForLabel instead')
-  double xToCanvas(int index, int total) {
-    if (total <= 1) return chartArea.center.dx;
-    return chartArea.left + chartArea.width * index / (total - 1);
-  }
 }

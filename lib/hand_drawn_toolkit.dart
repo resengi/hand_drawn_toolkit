@@ -6,9 +6,11 @@
 /// The package supports three chart types with intentional restrictions:
 ///
 /// - **Bar charts** are categorical on X and numeric on Y. Stacked bar
-///   segments must have non-negative values and accumulate from a data
-///   baseline of `0.0`. The `minY`/`maxY` parameters control the visible
-///   Y-range, not the stacking origin.
+///   segments may have positive or negative values; positive segments
+///   stack upward from the data baseline of `0.0`, negative segments
+///   stack downward, and a single bar may mix the two. The
+///   `minY`/`maxY` parameters control the visible Y-range, not the
+///   stacking origin.
 /// - **Line charts** are numeric on both axes. Points should be sorted
 ///   by X for coherent rendering.
 /// - **Scatter plots** are numeric on both axes.
@@ -43,6 +45,7 @@ export 'src/charts/chart_data.dart';
 export 'src/charts/chart_interaction.dart';
 export 'src/charts/hand_drawn_bar_chart.dart';
 export 'src/charts/hand_drawn_chart_painter.dart';
+export 'src/charts/hand_drawn_legend.dart';
 export 'src/charts/hand_drawn_line_chart.dart';
 export 'src/charts/hand_drawn_scatter_plot.dart';
 export 'src/hand_drawn_container.dart';

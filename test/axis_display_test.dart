@@ -58,6 +58,36 @@ ScatterPlotData _scatter({
   );
 }
 
+/// Default bar data for axisDisplay tests. Mixes positive and negative
+/// segments so zero-crossing actually has somewhere to cross.
+BarChartData _bar({AxisDisplay axisDisplay = AxisDisplay.edge}) {
+  return BarChartData(
+    bars: const [
+      BarGroup(
+        label: 'Q1',
+        segments: [
+          BarSegment(category: 'rev', value: 12, color: Color(0xFF000000)),
+          BarSegment(category: 'rev', value: -5, color: Color(0xFF000000)),
+        ],
+      ),
+      BarGroup(
+        label: 'Q2',
+        segments: [
+          BarSegment(category: 'rev', value: 8, color: Color(0xFF000000)),
+        ],
+      ),
+      BarGroup(
+        label: 'Q3',
+        segments: [
+          BarSegment(category: 'rev', value: -7, color: Color(0xFF000000)),
+        ],
+      ),
+    ],
+    legend: const [LegendEntry(label: 'rev', color: Color(0xFF000000))],
+    axisDisplay: axisDisplay,
+  );
+}
+
 void main() {
   // ── Data model ───────────────────────────────────────────────────────
 
@@ -273,7 +303,7 @@ void main() {
       'mixed-sign line (multiple zero crossings) paints without throwing',
       () {
         // Exercises the sign-split fill path on a series that crosses
-        // zero four times. A regression in the split logic would likely
+        // zero four times. A bug in the split logic would likely
         // surface here as a throw or degenerate path.
         const data = LineChartData(
           minX: 0,
@@ -336,6 +366,154 @@ void main() {
       );
       expect(b.shouldRepaint(a), isTrue);
     });
+
+    test('bar painter repaints when axisDisplay changes', () {
+      final a = HandDrawnBarChartPainter(data: _bar());
+      final b = HandDrawnBarChartPainter(
+        data: _bar(
+          axisDisplay: const AxisDisplay(
+            horizontal: AxisDisplayMode.zeroCrossing,
+          ),
+        ),
+      );
+      expect(b.shouldRepaint(a), isTrue);
+    });
+  });
+
+  // ── Bar chart with axisDisplay ───────────────────────────────────────
+
+  group('Bar chart geometry with negative segments', () {
+    test('BarChartData defaults to AxisDisplay.edge', () {
+      expect(_bar().axisDisplay, AxisDisplay.edge);
+    });
+
+    test('mixed-sign stack: positive segments above zero, negatives below', () {
+      // Q1 stack is [12, -5]: positive part fills [0, 12], negative
+      // part fills [-5, 0]. After mapping into canvas coords (Y inverted),
+      // the positive rect's bottom must be at the y=0 canvas line and
+      // its top above; the negative rect's top must be at the y=0 line
+      // and its bottom below.
+      final layout = HandDrawnBarChartPainter(
+        data: _bar(),
+      ).computeLayout(kChartTestSize);
+
+      // Find Q1's two segments by category index.
+      final q1 = layout.segments.where((s) => s.barIndex == 0).toList();
+      expect(q1, hasLength(2));
+
+      // Positive accumulator: 0 → 12.
+      final positive = q1.firstWhere((s) => s.value == 12);
+      expect(positive.cumulativeStart, 0);
+      expect(positive.cumulativeEnd, 12);
+
+      // Negative accumulator: 0 → -5.
+      final negative = q1.firstWhere((s) => s.value == -5);
+      expect(negative.cumulativeStart, 0);
+      expect(negative.cumulativeEnd, -5);
+
+      // The two rects must meet at the same canvas Y (the y=0 line):
+      // positive's bottom == negative's top.
+      expect(
+        (positive.bounds.bottom - negative.bounds.top).abs(),
+        lessThan(0.5),
+      );
+    });
+
+    test('axisDisplay does not affect bar segment rects', () {
+      // Switching axis-line placement must not move bar geometry.
+      final edge = HandDrawnBarChartPainter(
+        data: _bar(),
+      ).computeLayout(kChartTestSize);
+      final zero = HandDrawnBarChartPainter(
+        data: _bar(
+          axisDisplay: const AxisDisplay(
+            horizontal: AxisDisplayMode.zeroCrossing,
+            vertical: AxisDisplayMode.zeroCrossing,
+          ),
+        ),
+      ).computeLayout(kChartTestSize);
+      expect(edge.segments.length, zero.segments.length);
+      for (int i = 0; i < edge.segments.length; i++) {
+        expect(edge.segments[i].bounds, equals(zero.segments[i].bounds));
+      }
+    });
+
+    test('hit testing works for negative-value segments', () {
+      final layout = HandDrawnBarChartPainter(
+        data: _bar(),
+      ).computeLayout(kChartTestSize);
+      // Q3 is the all-negative bar (single segment value -7).
+      final q3Negative = layout.segments.firstWhere((s) => s.value == -7);
+      // A point inside that rect must hit-test back to the same segment.
+      expect(layout.hitTest(q3Negative.bounds.center), isNotNull);
+    });
+  });
+
+  group('Bar chart smoke tests with axisDisplay', () {
+    final modes = <({String label, AxisDisplay display})>[
+      (label: 'edge defaults', display: AxisDisplay.edge),
+      (
+        label: 'horizontal zero-crossing only',
+        display: const AxisDisplay(horizontal: AxisDisplayMode.zeroCrossing),
+      ),
+      (
+        label: 'vertical zero-crossing only (no-op on bar charts)',
+        display: const AxisDisplay(vertical: AxisDisplayMode.zeroCrossing),
+      ),
+      (
+        label: 'both axes zero-crossing',
+        display: const AxisDisplay(
+          horizontal: AxisDisplayMode.zeroCrossing,
+          vertical: AxisDisplayMode.zeroCrossing,
+        ),
+      ),
+    ];
+
+    for (final mode in modes) {
+      test('bar paints under ${mode.label} without throwing', () {
+        final recorder = PictureRecorder();
+        final canvas = Canvas(recorder);
+        final painter = HandDrawnBarChartPainter(
+          data: _bar(axisDisplay: mode.display),
+        );
+        expect(() => painter.paint(canvas, kChartTestSize), returnsNormally);
+        recorder.endRecording();
+      });
+    }
+
+    test(
+      'bar with all-positive data + zeroCrossing requested falls back to edge',
+      () {
+        // No negatives → isZeroVisibleY is false → axis silently stays
+        // at the chart bottom edge. Just verify paint succeeds.
+        const data = BarChartData(
+          bars: [
+            BarGroup(
+              label: 'A',
+              segments: [
+                BarSegment(category: 'x', value: 10, color: Color(0xFF000000)),
+              ],
+            ),
+            BarGroup(
+              label: 'B',
+              segments: [
+                BarSegment(category: 'x', value: 20, color: Color(0xFF000000)),
+              ],
+            ),
+          ],
+          legend: [],
+          axisDisplay: AxisDisplay(horizontal: AxisDisplayMode.zeroCrossing),
+        );
+        final recorder = PictureRecorder();
+        expect(
+          () => HandDrawnBarChartPainter(
+            data: data,
+          ).paint(Canvas(recorder), kChartTestSize),
+          returnsNormally,
+        );
+        recorder.endRecording();
+      },
+    );
   });
 
   // ── Sign-flip crossing detection (fill contract) ─────────────────────
@@ -343,7 +521,7 @@ void main() {
   // The zero-crossing fill splits its polygon at every strict sign flip
   // (y0*y1 < 0), inserting an interpolated crossing X. We can't assert
   // on raw Path contents without Canvas mocking, but we CAN lock in the
-  // math that drives the split — any regression in how crossings are
+  // math that drives the split — any change in how crossings are
   // detected or interpolated will show up here before it surfaces as a
   // rendering bug.
 

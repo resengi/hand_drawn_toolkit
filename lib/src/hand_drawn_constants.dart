@@ -148,7 +148,6 @@ const double chartLegendDotRadius = 4.0;
 const double chartLegendDotOffset = 5.0;
 const double chartLegendTextOffset = 13.0;
 const double chartLegendEntryGap = 12.0;
-const double chartLegendBottomOffset = 2.0;
 
 // ── Chart rendering parameters ─────────────────────────────────────────────
 
@@ -187,21 +186,22 @@ const int barSegmentSeedStep = 10;
 
 /// Seed offset added per inner bar within a grouped-bar category. When
 /// the chart has no grouping (a single inner bar per category), the
-/// `innerBarIndex` is always 0 → contributes 0 to the seed → wobble
-/// patterns for stacked-only charts remain bit-identical to pre-grouped
-/// rendering.
+/// `innerBarIndex` is always 0 → contributes 0 to the seed → adjacent
+/// stacked segments still get distinct wobble via the segment-index
+/// term.
 ///
 /// **Practical limit:** the seed scheme uses
 /// `categoryIndex*100 + innerBarIndex*1 + segmentIndex*10`. Because
 /// `barInnerSeedMultiplier` (1) divides into `barSegmentSeedStep` (10),
 /// distinct `(innerBarIndex, segmentIndex)` pairs collide once
 /// `innerBarIndex >= 10` (e.g. innerBarIndex=10, segmentIndex=0 collides
-/// with innerBarIndex=0, segmentIndex=1). The pre-existing scheme already
-/// implies a "≤9 segments per bar" limit from the same multiplier choice,
-/// so this just extends the same constraint to "≤9 inner bars per
-/// category" — well above any realistic grouped-bar UX. If you ever need
-/// more, rework the multipliers as a coherent set rather than tweaking
-/// just this one (which would silently change wobble for existing charts).
+/// with innerBarIndex=0, segmentIndex=1). The scheme already implies a
+/// "≤9 segments per bar" limit from the same multiplier choice, so
+/// this just extends the same constraint to "≤9 inner bars per
+/// category" — well above any realistic grouped-bar UX. If you ever
+/// need more, rework the multipliers as a coherent set rather than
+/// tweaking just this one (which would silently change wobble for
+/// existing charts).
 const int barInnerSeedMultiplier = 1;
 const int lineChartSeedOffset = 4000;
 const int lineDotSeedOffset = 5000;
@@ -214,6 +214,13 @@ const int linePointSeedStep = 10;
 const int lineRunSeedMultiplier = 100;
 const int scatterSeedOffset = 6000;
 const int scatterPointSeedStep = 10;
+
+/// Seed offset for the wobbly border drawn around external boxed
+/// legends. Sits clear of the chart-content seed buckets above
+/// (`barChartSeedOffset = 3000`, `lineChartSeedOffset = 4000`,
+/// `lineDotSeedOffset = 5000`, `scatterSeedOffset = 6000`) so legend
+/// wobble doesn't share a phase with any data series.
+const int chartLegendBoxSeedOffset = 7000;
 
 // ── Bar chart rendering ────────────────────────────────────────────────────
 
