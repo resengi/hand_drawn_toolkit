@@ -381,5 +381,30 @@ void main() {
       );
       recorder.endRecording();
     });
+
+    test('grouped-only data does not require explicit bars argument', () {
+      // Categories take precedence over bars, so a grouped chart can
+      // omit `bars:` entirely. The data class const-constructs and
+      // renders normally.
+      const data = BarChartData(
+        categories: [
+          BarCategory(
+            label: 'A',
+            bars: [
+              BarGroup(
+                label: 'a',
+                segments: [BarSegment(category: 'x', value: 10, color: _color)],
+              ),
+            ],
+          ),
+        ],
+      );
+      expect(data.bars, isEmpty);
+      expect(data.resolvedCategories, hasLength(1));
+
+      final painter = _painter(data);
+      final layout = painter.computeLayout(kChartTestSize);
+      expect(layout.segments, hasLength(1));
+    });
   });
 }

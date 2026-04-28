@@ -326,6 +326,62 @@ void main() {
       final spacing = dividerParents[1].left! - dividerParents[0].left!;
       expect(spacing, closeTo(middleColumnWidth, 0.01));
     });
+
+    testWidgets('vertical dividers do not extend into the title band', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          const SizedBox(
+            width: 400,
+            child: HandDrawnTable(
+              title: 'Leaderboard',
+              columns: _columns,
+              rows: _rows,
+              columnDividers: TableDividerStyle(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final titleBottomY = tester.getBottomLeft(find.text('Leaderboard')).dy;
+
+      final verticalDividers = tester.widgetList<HandDrawnDivider>(
+        find.byWidgetPredicate(
+          (w) => w is HandDrawnDivider && w.direction == Axis.vertical,
+        ),
+      );
+      expect(verticalDividers, isNotEmpty);
+
+      for (final divider in verticalDividers) {
+        final dividerTopY = tester.getTopLeft(find.byWidget(divider)).dy;
+        expect(
+          dividerTopY,
+          greaterThanOrEqualTo(titleBottomY),
+          reason:
+              'Column divider top ($dividerTopY) must sit at or below the '
+              'title bottom ($titleBottomY).',
+        );
+      }
+    });
+
+    testWidgets('title and column dividers compose without throwing', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          const HandDrawnTable(
+            title: 'Quarterly Revenue Report 2024',
+            columns: _columns,
+            rows: _rows,
+            columnDividers: TableDividerStyle(),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.text('Quarterly Revenue Report 2024'), findsOneWidget);
+    });
   });
 
   // ── Narrow-width layout (flex-space clamp) ──────────────────────────
@@ -689,7 +745,7 @@ void main() {
     });
   });
 
-  // ── Text overflow configurability (Step 3.1) ────────────────────────
+  // ── Text overflow configurability ───────────────────────────────────
 
   group('HandDrawnTable text overflow', () {
     testWidgets('uses ellipsis by default', (tester) async {
@@ -715,9 +771,47 @@ void main() {
       final clipTexts = texts.where((t) => t.overflow == TextOverflow.clip);
       expect(clipTexts, isNotEmpty);
     });
+
+    testWidgets('cells default to single line, no soft wrap', (tester) async {
+      await tester.pumpWidget(
+        _wrap(const HandDrawnTable(columns: _columns, rows: _rows)),
+      );
+      final cellTexts = tester
+          .widgetList<Text>(find.byType(Text))
+          .where((t) => t.maxLines != null)
+          .toList();
+      expect(cellTexts, isNotEmpty);
+      for (final t in cellTexts) {
+        expect(t.maxLines, 1);
+        expect(t.softWrap, isFalse);
+      }
+    });
+
+    testWidgets('cells respect custom cellMaxLines and softWrap', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          const HandDrawnTable(
+            columns: _columns,
+            rows: _rows,
+            cellMaxLines: 3,
+            softWrap: true,
+          ),
+        ),
+      );
+      final cellTexts = tester
+          .widgetList<Text>(find.byType(Text))
+          .where((t) => t.maxLines == 3)
+          .toList();
+      expect(cellTexts, isNotEmpty);
+      for (final t in cellTexts) {
+        expect(t.softWrap, isTrue);
+      }
+    });
   });
 
-  // ── Horizontal scrolling (Step 3.3) ─────────────────────────────────
+  // ── Horizontal scrolling ────────────────────────────────────────────
 
   group('HandDrawnTable horizontal scroll', () {
     testWidgets('wraps content in SingleChildScrollView when enabled', (

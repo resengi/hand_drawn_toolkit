@@ -104,10 +104,12 @@ class TableDividerStyle {
 ///
 /// ## Layout
 ///
-/// This table is designed for compact, summary-style data. All cells render
-/// with `maxLines: 1` and [textOverflow] (defaults to [TextOverflow.ellipsis]),
-/// so long cell content is truncated rather than wrapped. For wider content,
-/// use explicit [HandDrawnTableColumn.width] values or enable
+/// This table is designed for compact, summary-style data. By default,
+/// all cells render with a single line and [textOverflow]
+/// (defaulting to [TextOverflow.ellipsis]) so long content is
+/// truncated rather than wrapped. For multi-line cells, set
+/// [cellMaxLines] and [softWrap] together. For wider content, use
+/// explicit [HandDrawnTableColumn.width] values or enable
 /// [horizontalScroll].
 ///
 /// ```dart
@@ -140,6 +142,8 @@ class HandDrawnTable extends StatelessWidget {
     this.rowPadding = tableRowVerticalPadding,
     this.titleBottomPadding = tableTitleBottomPadding,
     this.textOverflow = TextOverflow.ellipsis,
+    this.cellMaxLines = 1,
+    this.softWrap = false,
     this.horizontalScroll = false,
     this.seed = HandDrawnDefaults.seed,
     this.irregularity = HandDrawnDefaults.irregularity,
@@ -180,8 +184,13 @@ class HandDrawnTable extends StatelessWidget {
   /// Message shown when [rows] is empty.
   final String emptyMessage;
 
-  /// Row divider configuration. Null (default) disables row dividers.
-  /// Provide a [TableDividerStyle] to enable dividers between data rows.
+  /// Row divider configuration.
+  ///
+  /// Null (default) disables dividers between data rows. The
+  /// header-to-data divider is always drawn — with default styling
+  /// when this is null, or with the configured styling when set.
+  /// Provide a [TableDividerStyle] to enable dividers between data
+  /// rows in addition to the header divider.
   final TableDividerStyle? rowDividers;
 
   /// Column divider configuration. Null (default) disables column dividers.
@@ -199,6 +208,24 @@ class HandDrawnTable extends StatelessWidget {
 
   /// How overflowing cell text is handled. Defaults to [TextOverflow.ellipsis].
   final TextOverflow textOverflow;
+
+  /// Maximum number of lines a cell may render. Defaults to `1`, which
+  /// pairs with the default [textOverflow] of [TextOverflow.ellipsis]
+  /// to truncate long content on a single line.
+  ///
+  /// Set higher (e.g. `2` or `3`) when cells contain content that
+  /// benefits from wrapping. For wrapping to take effect, also set
+  /// [softWrap] to `true`; otherwise the cell will hard-truncate at
+  /// the available width without breaking words.
+  final int cellMaxLines;
+
+  /// Whether cell text wraps onto multiple lines at soft break points.
+  /// Defaults to `false`, matching the compact summary-table aesthetic.
+  ///
+  /// Pair with [cellMaxLines] greater than `1` to render wrapped
+  /// multi-line cells. Setting `softWrap: true` with `cellMaxLines: 1`
+  /// has no visible effect — there is only one line to render.
+  final bool softWrap;
 
   /// When true, the table body is wrapped in a horizontal [ScrollView].
   ///
@@ -280,15 +307,14 @@ class HandDrawnTable extends StatelessWidget {
       }
     }
 
-    final content = Column(
+    // The grid (headers + data rows + dividers) is the unit that column
+    // dividers overlay. The title sits above the grid as a sibling so the
+    // overlaid vertical dividers cannot extend into the title's vertical
+    // band.
+    final grid = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (title != null)
-          Padding(
-            padding: EdgeInsets.only(bottom: titleBottomPadding),
-            child: Text(title!, style: _titleStyle),
-          ),
         if (rows.isEmpty)
           Center(child: Text(emptyMessage, style: _emptyStyle))
         else ...[
@@ -302,7 +328,7 @@ class HandDrawnTable extends StatelessWidget {
       ],
     );
 
-    // Wrap content with column divider overlay when enabled.
+    // Wrap grid with column divider overlay when enabled.
     Widget body;
     if (columnDividers != null && rows.isNotEmpty) {
       if (horizontalScroll) {
@@ -311,7 +337,7 @@ class HandDrawnTable extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           child: SizedBox(
             width: totalWidth,
-            child: _columnDividerStack(content, _columnBoundaries(totalWidth)),
+            child: _columnDividerStack(grid, _columnBoundaries(totalWidth)),
           ),
         );
       } else {
@@ -319,7 +345,7 @@ class HandDrawnTable extends StatelessWidget {
         body = LayoutBuilder(
           builder: (context, constraints) {
             return _columnDividerStack(
-              content,
+              grid,
               _columnBoundaries(constraints.maxWidth),
             );
           },
@@ -329,10 +355,26 @@ class HandDrawnTable extends StatelessWidget {
       body = horizontalScroll
           ? SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: SizedBox(width: totalWidth, child: content),
+              child: SizedBox(width: totalWidth, child: grid),
             )
-          : content;
+          : grid;
     }
+
+    // Title sits above the body so column dividers (when enabled) overlay
+    // only the grid, not the title.
+    final child = title == null
+        ? body
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: EdgeInsets.only(bottom: titleBottomPadding),
+                child: Text(title!, style: _titleStyle),
+              ),
+              body,
+            ],
+          );
 
     return HandDrawnContainer(
       padding: padding,
@@ -341,7 +383,7 @@ class HandDrawnTable extends StatelessWidget {
       strokeWidth: strokeWidth,
       strokeColor: strokeColor,
       backgroundColor: backgroundColor,
-      child: body,
+      child: child,
     );
   }
 
@@ -448,8 +490,8 @@ class HandDrawnTable extends StatelessWidget {
         child: Text(
           cells[i],
           style: style,
-          maxLines: 1,
-          softWrap: false,
+          maxLines: cellMaxLines,
+          softWrap: softWrap,
           overflow: textOverflow,
         ),
       );

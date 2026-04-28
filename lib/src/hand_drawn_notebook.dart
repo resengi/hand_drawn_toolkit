@@ -124,6 +124,13 @@ class _HandDrawnNotebookLinesPainter extends CustomPainter {
   final int segments;
 
   // ── Path caching ─────────────────────────────────────────────────────────
+  //
+  // The generated paths are cached on the painter instance and reused
+  // when [paint] is called multiple times on the same instance for
+  // the same size. Flutter typically constructs a new painter each
+  // rebuild, so this cache primarily helps when the painter is
+  // retained or when the parent triggers a repaint without
+  // rebuilding the [CustomPaint].
 
   List<Path>? _cachedPaths;
   Size? _lastSize;

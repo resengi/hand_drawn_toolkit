@@ -149,6 +149,7 @@ class HandDrawnScatterPlot extends StatelessWidget {
     this.titleStyle,
     this.axisStrokeWidth = chartAxisStrokeWidth,
     this.emptyStyle,
+    this.emptyMessage = 'No data for this range',
     this.clipToChartArea = false,
     this.xLabelConfig = ChartLabelConfig.horizontal,
     this.legendConfig = ChartLegendConfig.inlineBottom,
@@ -173,6 +174,9 @@ class HandDrawnScatterPlot extends StatelessWidget {
   final TextStyle? titleStyle;
   final double axisStrokeWidth;
   final TextStyle? emptyStyle;
+
+  /// Message shown when [data] is non-null but empty.
+  final String emptyMessage;
 
   /// When `true`, data rendering is clipped to the chart's plot area so
   /// outlier points can't paint outside the chart. See
@@ -202,6 +206,7 @@ class HandDrawnScatterPlot extends StatelessWidget {
       isEmpty: data?.isEmpty ?? true,
       height: height,
       emptyStyle: emptyStyle,
+      emptyMessage: emptyMessage,
       builder: () => CustomPaint(
         size: Size.infinite,
         painter: HandDrawnScatterPlotPainter(

@@ -177,14 +177,23 @@ class HandDrawnHelpers {
 /// wrapped height. The default `double.infinity` preserves the
 /// historical "single-line, unbounded width" behavior for callers
 /// that don't need wrapping.
+///
+/// When [maxLines] and [ellipsis] are both provided, lines beyond the
+/// limit are truncated and the truncation marker is appended. This
+/// only takes effect under a finite [maxWidth] — without a width
+/// constraint the painter has no notion of where to truncate.
 TextPainter layoutText(
   String text,
   TextStyle style, {
   double maxWidth = double.infinity,
+  int? maxLines,
+  String? ellipsis,
 }) {
   final tp = TextPainter(
     text: TextSpan(text: text, style: style),
     textDirection: TextDirection.ltr,
+    maxLines: maxLines,
+    ellipsis: ellipsis,
   )..layout(maxWidth: maxWidth);
   return tp;
 }

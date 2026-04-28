@@ -68,6 +68,21 @@ abstract class HandDrawnChartPainter extends CustomPainter {
     if (xDivisions <= 0) {
       throw ArgumentError.value(xDivisions, 'xDivisions', 'must be positive');
     }
+    // Finite-value checks run before the ordering checks below: NaN
+    // comparisons return false in Dart, so without these guards a NaN
+    // bound would slip past `yMin > yMax` and produce silent NaN canvas
+    // coordinates downstream.
+    if (!yMin.isFinite || !yMax.isFinite) {
+      throw ArgumentError(
+        'yMin and yMax must be finite, got yMin=$yMin, yMax=$yMax',
+      );
+    }
+    if (xMin != null && !xMin!.isFinite) {
+      throw ArgumentError.value(xMin, 'xMin', 'must be finite');
+    }
+    if (xMax != null && !xMax!.isFinite) {
+      throw ArgumentError.value(xMax, 'xMax', 'must be finite');
+    }
     if (yMin > yMax) {
       throw ArgumentError('yMin ($yMin) must be <= yMax ($yMax)');
     }
@@ -95,7 +110,18 @@ abstract class HandDrawnChartPainter extends CustomPainter {
   /// The [left] value controls the gutter reserved for Y-axis labels.
   /// The default (40 px) suits short numeric labels. When using a
   /// [yValueFormatter] that produces longer strings (e.g. `"$1,234.56"`),
-  /// increase [left] to prevent label clipping.
+  /// increase [left] to prevent label clipping. The same applies when
+  /// using a [labelStyle] with a larger font: the Y-axis title (when
+  /// [yAxisLabel] is set) reserves left-gutter space proportional to
+  /// the rendered text height, so increase [left] enough to clear the
+  /// label height plus a few pixels of breathing room.
+  ///
+  /// With rotated x-axis labels (see [ChartLabelConfig]), increase
+  /// [left] and/or [right] when the first or last tick label is long:
+  /// rotation reserves vertical space in the X tick band but does not
+  /// adjust horizontal padding, so a long diagonal or vertical label
+  /// at an edge tick can spill into the Y-label gutter or past the
+  /// chart's right edge.
   final EdgeInsets padding;
   final List<String> xLabels;
 
@@ -157,10 +183,12 @@ abstract class HandDrawnChartPainter extends CustomPainter {
   /// Internal frame layout, set during [paint] via [buildFrame].
   late ChartFrameLayout _frame;
 
-  /// Cached wobbly-box path for the legend, retained across paints
-  /// when the legend rect hasn't changed. Generating the wobbly path
-  /// involves seeded RNG and segment construction — repeating it
-  /// every paint would be wasteful for charts inside scrolling lists.
+  /// Cached wobbly-box path for the legend, retained on the painter
+  /// instance across paints when the legend rect hasn't changed.
+  /// Generating the wobbly path involves seeded RNG and segment
+  /// construction — repeating it every paint would be wasteful when
+  /// the same painter instance is reused (e.g. when the parent
+  /// triggers a repaint without rebuilding the [CustomPaint]).
   Path? _cachedLegendBox;
 
   /// The legend rect that [_cachedLegendBox] was generated for. Used
@@ -177,8 +205,11 @@ abstract class HandDrawnChartPainter extends CustomPainter {
 
   /// The main plotting region. Read-only; computed during [paint].
   ///
-  /// Consumers should use the layout objects returned by `computeLayout()`
-  /// instead of reading this directly.
+  /// Throws `LateInitializationError` if accessed before [paint] has
+  /// run; calling `computeLayout()` does not initialize this getter.
+  /// Consumers should read `chartArea` from a `BarChartLayout`,
+  /// `LineChartLayout`, or `ScatterPlotLayout` returned by
+  /// `computeLayout()` instead of reading this directly.
   Rect get chartArea => _frame.chartArea;
 
   /// Builds the canonical [ChartFrameLayout] for a given [size].
@@ -823,7 +854,10 @@ abstract class HandDrawnChartPainter extends CustomPainter {
     final rect = _frame.legendArea;
     if (layout == null || layout.origins.isEmpty || rect.isEmpty) return;
 
-    // Optional wobbly box border around the legend rect. The path is
+    // Optional wobbly box border around the legend rect. Painted
+    // unclipped: the hand-drawn wobble is meant to extend a couple
+    // of pixels past the rect's mathematical edges, matching how
+    // every other wobbly box in the package renders. The path is
     // cached across paints — regenerated only when the rect changes
     // (Dart's Rect equality is value-based on LTRB, so this works
     // without explicit hashing). This is material when the chart
@@ -847,6 +881,15 @@ abstract class HandDrawnChartPainter extends CustomPainter {
         ..strokeJoin = StrokeJoin.round;
       canvas.drawPath(_cachedLegendBox!, boxPaint);
     }
+
+    // Clip only the entry painting to the reserved rect so neither
+    // overflowing entry text nor color dots can paint into adjacent
+    // chart bands (X tick labels, axis title, plot area). A
+    // right-position legend with many entries or a bottom legend
+    // with an unusually wide single label would otherwise spill
+    // beyond its reservation.
+    canvas.save();
+    canvas.clipRect(rect);
 
     // Anchor inside the rect: indent by padding when boxed; otherwise
     // vertical-center the content within the available rect height so
@@ -885,6 +928,8 @@ abstract class HandDrawnChartPainter extends CustomPainter {
         Offset(entryX + chartLegendTextOffset, centerY - painter.height / 2),
       );
     }
+
+    canvas.restore();
   }
 
   // ── Coordinate helpers for subclasses ────────────────────────────────

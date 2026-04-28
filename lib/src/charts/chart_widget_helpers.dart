@@ -9,13 +9,15 @@ import '../hand_drawn_constants.dart';
 /// null nor empty), which defers widget construction and avoids
 /// null-assertion crashes when data is null.
 ///
-/// Pass [emptyStyle] to customize the "No data" message appearance.
+/// Pass [emptyStyle] to customize the "No data" message appearance,
+/// and [emptyMessage] to override the message text itself.
 Widget buildChartBody({
   required bool isLoading,
   required bool isEmpty,
   required double height,
   required Widget Function() builder,
   TextStyle? emptyStyle,
+  String emptyMessage = 'No data for this range',
 }) {
   if (isLoading) {
     return SizedBox(
@@ -34,7 +36,7 @@ Widget buildChartBody({
       height: height,
       child: Center(
         child: Text(
-          'No data for this range',
+          emptyMessage,
           style:
               emptyStyle ??
               const TextStyle(

@@ -224,6 +224,27 @@ void main() {
       expect(find.text('No data for this range'), findsOneWidget);
     });
 
+    testWidgets('renders custom emptyMessage when provided', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const HandDrawnLineChart(
+            data: LineChartData(
+              series: [
+                LineSeriesData(name: 'A', points: [], color: Color(0xFF000000)),
+              ],
+              minX: 0,
+              maxX: 10,
+              minY: 0,
+              maxY: 100,
+            ),
+            emptyMessage: 'Nothing to show yet',
+          ),
+        ),
+      );
+      expect(find.text('Nothing to show yet'), findsOneWidget);
+      expect(find.text('No data for this range'), findsNothing);
+    });
+
     testWidgets('renders CustomPaint with correct painter for valid data', (
       tester,
     ) async {
@@ -1237,6 +1258,70 @@ void main() {
         _wrap(HandDrawnLineChart(data: _lineData(), xDivisions: 5)),
       );
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('line chart rejects NaN minY', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const HandDrawnLineChart(
+            data: LineChartData(
+              series: [
+                LineSeriesData(
+                  name: 'S',
+                  color: Color(0xFF000000),
+                  points: [LinePoint(x: 0, y: 0)],
+                ),
+              ],
+              minX: 0,
+              maxX: 1,
+              minY: double.nan,
+              maxY: 1,
+            ),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isA<ArgumentError>());
+    });
+
+    testWidgets('scatter plot rejects positive infinity maxY', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const HandDrawnScatterPlot(
+            data: ScatterPlotData(
+              points: [ScatterPoint(x: 0, y: 0)],
+              minX: 0,
+              maxX: 1,
+              minY: 0,
+              maxY: double.infinity,
+            ),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isA<ArgumentError>());
+    });
+
+    testWidgets('scatter plot rejects negative infinity xMin', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const HandDrawnScatterPlot(
+            data: ScatterPlotData(
+              points: [ScatterPoint(x: 0, y: 0)],
+              minX: double.negativeInfinity,
+              maxX: 1,
+              minY: 0,
+              maxY: 1,
+            ),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isA<ArgumentError>());
+    });
+
+    testWidgets('bar chart rejects NaN explicit maxY', (tester) async {
+      await tester.pumpWidget(
+        _wrap(HandDrawnBarChart(data: _barData(maxY: double.nan))),
+      );
+      expect(tester.takeException(), isA<ArgumentError>());
     });
   });
 
@@ -2309,6 +2394,50 @@ void main() {
       expect(reservedWidth, greaterThan(0));
     });
 
+    test('bottom legend constrains long single label width', () {
+      // A single very long label on a bottom legend must be measured
+      // against the chart's available width — otherwise the entry
+      // would lay out unbounded and visually spill past the chart's
+      // right edge. The painter relies on the layout to bound
+      // individual entry widths so the painted result stays inside
+      // the chart's footprint.
+      const longLabel =
+          'An exceptionally long legend label that on its own '
+          'would exceed any reasonable single-row legend width';
+      const data = LineChartData(
+        minX: 0,
+        maxX: 1,
+        minY: 0,
+        maxY: 1,
+        series: [
+          LineSeriesData(
+            name: 'S',
+            color: Color(0xFF000000),
+            points: [LinePoint(x: 0, y: 0), LinePoint(x: 1, y: 1)],
+          ),
+        ],
+        legend: [LegendEntry(label: longLabel, color: Color(0xFF000000))],
+      );
+
+      final painter = HandDrawnLineChartPainter(
+        data: data,
+        legendConfig: ChartLegendConfig.externalBottomBoxed,
+      );
+      final recorder = PictureRecorder();
+      painter.paint(Canvas(recorder), kChartTestSize);
+      recorder.endRecording();
+
+      final frame = painter.frame;
+      expect(frame.legendLayout, isNotNull);
+      expect(
+        frame.legendLayout!.size.width,
+        lessThanOrEqualTo(frame.legendArea.width + 0.01),
+        reason:
+            'Bottom legend content width must not exceed the legend rect '
+            'so individual long entries cannot spill past chart bounds.',
+      );
+    });
+
     test('right-side legend content fits inside its reserved column', () {
       // Long label that would saturate the column width budget. With
       // the right-side legend's measurement budget aligned to the
@@ -2359,6 +2488,34 @@ void main() {
         reason: 'Legend content width must not exceed its reserved area',
       );
     });
+
+    test('right legend with many entries paints without throwing', () {
+      // Many entries can lay out taller than the reserved column. The
+      // painter must clip its output rather than paint past the
+      // reserved rect or otherwise fail.
+      final manyEntries = [
+        for (int i = 0; i < 30; i++)
+          LegendEntry(label: 'Series $i', color: const Color(0xFF000000)),
+      ];
+      final painter = HandDrawnBarChartPainter(
+        data: BarChartData(
+          bars: const [
+            BarGroup(
+              label: 'A',
+              segments: [
+                BarSegment(category: 'x', value: 10, color: Color(0xFF000000)),
+              ],
+            ),
+          ],
+          legend: manyEntries,
+        ),
+        legendConfig: ChartLegendConfig.externalRightBoxed,
+      );
+      final recorder = PictureRecorder();
+      final canvas = Canvas(recorder);
+      expect(() => painter.paint(canvas, kChartTestSize), returnsNormally);
+      recorder.endRecording();
+    });
   });
 
   group('HandDrawnLegend standalone widget', () {
@@ -2382,6 +2539,33 @@ void main() {
       // descendant (its render surface).
       expect(find.byType(HandDrawnLegend), findsOneWidget);
       expect(find.byType(CustomPaint), findsWidgets);
+    });
+
+    testWidgets('entry label Text uses single-line ellipsis', (tester) async {
+      // Long labels under bounded width must truncate gracefully
+      // rather than overflow the legend's footprint.
+      const entries = [
+        LegendEntry(
+          label: 'An extremely long legend label that should ellipsize',
+          color: Color(0xFFFF0000),
+        ),
+      ];
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 200,
+              child: HandDrawnLegend(entries: entries),
+            ),
+          ),
+        ),
+      );
+      // Layout must complete without RenderFlex overflow exceptions.
+      expect(tester.takeException(), isNull);
+
+      final labelText = tester.widget<Text>(find.text(entries.first.label));
+      expect(labelText.maxLines, 1);
+      expect(labelText.overflow, TextOverflow.ellipsis);
     });
 
     testWidgets('empty entries produce a zero-size shrink', (tester) async {

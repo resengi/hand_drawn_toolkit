@@ -202,7 +202,24 @@ class _LegendEntryWidget extends StatelessWidget {
               chartLegendDotOffset -
               chartLegendDotRadius,
         ),
-        Text(entry.label, style: textStyle),
+        // Flexible (FlexFit.loose) lets the Text shrink to whatever
+        // width the Row's parent allows after the dot + spacers take
+        // their fixed space. With Row(mainAxisSize: MainAxisSize.min),
+        // a bounded parent (e.g. Wrap, or a sized HandDrawnLegend)
+        // produces a finite text-width budget — at which point
+        // maxLines + ellipsis kick in and the entry stays inside the
+        // parent's footprint. Under an unbounded parent (the
+        // wrap=false path uses SingleChildScrollView for that), the
+        // Text lays out at natural width and the surrounding ClipRect
+        // handles the visual.
+        Flexible(
+          child: Text(
+            entry.label,
+            style: textStyle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     );
   }

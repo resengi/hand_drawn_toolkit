@@ -256,6 +256,12 @@ class GridConfig {
 /// title sitting below the labels still has room. Label thinning also
 /// uses the rotated label width — a label that fits horizontally may
 /// not fit at 45° and vice versa.
+///
+/// Rotation reserves vertical space in the X tick band but does not
+/// adjust the chart's horizontal padding. For long edge labels with
+/// diagonal or vertical rotation, increase the chart widget's
+/// `padding.left` and/or `padding.right` to prevent spill into the
+/// Y-label gutter or past the right edge.
 class ChartLabelConfig {
   const ChartLabelConfig({
     this.rotationDegrees = 0,
@@ -476,6 +482,12 @@ class ChartLegendConfig {
 
   /// External boxed legend to the right of the chart, stacked
   /// vertically. The chart's plot area becomes narrower to make room.
+  ///
+  /// Best suited for short legends. With many entries or long wrapped
+  /// labels, content that exceeds the reserved column's height is
+  /// clipped at paint time. For many series, prefer
+  /// [externalBottomBoxed] or compose with a standalone
+  /// [HandDrawnLegend] placed in your own scrollable layout.
   static const ChartLegendConfig externalRightBoxed = ChartLegendConfig(
     visible: true,
     position: ChartLegendPosition.right,
@@ -760,7 +772,7 @@ class BarCategory {
 /// legend identity from grouped structure.
 class BarChartData {
   const BarChartData({
-    required this.bars,
+    this.bars = const [],
     this.legend = const [],
     this.title,
     this.yAxisLabel,
@@ -965,6 +977,14 @@ class LineSeriesData {
 /// Receives an x-value from the chart's numeric x-domain and returns the
 /// corresponding y-value. Non-finite outputs (NaN, +∞, −∞) are treated as
 /// discontinuities and will split the rendered curve into separate runs.
+///
+/// Splitting only happens when a sampled output is itself non-finite. If
+/// an asymptote falls strictly between samples — where both adjacent
+/// samples return finite-but-extreme values — the rendered line will
+/// bridge across the discontinuity. Increase
+/// [FunctionSeriesData.sampleCount], or have the function return
+/// [double.nan] over a small exclusion interval around the
+/// discontinuity, to opt out of the bridge.
 typedef ChartFunction = double Function(double x);
 
 /// A function-backed line series.

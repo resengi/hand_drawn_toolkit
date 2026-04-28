@@ -356,7 +356,7 @@ void main() {
     });
   });
 
-  // ── Model equality (Step 3.4) ────────────────────────────────────────
+  // ── Model equality ───────────────────────────────────────────────────
 
   group('BarSegment equality', () {
     test('equal when all fields match', () {

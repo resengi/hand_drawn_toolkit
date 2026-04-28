@@ -353,7 +353,7 @@ void main() {
     });
   });
 
-  // ── TextField passthroughs (Step 3.2) ───────────────────────────────
+  // ── TextField passthroughs ──────────────────────────────────────────
 
   group('HandDrawnTextField passthroughs', () {
     testWidgets('enabled: false produces disabled TextField', (tester) async {

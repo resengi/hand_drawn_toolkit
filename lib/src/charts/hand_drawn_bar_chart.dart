@@ -278,6 +278,7 @@ class HandDrawnBarChart extends StatelessWidget {
     this.legendStyle,
     this.axisStrokeWidth = chartAxisStrokeWidth,
     this.emptyStyle,
+    this.emptyMessage = 'No data for this range',
     this.clipToChartArea = false,
     this.xLabelConfig = ChartLabelConfig.horizontal,
     this.legendConfig = ChartLegendConfig.inlineBottom,
@@ -300,6 +301,9 @@ class HandDrawnBarChart extends StatelessWidget {
   final TextStyle? legendStyle;
   final double axisStrokeWidth;
   final TextStyle? emptyStyle;
+
+  /// Message shown when [data] is non-null but empty.
+  final String emptyMessage;
 
   /// When `true`, data rendering is clipped to the chart's plot area so
   /// bars can't paint outside the chart. See
@@ -325,6 +329,7 @@ class HandDrawnBarChart extends StatelessWidget {
       isEmpty: data?.isEmpty ?? true,
       height: height,
       emptyStyle: emptyStyle,
+      emptyMessage: emptyMessage,
       builder: () => CustomPaint(
         size: Size.infinite,
         painter: HandDrawnBarChartPainter(

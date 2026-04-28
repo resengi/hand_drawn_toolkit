@@ -58,10 +58,13 @@ import 'hand_drawn_toolkit_helpers.dart';
 ///
 /// ## Performance
 ///
-/// The generated [Path] is cached internally and only recomputed when the
-/// widget's size or any of the generation parameters ([color], [strokeWidth],
-/// [irregularity], [seed], [segments]) change. This makes it safe to use in
-/// frequently-rebuilding widget trees.
+/// The generated [Path] is cached on the painter instance and reused
+/// when [paint] is called multiple times on the same instance with
+/// the same size and generation parameters ([color], [strokeWidth],
+/// [irregularity], [seed], [segments]). Note that Flutter typically
+/// constructs a new painter each rebuild, so the cache primarily
+/// helps when consumers retain the painter (e.g. in a `State`) or
+/// when the parent triggers a repaint without rebuilding.
 class HandDrawnLinePainter extends CustomPainter {
   /// Creates a hand-drawn line painter.
   ///

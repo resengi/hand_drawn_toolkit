@@ -20,6 +20,11 @@ import 'chart_data.dart'
 /// render with one decimal place; larger values round to the nearest
 /// integer. No domain assumptions (no currency, units, dates).
 ///
+/// For ranges with values below 1.0, this formatter rounds to one
+/// decimal place (so `0.001` renders as `'0.0'`). Supply a custom
+/// formatter via the chart data's `yValueFormatter` or
+/// `xValueFormatter` when finer precision is needed.
+///
 /// Package-internal — `chart_layout.dart` is not exported from the
 /// public surface, so this stays out of the public API while still
 /// being shared between the layout engine and the painter.
@@ -463,14 +468,27 @@ layoutLegend({
 
   // For right-position legends, constrain each text painter to the
   // available column width so long labels wrap onto multiple lines
-  // instead of overflowing horizontally. Bottom-position legends
-  // stay unconstrained — they wrap onto new rows at the entry level
-  // (handled below), not within an entry.
+  // instead of overflowing horizontally. For bottom-position legends
+  // with a finite [maxWidth], constrain each label to at most the
+  // available row width with single-line ellipsis truncation —
+  // otherwise a single very long label would lay out unbounded and
+  // visually spill past the chart's right edge.
   final double textMaxWidth;
+  final int? textMaxLines;
+  final String? textEllipsis;
   if (config.position == ChartLegendPosition.right && maxWidth != null) {
     textMaxWidth = math.max(0, maxWidth - padHor - chartLegendTextOffset);
+    textMaxLines = null;
+    textEllipsis = null;
+  } else if (config.position == ChartLegendPosition.bottom &&
+      maxWidth != null) {
+    textMaxWidth = math.max(0, maxWidth - padHor - chartLegendTextOffset);
+    textMaxLines = 1;
+    textEllipsis = '…';
   } else {
     textMaxWidth = double.infinity;
+    textMaxLines = null;
+    textEllipsis = null;
   }
 
   // Per-entry text painters and widths. Each entry's display width is
@@ -480,7 +498,13 @@ layoutLegend({
   // additionally advances per-entry to handle wrapped multi-line text.
   final tps = <TextPainter>[
     for (final e in entries)
-      layoutText(e.label, textStyle, maxWidth: textMaxWidth),
+      layoutText(
+        e.label,
+        textStyle,
+        maxWidth: textMaxWidth,
+        maxLines: textMaxLines,
+        ellipsis: textEllipsis,
+      ),
   ];
   final entryWidths = <double>[
     for (final tp in tps) chartLegendTextOffset + tp.width,
