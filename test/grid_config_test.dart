@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
 
@@ -55,7 +56,7 @@ BarChartData _bar() {
   );
 }
 
-void _paint(HandDrawnChartPainter p) {
+void _paint(CustomPainter p) {
   final recorder = PictureRecorder();
   p.paint(Canvas(recorder), kChartTestSize);
   recorder.endRecording();

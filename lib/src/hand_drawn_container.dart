@@ -90,7 +90,7 @@ class HandDrawnContainer extends StatelessWidget {
   Widget build(BuildContext context) {
     return CustomPaint(
       foregroundPainter: HandDrawnLinePainter(
-        color: strokeColor.withValues(alpha: borderOpacity),
+        color: strokeColor.withValues(alpha: strokeColor.a * borderOpacity),
         strokeWidth: strokeWidth,
         irregularity: irregularity,
         segments: segments,

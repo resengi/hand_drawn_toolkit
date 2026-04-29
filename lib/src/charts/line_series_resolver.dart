@@ -1,6 +1,6 @@
 // Internal resolver layer for line-chart rendering.
 //
-// Transforms public [LineChartData] (ordinary [LineSeriesData] + new
+// Transforms public [LineChartData] ([LineSeriesData] and
 // [FunctionSeriesData]) into a render-ready list of [ResolvedLineSeries].
 //
 // This file is intentionally **not** exported from `hand_drawn_toolkit.dart`.
@@ -13,8 +13,8 @@ import 'chart_data.dart';
 /// Controls how the line painter should render a resolved series.
 enum ResolvedLineRenderMode {
   /// Ordinary segmented stroke — each pair of adjacent points is wobbled
-  /// independently. Preserves the pre-existing hand-drawn aesthetic for
-  /// [LineSeriesData]-sourced charts.
+  /// independently. Used for [LineSeriesData]-sourced charts to give
+  /// each data segment its own wobble character.
   segmentedStroke,
 
   /// One coherent wobble pass per run. Used for function-series curves to
@@ -60,7 +60,7 @@ class ResolvedLineSeries {
   /// Stride for the function-series wobble anchors. Read by the painter
   /// when [renderMode] is [ResolvedLineRenderMode.continuousCurve];
   /// ignored for [ResolvedLineRenderMode.segmentedStroke] (ordinary
-  /// series use the legacy per-data-segment wobble).
+  /// series use per-data-segment wobble).
   final int wobbleAnchorStride;
 }
 
@@ -128,6 +128,20 @@ ResolvedLineSeries _resolveFunctionSeries(
   double minX,
   double maxX,
 ) {
+  if (f.sampleCount < 2) {
+    throw ArgumentError.value(
+      f.sampleCount,
+      'sampleCount',
+      'must be at least 2',
+    );
+  }
+  if (f.wobbleAnchorStride < 1) {
+    throw ArgumentError.value(
+      f.wobbleAnchorStride,
+      'wobbleAnchorStride',
+      'must be >= 1',
+    );
+  }
   // Uniform sampling across [minX, maxX]. Split on non-finite y.
   final runs = <List<LinePoint>>[];
   var current = <LinePoint>[];
@@ -152,6 +166,10 @@ ResolvedLineSeries _resolveFunctionSeries(
   // Sparse visible points from displayXs. Order + duplicates preserved.
   final displayPoints = <LinePoint>[];
   for (final dx in f.displayXs) {
+    // NaN and ±∞ slip past the bound checks below because IEEE 754
+    // comparisons against non-finite values return false. Filter
+    // explicitly.
+    if (!dx.isFinite) continue;
     if (dx < minX || dx > maxX) continue;
     final dy = f.function(dx);
     if (!dy.isFinite) continue;

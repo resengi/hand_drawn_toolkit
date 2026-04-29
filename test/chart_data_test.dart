@@ -140,6 +140,40 @@ void main() {
         returnsNormally,
       );
     });
+
+    test('debug-asserts on invalid fillAlpha (NaN and out-of-range)', () {
+      // IEEE 754 comparisons against NaN are always false — `NaN >= 0`
+      // is false, so the conjunction `(fa >= 0 && fa <= 1)` fails and
+      // the disjunction with `null` also fails, firing the assert.
+      expect(
+        () => BarSegment(
+          category: 'x',
+          value: 1,
+          color: const Color(0xFF000000),
+          fillAlpha: double.nan,
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+      // Out-of-range fails the conjunction directly.
+      expect(
+        () => BarSegment(
+          category: 'x',
+          value: 1,
+          color: const Color(0xFF000000),
+          fillAlpha: 1.5,
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+      expect(
+        () => BarSegment(
+          category: 'x',
+          value: 1,
+          color: const Color(0xFF000000),
+          fillAlpha: -0.1,
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+    });
   });
 
   // ── LineChartData ────────────────────────────────────────────────────
@@ -321,6 +355,32 @@ void main() {
       expect(p.x, 3.5);
       expect(p.y, 7.2);
     });
+
+    test('LinePoint asserts on non-finite x', () {
+      expect(
+        () => LinePoint(x: double.nan, y: 0),
+        throwsA(isA<AssertionError>()),
+      );
+      expect(
+        () => LinePoint(x: double.infinity, y: 0),
+        throwsA(isA<AssertionError>()),
+      );
+      expect(
+        () => LinePoint(x: double.negativeInfinity, y: 0),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+
+    test('LinePoint asserts on non-finite y', () {
+      expect(
+        () => LinePoint(x: 0, y: double.nan),
+        throwsA(isA<AssertionError>()),
+      );
+      expect(
+        () => LinePoint(x: 0, y: double.infinity),
+        throwsA(isA<AssertionError>()),
+      );
+    });
   });
 
   // ── LegendEntry ──────────────────────────────────────────────────────
@@ -480,7 +540,7 @@ void main() {
     });
   });
 
-  group('ScatterPoint equality', () {
+  group('ScatterPoint', () {
     test('equal when all fields match', () {
       const a = ScatterPoint(x: 1, y: 2, size: 5);
       const b = ScatterPoint(x: 1, y: 2, size: 5);
@@ -497,6 +557,28 @@ void main() {
       const a = ScatterPoint(x: 1, y: 2, size: 5);
       const b = ScatterPoint(x: 1, y: 2, size: 10);
       expect(a, isNot(equals(b)));
+    });
+
+    test('ScatterPoint asserts on non-finite x', () {
+      expect(
+        () => ScatterPoint(x: double.nan, y: 0),
+        throwsA(isA<AssertionError>()),
+      );
+      expect(
+        () => ScatterPoint(x: double.infinity, y: 0),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+
+    test('ScatterPoint asserts on non-finite y', () {
+      expect(
+        () => ScatterPoint(x: 0, y: double.nan),
+        throwsA(isA<AssertionError>()),
+      );
+      expect(
+        () => ScatterPoint(x: 0, y: double.negativeInfinity),
+        throwsA(isA<AssertionError>()),
+      );
     });
   });
 

@@ -34,12 +34,12 @@ import 'chart_layout.dart';
 /// identical parameters always produce the same chart.
 abstract class HandDrawnChartPainter extends CustomPainter {
   HandDrawnChartPainter({
-    this.irregularity = chartIrregularity,
-    this.segments = chartSegments,
-    this.axisColor = chartAxisColor,
+    this.irregularity = HandDrawnDefaults.chartIrregularity,
+    this.segments = HandDrawnDefaults.chartSegments,
+    this.axisColor = HandDrawnDefaults.chartAxisColor,
     this.grid = GridConfig.standard,
-    this.labelStyle = chartDefaultLabelStyle,
-    this.padding = chartDefaultPadding,
+    this.labelStyle = HandDrawnDefaults.chartLabelStyle,
+    this.padding = HandDrawnDefaults.chartPadding,
     this.xLabels = const [],
     this.legend = const [],
     this.title,
@@ -47,16 +47,16 @@ abstract class HandDrawnChartPainter extends CustomPainter {
     this.xAxisLabel,
     this.yMin = 0,
     this.yMax = 1,
-    this.yDivisions = chartYDivisions,
+    this.yDivisions = HandDrawnDefaults.chartYDivisions,
     this.xMin,
     this.xMax,
-    this.xDivisions = chartXDivisions,
+    this.xDivisions = HandDrawnDefaults.chartXDivisions,
     this.seed = HandDrawnDefaults.seed,
     this.yValueFormatter,
     this.xValueFormatter,
     this.titleStyle,
     this.legendStyle,
-    this.axisStrokeWidth = chartAxisStrokeWidth,
+    this.axisStrokeWidth = HandDrawnDefaults.chartAxisStrokeWidth,
     this.axisDisplay = AxisDisplay.edge,
     this.xLabelConfig = ChartLabelConfig.horizontal,
     this.legendConfig = ChartLegendConfig.inlineBottom,
@@ -98,7 +98,7 @@ abstract class HandDrawnChartPainter extends CustomPainter {
   /// When `true`, subclass data rendering (the `paintData` call) is
   /// clipped to the plot area so values outside the declared axis
   /// bounds can't paint across axes, labels, title, or legend. Defaults
-  /// to `false` to preserve existing behavior across all chart types.
+  /// to `false`.
   final bool clipToChartArea;
 
   /// Grid configuration bundle. See [GridConfig] for all knobs.
@@ -298,7 +298,7 @@ abstract class HandDrawnChartPainter extends CustomPainter {
         !listEquals(oldDelegate.legend, legend);
   }
 
-  bool get _hasNumericXAxis => xMin != null && xMax != null;
+  bool get _hasNumericXAxis => xLabels.isEmpty && xMin != null && xMax != null;
 
   // ── Text helper ──────────────────────────────────────────────────────
 
@@ -427,7 +427,7 @@ abstract class HandDrawnChartPainter extends CustomPainter {
     int points = wobblyCirclePoints,
   }) {
     final rng = math.Random(circleSeed);
-    final irr = jitter ?? (irregularity * 0.5);
+    final irr = jitter ?? (irregularity * scatterCircleJitterRatio);
 
     final raw = List<double>.filled(points, 0);
     for (int i = 0; i < points; i++) {
@@ -513,8 +513,7 @@ abstract class HandDrawnChartPainter extends CustomPainter {
     // (bottom edge) through yDivisions (top edge) so every chart has a
     // complete grid. In edge mode, the bottom-edge grid line at i=0
     // sits directly under the X-axis line, which is drawn afterward
-    // and fully obscures it — preserving the original edge-mode
-    // appearance bit-for-bit. In zero-crossing mode, the bottom-edge
+    // and fully obscures it. In zero-crossing mode, the bottom-edge
     // grid line is the only thing marking that boundary.
     if (grid.showHorizontal) {
       for (int i = 0; i <= yDivisions; i++) {
@@ -867,7 +866,7 @@ abstract class HandDrawnChartPainter extends CustomPainter {
       if (_cachedLegendBox == null || _cachedLegendRect != rect) {
         final helpers = HandDrawnHelpers(
           seed: seed + chartLegendBoxSeedOffset,
-          segments: wobblyRectSegments,
+          segments: defaultWobblyRectSegments,
           irregularity: irregularity,
         );
         _cachedLegendBox = helpers.rectBorder(rect.size).shift(rect.topLeft);

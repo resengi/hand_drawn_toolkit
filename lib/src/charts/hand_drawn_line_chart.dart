@@ -50,11 +50,24 @@ class HandDrawnLineChartPainter extends HandDrawnChartPainter {
          yAxisLabel: data.yAxisLabel,
          xAxisLabel: data.xAxisLabel,
          title: data.title,
-         labelStyle: labelStyle ?? chartDefaultLabelStyle,
+         labelStyle: labelStyle ?? HandDrawnDefaults.chartLabelStyle,
          yValueFormatter: data.yValueFormatter,
          xValueFormatter: data.xValueFormatter,
          axisDisplay: data.axisDisplay,
-       );
+       ) {
+    for (int s = 0; s < data.series.length; s++) {
+      final series = data.series[s];
+      for (int i = 0; i < series.points.length; i++) {
+        final p = series.points[i];
+        if (!p.x.isFinite || !p.y.isFinite) {
+          throw ArgumentError(
+            'LinePoint coordinates must be finite, got (${p.x}, ${p.y}) at '
+            'series "${series.name}" index $i.',
+          );
+        }
+      }
+    }
+  }
 
   final LineChartData data;
 
@@ -143,7 +156,7 @@ class HandDrawnLineChartPainter extends HandDrawnChartPainter {
   void paintData(Canvas canvas, Size size) {
     // Resolve the fill baseline once per paint. Falls back to the chart
     // bottom whenever zero-crossing is off OR zero isn't inside the
-    // visible Y range — both of which preserve the original behavior.
+    // visible Y range.
     final useZeroBaseline =
         data.axisDisplay.horizontal == AxisDisplayMode.zeroCrossing &&
         frame.isZeroVisibleY;
@@ -275,17 +288,17 @@ class HandDrawnLineChart extends StatelessWidget {
     required this.data,
     this.height = HandDrawnDefaults.chartHeight,
     this.seed = HandDrawnDefaults.seed,
-    this.axisColor = chartAxisColor,
+    this.axisColor = HandDrawnDefaults.chartAxisColor,
     this.grid = GridConfig.standard,
     this.labelStyle,
-    this.irregularity = chartIrregularity,
-    this.segments = chartSegments,
-    this.yDivisions = chartYDivisions,
-    this.xDivisions = chartXDivisions,
-    this.padding = chartDefaultPadding,
+    this.irregularity = HandDrawnDefaults.chartIrregularity,
+    this.segments = HandDrawnDefaults.chartSegments,
+    this.yDivisions = HandDrawnDefaults.chartYDivisions,
+    this.xDivisions = HandDrawnDefaults.chartXDivisions,
+    this.padding = HandDrawnDefaults.chartPadding,
     this.titleStyle,
     this.legendStyle,
-    this.axisStrokeWidth = chartAxisStrokeWidth,
+    this.axisStrokeWidth = HandDrawnDefaults.chartAxisStrokeWidth,
     this.emptyStyle,
     this.emptyMessage = 'No data for this range',
     this.clipToChartArea = false,

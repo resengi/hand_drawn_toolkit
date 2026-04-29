@@ -30,11 +30,15 @@ flutter run
 - **`HandDrawnNotebook`** with ruled lines and `NotebookRow` grid snapping,
   shown in both non-uniform (status-square section) and uniform
   (notebook section) line modes
-- **`HandDrawnBarChart`** in three variants:
+- **`HandDrawnBarChart`** in five variants:
   - Simple single-segment bars (Daily Steps)
   - Stacked bars with multiple segments per bar (Weekly Activity)
   - Grouped bars with multi-bar categories, including a Q4 group that combines
     grouped + stacked layouts (Quarterly Revenue by Region)
+  - Mixed positive/negative segments with a zero-crossing horizontal axis
+    (Quarterly P/L)
+  - Long category labels rotated -45° via `ChartLabelConfig.diagonalLeft`
+    (Monthly Active Users)
 - **`HandDrawnLineChart`** in five point-based variants:
   - Single-series with categorical X labels (Weekly Runs)
   - Multi-series with auto-generated legend (Mood Tracker)
@@ -52,19 +56,30 @@ flutter run
   - Discontinuous function `f(x) = 1/x` with `clipToChartArea: true`,
     showing how non-finite evaluations split the curve into independent
     runs without bridging across the asymptote
+- **`ChartLegendConfig` presets and standalone `HandDrawnLegend`** — three
+  variants of the multi-series Mood Tracker chart show every supported
+  legend layout:
+  - External boxed legend below the chart with wrapping
+    (`ChartLegendConfig.externalBottomBoxed`)
+  - External boxed legend on the right; the plot area shrinks to make room
+    (`ChartLegendConfig.externalRightBoxed`)
+  - Standalone `HandDrawnLegend` composed above the chart, with the
+    chart's own legend suppressed via `ChartLegendConfig.hidden`
 - **`HandDrawnScatterPlot`** in four variants spanning all axis modes:
   positive-only, negative-Y with zero-crossing, negative-X with zero-crossing,
-  and a four-quadrant variant with variable dot sizes
+  and a four-quadrant variant. Three of the four use variable per-point dot
+  sizes via `ScatterPoint.size`.
 - **`HandDrawnTable`** with a title, row dividers, highlighted rows, and
   mixed column alignment (flex and fixed width)
 - **Resizable table columns** built on top of `HandDrawnTable` with a
   `Stack` + drag handles, demonstrating how to extend the package's widgets
   with consumer-side interactivity
 - **Interactive charts** — every static chart above has a corresponding
-  interactive version (12 charts total: 3 bar, 5 ordinary line, 3 function,
-  4 scatter) using `LayoutBuilder`, `computeLayout()`, and `GestureDetector`
-  to tap chart elements and display hit-test results, including:
-  - Bar segment hit-testing with grouped/inner labels
+  interactive version (20 charts total: 5 bar, 5 ordinary line, 3 function,
+  3 legend-variant line, 4 scatter) using `LayoutBuilder`, `computeLayout()`,
+  and `GestureDetector` to tap chart elements and display hit-test results,
+  including:
+  - Bar segment hit-testing with grouped/inner labels and zero-crossing axes
   - Sealed `LineHitTestResult` switching for point vs. segment hits, with
     automatic series-name reporting in multi-series and multi-function
     charts
@@ -72,7 +87,9 @@ flutter run
     interactive) combined with full-curve segment hits
   - Discontinuity-aware hit testing — taps near the `1/x` asymptote fall
     through cleanly with no bridging segment
-  - Scatter point hit-testing
+  - Hit-testing on charts using every `ChartLegendConfig` preset, including
+    the standalone `HandDrawnLegend` composition
+  - Scatter point hit-testing across all four axis modes
 - **`clipToChartArea`** on `HandDrawnLineChart` — used on the discontinuous
   function chart to keep the asymptotic tails contained within the plot area
 - **Custom path building** using `smoothedOffsets()` to draw a diagonal line,
@@ -91,7 +108,8 @@ package API:
 1. **High-level widgets** — `HandDrawnContainer`, `HandDrawnDivider`,
    `HandDrawnStatusSquare`, `HandDrawnTextField`, `HandDrawnNotebook`,
    `HandDrawnBarChart`, `HandDrawnLineChart`, `HandDrawnScatterPlot`,
-   and `HandDrawnTable` cover most use cases out of the box.
+   `HandDrawnLegend`, and `HandDrawnTable` cover most use cases out of
+   the box.
 2. **Painter + interaction** — `HandDrawnBarChartPainter`,
    `HandDrawnLineChartPainter`, and `HandDrawnScatterPlotPainter` are used
    with `CustomPaint` inside `LayoutBuilder` and `GestureDetector` to

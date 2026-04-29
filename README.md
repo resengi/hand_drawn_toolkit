@@ -241,7 +241,7 @@ BarGroup(label: 'Mon', segments: [
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `bars` | `List<BarGroup>` | required | Bar groups with labels and segments |
+| `bars` | `List<BarGroup>` | `[]` | Bar groups with labels and segments. Use categories instead for grouped charts. |
 | `categories` | `List<BarCategory>` | `[]` | Grouped-bar categories (use instead of `bars` for grouped charts) |
 | `legend` | `List<LegendEntry>` | `[]` | Legend entries |
 | `title` | `String?` | `null` | Chart title above the chart area |
@@ -442,6 +442,7 @@ Each `ScatterPoint` can specify an optional `size` (dot radius in logical pixels
 | `xAxisLabel` | `String?` | `null` | X-axis title below tick labels |
 | `yValueFormatter` | `AxisValueFormatter?` | `null` | Custom Y-axis label formatter |
 | `xValueFormatter` | `AxisValueFormatter?` | `null` | Custom X-axis label formatter |
+| `legend` | `List<LegendEntry>` | `[]` | Custom legend entries. Scatter plots don't auto-derive entries — supply them explicitly when a legend is needed |
 
 ### Plot-area clipping
 
@@ -698,7 +699,7 @@ Series ordering for hit-test indices is: ordinary `series` first (in declaration
 
 ## Tables
 
-`HandDrawnTable` renders column-aligned data inside a `HandDrawnContainer` with `HandDrawnDivider` separators. All cells render with `maxLines: 1` and configurable overflow, making it ideal for compact, summary-style data.
+`HandDrawnTable` renders column-aligned data inside a `HandDrawnContainer` with `HandDrawnDivider` separators. Cells render with `maxLines: 1` and `softWrap: false` by default, with configurable overflow — making it ideal for compact, summary-style data. Both can be overridden per-table for wider content.
 
 ```dart
 HandDrawnTable(
@@ -811,7 +812,7 @@ HandDrawnTable(
 | `seed` | `int` | `42` | Random seed for the outer container border |
 | `irregularity` | `double` | `3.5` | Wobble magnitude for the outer container border |
 | `strokeWidth` | `double` | `2.0` | Stroke width for the outer container border |
-| `strokeColor` | `Color` | `Color(0xDD000000)` | Stroke color for the outer container border |
+| `strokeColor` | `Color` | `Color(0xFF000000)` | Stroke color for the outer container border |
 | `backgroundColor` | `Color` | `Colors.white` | Background fill color |
 | `highlightColor` | `Color` | green | Highlighted row tint and text color |
 | `highlightAlpha` | `double` | `0.08` | Background tint opacity |
@@ -824,6 +825,8 @@ HandDrawnTable(
 | `rowPadding` | `double` | `6.0` | Vertical spacing between rows |
 | `titleBottomPadding` | `double` | `8.0` | Space between title and header |
 | `textOverflow` | `TextOverflow` | `ellipsis` | How overflowing text is handled |
+| `cellMaxLines` | `int` | `1` | Maximum number of lines per cell. Pair with `softWrap: true` to wrap long content. |
+| `softWrap` | `bool` | `false` | Whether cell text wraps at soft break points. Has no effect when `cellMaxLines` is `1`. |
 | `horizontalScroll` | `bool` | `false` | Enable horizontal scrolling |
 
 ### HandDrawnTableColumn Properties
@@ -847,6 +850,7 @@ HandDrawnTable(
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
+| `color` | `Color` | `HandDrawnDefaults.dividerColor` | Stroke color for the dividers |
 | `seed` | `int` | `42` | Random seed for divider wobble |
 | `irregularity` | `double` | `1.0` | Wobble magnitude |
 | `thickness` | `double` | `1.5` | Stroke thickness of the dividers |
@@ -872,7 +876,7 @@ HandDrawnContainer(
 
 ### Animating the Border
 
-Use `borderOpacity` to fade the border in or out without changing the stroke color — useful for entrance animations or interactive states:
+Use `borderOpacity` to fade the border in or out — it multiplies the strokeColor's alpha, so values between `0.0` and `1.0` smoothly fade the existing stroke without changing its hue. Useful for entrance animations or interactive states:
 
 ```dart
 HandDrawnContainer(
@@ -1057,7 +1061,7 @@ CustomPaint(
 
 3. **Path assembly** — Built-in helpers (`lineHorizontal`, `lineVertical`, `rectBorder`) stitch smoothed offsets into Flutter `Path` objects. `rectBorder` uses four independent offset sets so irregularity varies around the perimeter.
 
-4. **Caching** — `HandDrawnLinePainter` and `HandDrawnNotebook` cache generated paths and only recompute when the widget size or generation parameters change.
+4. **Caching** — `HandDrawnLinePainter` and `HandDrawnNotebook` cache generated paths and only recompute when the widget size or numeric generation parameters change. Note that `buildPath` shape changes are not detected automatically; see `HandDrawnLinePainter`'s class docs for the contract.
 
 5. **Determinism** — All randomness flows through `dart:math.Random(seed)`, so identical parameters always produce identical strokes.
 

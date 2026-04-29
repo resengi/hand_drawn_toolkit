@@ -65,6 +65,28 @@ import 'hand_drawn_toolkit_helpers.dart';
 /// constructs a new painter each rebuild, so the cache primarily
 /// helps when consumers retain the painter (e.g. in a `State`) or
 /// when the parent triggers a repaint without rebuilding.
+///
+/// ## Limitations
+///
+/// [shouldRepaint] does not compare [buildPath] callbacks. Inline closures
+/// in `build` methods get fresh identity on every rebuild, so identity-based
+/// comparison would invalidate the path cache spuriously and force expensive
+/// re-jittering on every frame. To avoid that, [buildPath] is excluded from
+/// the repaint-decision parameters entirely.
+///
+/// As a consequence, **changing the [buildPath] shape on a long-lived
+/// painter instance is unsupported.** If your widget needs to switch
+/// between, say, `lineHorizontal` and `rectBorder`, express that switch
+/// at the widget level — use a different `CustomPaint` per shape, or
+/// give the painter a [Key] that changes when the shape does, so Flutter
+/// constructs a fresh painter instance instead of asking the existing
+/// one whether to repaint.
+///
+/// In practice this isn't a constraint that comes up in normal Flutter
+/// code: a widget whose appearance changes between two distinct shapes
+/// almost always re-keys or swaps its `CustomPaint` for unrelated reasons.
+/// The package's own widgets ([HandDrawnContainer], [HandDrawnDivider])
+/// each draw a single fixed shape per instance and don't hit this limit.
 class HandDrawnLinePainter extends CustomPainter {
   /// Creates a hand-drawn line painter.
   ///
@@ -142,15 +164,10 @@ class HandDrawnLinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant HandDrawnLinePainter old) {
-    final paramsChanged =
-        old.color != color ||
+    return old.color != color ||
         old.strokeWidth != strokeWidth ||
         old.irregularity != irregularity ||
         old.seed != seed ||
         old.segments != segments;
-    if (paramsChanged) {
-      _cachedPath = null;
-    }
-    return paramsChanged;
   }
 }

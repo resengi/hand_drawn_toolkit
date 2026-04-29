@@ -11,7 +11,7 @@ import 'hand_drawn_toolkit_defaults.dart';
 /// ```dart
 /// HandDrawnTextField(
 ///   hintText: 'Enter a title…',
-///   onChanged: (value) => print(value),
+///   onChanged: (value) => debugPrint(value),
 /// )
 /// ```
 ///

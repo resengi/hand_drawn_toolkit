@@ -7,15 +7,6 @@ import 'chart_interaction.dart';
 import 'chart_widget_helpers.dart';
 import 'hand_drawn_chart_painter.dart';
 
-/// Validates that [radius] is positive; throws [ArgumentError] otherwise.
-void _validateScatterRadius(double radius, double? rawSize, int index) {
-  if (radius <= 0) {
-    throw ArgumentError(
-      'ScatterPoint.size must be positive, got $rawSize at index $index.',
-    );
-  }
-}
-
 /// Painter for hand-drawn scatter plots.
 ///
 /// Draws wobbly circles at each data point. All axis furniture is
@@ -24,7 +15,7 @@ class HandDrawnScatterPlotPainter extends HandDrawnChartPainter {
   HandDrawnScatterPlotPainter({
     required this.data,
     super.clipToChartArea,
-    this.dotColor = scatterDotColor,
+    this.dotColor = HandDrawnDefaults.scatterDotColor,
     super.seed,
     super.axisColor,
     super.grid,
@@ -47,12 +38,29 @@ class HandDrawnScatterPlotPainter extends HandDrawnChartPainter {
          yAxisLabel: data.yAxisLabel,
          xAxisLabel: data.xAxisLabel,
          title: data.title,
-         labelStyle: labelStyle ?? chartDefaultLabelStyle,
+         labelStyle: labelStyle ?? HandDrawnDefaults.chartLabelStyle,
          yValueFormatter: data.yValueFormatter,
          xValueFormatter: data.xValueFormatter,
          axisDisplay: data.axisDisplay,
          legend: data.legend,
-       );
+       ) {
+    for (int i = 0; i < data.points.length; i++) {
+      final p = data.points[i];
+      if (!p.x.isFinite || !p.y.isFinite) {
+        throw ArgumentError(
+          'ScatterPoint coordinates must be finite, got (${p.x}, ${p.y}) at '
+          'index $i.',
+        );
+      }
+      final radius = p.size ?? scatterDefaultDotRadius;
+      if (!radius.isFinite || radius <= 0) {
+        throw ArgumentError(
+          'ScatterPoint.size must be finite and positive, got ${p.size} at '
+          'index $i.',
+        );
+      }
+    }
+  }
 
   final ScatterPlotData data;
   final Color dotColor;
@@ -74,7 +82,6 @@ class HandDrawnScatterPlotPainter extends HandDrawnChartPainter {
       final x = xToCanvasValue(p.x);
       final y = yToCanvas(p.y);
       final radius = p.size ?? scatterDefaultDotRadius;
-      _validateScatterRadius(radius, p.size, i);
 
       final dotSeed = seed + scatterSeedOffset + i * scatterPointSeedStep;
       final circle = wobblyCircle(Offset(x, y), radius, dotSeed);
@@ -104,7 +111,6 @@ class HandDrawnScatterPlotPainter extends HandDrawnChartPainter {
       final x = frame.xToCanvasValue(p.x);
       final y = frame.yToCanvas(p.y);
       final radius = p.size ?? scatterDefaultDotRadius;
-      _validateScatterRadius(radius, p.size, i);
 
       points.add(
         ScatterPointLayout(
@@ -136,18 +142,18 @@ class HandDrawnScatterPlot extends StatelessWidget {
   const HandDrawnScatterPlot({
     required this.data,
     this.height = HandDrawnDefaults.chartHeight,
-    this.dotColor = scatterDotColor,
+    this.dotColor = HandDrawnDefaults.scatterDotColor,
     this.seed = HandDrawnDefaults.seed,
-    this.axisColor = chartAxisColor,
+    this.axisColor = HandDrawnDefaults.chartAxisColor,
     this.grid = GridConfig.standard,
     this.labelStyle,
-    this.irregularity = chartIrregularity,
-    this.segments = chartSegments,
-    this.yDivisions = chartYDivisions,
-    this.xDivisions = chartXDivisions,
-    this.padding = chartDefaultPadding,
+    this.irregularity = HandDrawnDefaults.chartIrregularity,
+    this.segments = HandDrawnDefaults.chartSegments,
+    this.yDivisions = HandDrawnDefaults.chartYDivisions,
+    this.xDivisions = HandDrawnDefaults.chartXDivisions,
+    this.padding = HandDrawnDefaults.chartPadding,
     this.titleStyle,
-    this.axisStrokeWidth = chartAxisStrokeWidth,
+    this.axisStrokeWidth = HandDrawnDefaults.chartAxisStrokeWidth,
     this.emptyStyle,
     this.emptyMessage = 'No data for this range',
     this.clipToChartArea = false,

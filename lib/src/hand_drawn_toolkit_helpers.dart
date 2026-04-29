@@ -174,9 +174,8 @@ class HandDrawnHelpers {
 ///
 /// When [maxWidth] is finite, the text painter wraps onto multiple
 /// lines as needed; the resulting `TextPainter.height` reflects the
-/// wrapped height. The default `double.infinity` preserves the
-/// historical "single-line, unbounded width" behavior for callers
-/// that don't need wrapping.
+/// wrapped height. The default `double.infinity` produces single-line,
+/// unbounded layout for callers that don't need wrapping.
 ///
 /// When [maxLines] and [ellipsis] are both provided, lines beyond the
 /// limit are truncated and the truncation marker is appended. This

@@ -4,6 +4,7 @@ import 'dart:ui' show Offset, Rect, Size;
 import 'package:flutter/painting.dart' show EdgeInsets, TextPainter, TextStyle;
 
 import '../hand_drawn_constants.dart';
+import '../hand_drawn_toolkit_defaults.dart';
 import '../hand_drawn_toolkit_helpers.dart' show layoutText;
 import 'chart_data.dart'
     show
@@ -51,6 +52,7 @@ class ChartFrameLayout {
     this.legendLayout,
     this.xMin,
     this.xMax,
+    this.xLabels = const [],
   });
 
   /// Bounds after applying outer padding.
@@ -81,6 +83,14 @@ class ChartFrameLayout {
   // Optional X-axis numeric range.
   final double? xMin;
   final double? xMax;
+
+  /// Categorical X-axis labels, if the chart uses categorical mode.
+  ///
+  /// Empty (the default) indicates a numeric X axis. When non-empty,
+  /// the chart positions points by [xMin]/[xMax] for layout but treats
+  /// the X axis as categorical for grid and axis-rendering decisions —
+  /// see [isZeroVisibleX].
+  final List<String> xLabels;
 
   // ── Coordinate mapping ──────────────────────────────────────────────────
 
@@ -118,6 +128,7 @@ class ChartFrameLayout {
   /// Whether `x = 0` lies strictly inside the visible numeric X range.
   /// Returns false when the chart has no numeric X range configured.
   bool get isZeroVisibleX {
+    if (xLabels.isNotEmpty) return false;
     final lo = xMin;
     final hi = xMax;
     if (lo == null || hi == null) return false;
@@ -128,7 +139,7 @@ class ChartFrameLayout {
   ///
   /// Returns the zero-crossing position when [zeroCrossing] is true AND
   /// zero is inside the visible Y range; otherwise returns the chart's
-  /// bottom edge (the existing behavior).
+  /// bottom edge.
   double resolvedHorizontalAxisY({required bool zeroCrossing}) {
     if (zeroCrossing && isZeroVisibleY) return yToCanvas(0);
     return chartArea.bottom;
@@ -138,9 +149,8 @@ class ChartFrameLayout {
   ///
   /// Returns the zero-crossing position when [zeroCrossing] is true AND
   /// zero is inside the visible numeric X range; otherwise returns the
-  /// chart's left edge (the existing behavior). Zero-crossing on the
-  /// vertical axis requires a numeric X scale — if none is configured,
-  /// falls back to the edge.
+  /// chart's left edge. Zero-crossing on the vertical axis requires a
+  /// numeric X scale — if none is configured, falls back to the edge.
   double resolvedVerticalAxisX({required bool zeroCrossing}) {
     if (zeroCrossing && isZeroVisibleX) return xToCanvasValue(0);
     return chartArea.left;
@@ -168,7 +178,7 @@ ChartFrameLayout buildChartFrame({
   ChartLabelConfig xLabelConfig = ChartLabelConfig.horizontal,
   double? xMin,
   double? xMax,
-  int xDivisions = chartXDivisions,
+  int xDivisions = HandDrawnDefaults.chartXDivisions,
   AxisValueFormatter? xValueFormatter,
 }) {
   final paddedBounds = Rect.fromLTWH(
@@ -220,7 +230,7 @@ ChartFrameLayout buildChartFrame({
     // overflow behavior — the cap governs measurement, not glyph
     // shaping.
     final legendMaxWidth = legendConfig.position == ChartLegendPosition.right
-        ? math.max(0.0, paddedBounds.width / 2 - chartLegendEntryGap)
+        ? math.max(0.0, paddedBounds.width / 2 - defaultChartLegendEntryGap)
         : paddedBounds.width;
 
     legendLayout = layoutLegend(
@@ -239,7 +249,7 @@ ChartFrameLayout buildChartFrame({
         // legendMaxWidth above already enforced the half-width cap on
         // content, so legendLayout.size.width is guaranteed to fit.
         // Add the gap to get the total reserved width.
-        rightLegendWidth = legendLayout.size.width + chartLegendEntryGap;
+        rightLegendWidth = legendLayout.size.width + defaultChartLegendEntryGap;
       }
     }
   }
@@ -301,7 +311,7 @@ ChartFrameLayout buildChartFrame({
       // left edge — and the rect overlays the chart area.
       if (legendConfig.reserveSpace) {
         legendArea = Rect.fromLTRB(
-          chartAreaRight + chartLegendEntryGap,
+          chartAreaRight + defaultChartLegendEntryGap,
           chartTop,
           paddedBounds.right,
           chartBottom,
@@ -329,6 +339,7 @@ ChartFrameLayout buildChartFrame({
     yMax: yMax,
     xMin: xMin,
     xMax: xMax,
+    xLabels: xLabels,
   );
 }
 
@@ -378,7 +389,7 @@ double _measureXTickHeight(
   ChartLabelConfig xLabelConfig, {
   double? xMin,
   double? xMax,
-  int xDivisions = chartXDivisions,
+  int xDivisions = HandDrawnDefaults.chartXDivisions,
   AxisValueFormatter? xValueFormatter,
 }) {
   if (xLabels.isEmpty && !hasNumericXAxis) return 0;

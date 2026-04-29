@@ -40,10 +40,10 @@ class HandDrawnLegend extends StatelessWidget {
     required this.entries,
     this.config = ChartLegendConfig.externalBottomBoxed,
     this.textStyle,
-    this.borderColor = chartAxisColor,
+    this.borderColor = HandDrawnDefaults.chartAxisColor,
     this.seed = HandDrawnDefaults.seed,
-    this.irregularity = chartIrregularity,
-    this.segments = wobblyRectSegments,
+    this.irregularity = HandDrawnDefaults.chartIrregularity,
+    this.segments = HandDrawnDefaults.wobblyRectSegments,
     this.maxWidth,
     super.key,
   });
@@ -63,8 +63,8 @@ class HandDrawnLegend extends StatelessWidget {
   final TextStyle? textStyle;
 
   /// Color of the wobbly border drawn when [config.boxed] is true.
-  /// Defaults to [chartAxisColor] so a standalone legend matches its
-  /// chart's axis tone.
+  /// Defaults to [HandDrawnDefaults.chartAxisColor] so a standalone
+  /// legend matches its chart's axis tone.
   final Color borderColor;
 
   /// Seed for the wobbly border's deterministic stroke jitter.

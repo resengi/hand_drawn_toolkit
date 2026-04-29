@@ -46,7 +46,7 @@ void main() {
       expect(data.resolvedCategories, [cat]);
     });
 
-    test('hasGroupedBars is false for legacy bars input', () {
+    test('hasGroupedBars is false for ungrouped bars input', () {
       const data = BarChartData(bars: [_bar, _bar], legend: []);
       expect(data.hasGroupedBars, isFalse);
     });

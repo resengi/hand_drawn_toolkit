@@ -4,15 +4,7 @@ import 'dart:ui' show Color;
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/painting.dart' show EdgeInsets;
 
-import '../hand_drawn_constants.dart'
-    show
-        chartGridColor,
-        chartGridJitterRatio,
-        chartGridStrokeWidth,
-        chartLabelThinningGap,
-        chartLegendEntryGap,
-        defaultSampleCount,
-        defaultWobbleAnchorStride;
+import '../hand_drawn_toolkit_defaults.dart';
 
 /// Generic color mapping keyed by category name (e.g., "completed",
 /// "skipped", "primary").
@@ -44,7 +36,8 @@ enum AxisDisplayMode { edge, zeroCrossing }
 
 /// Per-axis display configuration for numeric charts.
 ///
-/// Both axes default to [AxisDisplayMode.edge] — the existing behavior.
+/// Both axes default to [AxisDisplayMode.edge] (axes drawn at the
+/// chart's bottom and left edges).
 /// Opt into zero-crossing axes explicitly:
 ///
 /// ```dart
@@ -97,9 +90,8 @@ class AxisDisplay {
 /// Visual configuration for a chart's background grid.
 ///
 /// Bundles styling, visibility, and density controls into a single
-/// immutable value. Replaces the older flat `gridColor` /
-/// `gridStrokeWidth` / `gridJitterRatio` painter fields — they are now
-/// accessed as `grid.color`, `grid.strokeWidth`, etc.
+/// immutable value covering color, stroke width, hand-drawn jitter,
+/// per-axis visibility, and optional sub-grid lines.
 ///
 /// The defaults ([GridConfig.standard]) render both axes' grid lines
 /// at each tick position with no sub-divisions. To hide a grid,
@@ -124,9 +116,9 @@ class AxisDisplay {
 /// categorical-X line charts ignore [showVertical].
 class GridConfig {
   const GridConfig({
-    this.color = chartGridColor,
-    this.strokeWidth = chartGridStrokeWidth,
-    this.jitterRatio = chartGridJitterRatio,
+    this.color = HandDrawnDefaults.chartGridColor,
+    this.strokeWidth = HandDrawnDefaults.chartGridStrokeWidth,
+    this.jitterRatio = HandDrawnDefaults.chartGridJitterRatio,
     this.showHorizontal = true,
     this.showVertical = true,
     this.horizontalSubGridLinesBetweenTicks = 0,
@@ -177,7 +169,7 @@ class GridConfig {
   final double subGridAlphaMultiplier;
 
   /// Default configuration — both grids shown at every tick with no
-  /// sub-divisions. Matches the pre-GridConfig behavior exactly.
+  /// sub-divisions. Equivalent to the all-defaults configuration.
   static const GridConfig standard = GridConfig();
 
   /// No grid lines at all.
@@ -224,10 +216,9 @@ class GridConfig {
 /// Visual configuration for axis tick labels (currently the X-axis tick
 /// label band).
 ///
-/// Bundles rotation, label-thinning sensitivity, and any future label
-/// styling concerns into a single immutable value. The default
-/// ([ChartLabelConfig.horizontal]) is no rotation — opt into rotation
-/// explicitly:
+/// Bundles rotation and label-thinning sensitivity into a single
+/// immutable value. The default ([ChartLabelConfig.horizontal]) is
+/// no rotation — opt into rotation explicitly:
 ///
 /// ```dart
 /// HandDrawnBarChart(
@@ -265,7 +256,7 @@ class GridConfig {
 class ChartLabelConfig {
   const ChartLabelConfig({
     this.rotationDegrees = 0,
-    this.minVisibleGap = chartLabelThinningGap,
+    this.minVisibleGap = HandDrawnDefaults.chartLabelThinningGap,
   }) : assert(
          // value.isFinite is not const-evaluable, so we open-code the
          // same predicate: NaN fails the self-equality test, and the
@@ -289,7 +280,7 @@ class ChartLabelConfig {
   /// Minimum visible gap between adjacent tick labels in pixels, used
   /// by the thinning algorithm to decide how many labels can fit. Larger
   /// values produce sparser label spacing; smaller values pack more
-  /// labels in. Defaults to [chartLabelThinningGap].
+  /// labels in. Defaults to [HandDrawnDefaults.chartLabelThinningGap].
   final double minVisibleGap;
 
   /// Rotation in radians (derived from [rotationDegrees]).
@@ -401,7 +392,7 @@ class ChartLegendConfig {
     this.reserveSpace = true,
     this.wrap = false,
     this.padding = const EdgeInsets.all(8),
-    this.spacing = chartLegendEntryGap,
+    this.spacing = HandDrawnDefaults.chartLegendEntryGap,
     this.runSpacing = 4,
   }) : assert(
          spacing == spacing && spacing != double.infinity && spacing >= 0,
@@ -558,7 +549,10 @@ class ChartLegendConfig {
 class LegendEntry {
   const LegendEntry({required this.label, required this.color});
 
+  /// Text displayed for this legend item.
   final String label;
+
+  /// Color marker associated with this legend item.
   final Color color;
 
   @override
@@ -572,10 +566,9 @@ class LegendEntry {
 
 /// Helpers for deriving legend entries from chart data classes.
 ///
-/// Today this is only used by line charts. The chart construction site
-/// calls [fromLineChartData] unconditionally — the helper handles all
-/// three precedence cases internally so callers don't reimplement the
-/// fallback logic.
+/// The line chart construction site calls [fromLineChartData]
+/// unconditionally — the helper handles all three precedence cases
+/// internally so callers don't reimplement the fallback logic.
 class ChartLegendEntries {
   const ChartLegendEntries._();
 
@@ -627,9 +620,7 @@ class BarSegment {
     this.fillColor,
     this.fillAlpha,
   }) : assert(
-         // value.isFinite is not const-evaluable, so we open-code the
-         // same predicate: NaN fails the self-equality test, and the
-         // two infinities are rejected explicitly.
+         // See ChartLabelConfig for the open-coded finite-check rationale.
          value == value &&
              value != double.infinity &&
              value != double.negativeInfinity,
@@ -744,9 +735,8 @@ class BarCategory {
 ///
 /// Two input shapes are supported:
 ///
-/// - **Legacy / ungrouped**: pass [bars]. Each [BarGroup] occupies one
-///   x-axis tick and may contain stacked segments. This is the original
-///   API and continues to behave identically.
+/// - **Ungrouped (single-bar-per-tick)**: pass [bars]. Each [BarGroup]
+///   occupies one x-axis tick and may contain stacked segments.
 /// - **Grouped**: pass [categories]. Each [BarCategory] occupies one
 ///   x-axis tick and contains one or more side-by-side bars (each of
 ///   which may still be stacked). When [categories] is non-empty it
@@ -792,7 +782,7 @@ class BarChartData {
   /// Optional grouped-bar layout. When non-empty, this takes precedence
   /// over [bars]: each [BarCategory] occupies one x-axis slot and
   /// contains one or more side-by-side bars (each of which may still be
-  /// stacked). When empty, the chart renders from [bars] as before.
+  /// stacked). When empty, the chart renders from [bars].
   ///
   /// To keep a single API surface, [resolvedCategories] always returns
   /// the effective category list — either [categories], or a
@@ -916,7 +906,16 @@ class BarChartData {
 /// Points are positioned using their [x] and [y] values. The [x] value
 /// determines horizontal placement within the chart's `minX`–`maxX` range.
 class LinePoint {
-  const LinePoint({required this.x, required this.y});
+  const LinePoint({required this.x, required this.y})
+    : assert(
+        // See ChartLabelConfig for the open-coded finite-check rationale.
+        x == x && x != double.infinity && x != double.negativeInfinity,
+        'LinePoint.x must be finite',
+      ),
+      assert(
+        y == y && y != double.infinity && y != double.negativeInfinity,
+        'LinePoint.y must be finite',
+      );
 
   /// Numeric X value used for horizontal positioning.
   final double x;
@@ -954,8 +953,7 @@ class LineSeriesData {
   final Color color;
 
   /// Whether to draw the semi-transparent fill below this series' line.
-  /// Defaults to `true` (the existing behavior). Set `false` for an
-  /// unfilled stroke-only series.
+  /// Defaults to `true`. Set `false` for an unfilled stroke-only series.
   final bool showFill;
 
   @override
@@ -1012,9 +1010,9 @@ class FunctionSeriesData {
     required this.color,
     required this.function,
     this.displayXs = const [],
-    this.sampleCount = defaultSampleCount,
+    this.sampleCount = HandDrawnDefaults.functionSampleCount,
     this.showFill = true,
-    this.wobbleAnchorStride = defaultWobbleAnchorStride,
+    this.wobbleAnchorStride = HandDrawnDefaults.functionWobbleAnchorStride,
   }) : assert(sampleCount >= 2, 'sampleCount must be at least 2'),
        assert(wobbleAnchorStride >= 1, 'wobbleAnchorStride must be >= 1');
 
@@ -1033,6 +1031,7 @@ class FunctionSeriesData {
   /// visible dots and participate in point hit testing.
   ///
   /// - Empty is allowed → draws curve only, no visible dots, no point hits.
+  /// - Non-finite values (NaN, ±∞) are skipped.
   /// - Out-of-range values are ignored.
   /// - Values whose evaluated y is non-finite are skipped.
   /// - Duplicates are preserved.
@@ -1047,8 +1046,8 @@ class FunctionSeriesData {
   final int sampleCount;
 
   /// Whether to draw the semi-transparent fill below this series' curve.
-  /// Defaults to `true` (the existing behavior). Set `false` for an
-  /// unfilled stroke-only function series.
+  /// Defaults to `true`. Set `false` for an unfilled stroke-only
+  /// function series.
   final bool showFill;
 
   /// Stride (in samples) between pinned wobble anchors along the curve.
@@ -1131,9 +1130,9 @@ class LineChartData {
   /// accept non-canonical empty lists from callers.
   final List<FunctionSeriesData> functionSeries;
 
-  /// Axis display configuration. Defaults to edge-aligned axes (current
-  /// behavior). Set to enable zero-crossing axes for charts with mixed
-  /// positive/negative values.
+  /// Axis display configuration. Defaults to edge-aligned axes. Set to
+  /// enable zero-crossing axes for charts with mixed positive/negative
+  /// values.
   final AxisDisplay axisDisplay;
 
   /// Optional chart title rendered above the chart area.
@@ -1282,7 +1281,16 @@ class LineChartData {
 /// (defaults to 5.0).
 class ScatterPoint {
   const ScatterPoint({required this.x, required this.y, this.size})
-    : assert(size == null || size > 0, 'size must be positive when provided');
+    : assert(size == null || size > 0, 'size must be positive when provided'),
+      assert(
+        // See ChartLabelConfig for the open-coded finite-check rationale.
+        x == x && x != double.infinity && x != double.negativeInfinity,
+        'ScatterPoint.x must be finite',
+      ),
+      assert(
+        y == y && y != double.infinity && y != double.negativeInfinity,
+        'ScatterPoint.y must be finite',
+      );
 
   final double x;
   final double y;
@@ -1319,9 +1327,9 @@ class ScatterPlotData {
     this.legend = const [],
   });
 
-  /// Axis display configuration. Defaults to edge-aligned axes (current
-  /// behavior). Set to enable zero-crossing axes for plots with mixed
-  /// positive/negative values.
+  /// Axis display configuration. Defaults to edge-aligned axes. Set to
+  /// enable zero-crossing axes for charts with mixed positive/negative
+  /// values.
   final AxisDisplay axisDisplay;
 
   /// Optional chart title rendered above the chart area.

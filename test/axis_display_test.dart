@@ -576,4 +576,83 @@ void main() {
       expect(countCrossings(pts), 0);
     });
   });
+
+  // ── Categorical-X line charts ignore numeric-X axis behavior ─────────
+
+  group('Categorical-X line chart axis behavior', () {
+    LineChartData categoricalLine({
+      AxisDisplay axisDisplay = AxisDisplay.edge,
+    }) {
+      return LineChartData(
+        minX: -1,
+        maxX: 1,
+        minY: 0,
+        maxY: 100,
+        xLabels: const ['L', 'M', 'R'],
+        axisDisplay: axisDisplay,
+        series: const [
+          LineSeriesData(
+            name: 'S',
+            color: Color(0xFF000000),
+            points: [
+              LinePoint(x: -1, y: 10),
+              LinePoint(x: 0, y: 50),
+              LinePoint(x: 1, y: 80),
+            ],
+          ),
+        ],
+      );
+    }
+
+    test('frame.isZeroVisibleX is false even when zero is in [minX, maxX]', () {
+      // minX=-1, maxX=1 would make isZeroVisibleX true under numeric-X
+      // semantics. Categorical mode must override that.
+      final painter = HandDrawnLineChartPainter(data: categoricalLine());
+      final recorder = PictureRecorder();
+      painter.paint(Canvas(recorder), kChartTestSize);
+      recorder.endRecording();
+      expect(painter.frame.isZeroVisibleX, isFalse);
+    });
+
+    test(
+      'vertical zero-crossing falls back to left edge in categorical mode',
+      () {
+        // Even with vertical zero-crossing requested AND zero inside the
+        // numeric range, the resolved vertical axis stays at chartArea.left.
+        final painter = HandDrawnLineChartPainter(
+          data: categoricalLine(
+            axisDisplay: const AxisDisplay(
+              vertical: AxisDisplayMode.zeroCrossing,
+            ),
+          ),
+        );
+        final recorder = PictureRecorder();
+        painter.paint(Canvas(recorder), kChartTestSize);
+        recorder.endRecording();
+        final frame = painter.frame;
+        final resolvedX = frame.resolvedVerticalAxisX(zeroCrossing: true);
+        expect(resolvedX, equals(frame.chartArea.left));
+      },
+    );
+
+    test(
+      'paints cleanly with default GridConfig.standard (showVertical: true)',
+      () {
+        // The painter's _hasNumericXAxis getter gates vertical grid
+        // rendering. With xLabels non-empty, vertical grid must be skipped
+        // even though GridConfig.standard requests it. We verify paint
+        // succeeds; the gate itself is exercised by the isZeroVisibleX
+        // test above (same predicate, different consumer).
+        final recorder = PictureRecorder();
+        final canvas = Canvas(recorder);
+        expect(
+          () => HandDrawnLineChartPainter(
+            data: categoricalLine(),
+          ).paint(canvas, kChartTestSize),
+          returnsNormally,
+        );
+        recorder.endRecording();
+      },
+    );
+  });
 }

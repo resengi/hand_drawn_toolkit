@@ -2,17 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
 
-/// Finds [CustomPaint] widgets that use a [HandDrawnLinePainter] as either
-/// their `painter` or `foregroundPainter`. This avoids collisions with
-/// framework-internal [CustomPaint] widgets from [Scaffold], [Material], etc.
-Finder findHandDrawnPaint() {
-  return find.byWidgetPredicate(
-    (widget) =>
-        widget is CustomPaint &&
-        (widget.painter is HandDrawnLinePainter ||
-            widget.foregroundPainter is HandDrawnLinePainter),
-  );
-}
+import 'test_utils.dart';
 
 void main() {
   group('HandDrawnContainer', () {
@@ -106,6 +96,25 @@ void main() {
       expect(painter.segments, 30);
       expect(painter.seed, 99);
     });
+
+    testWidgets('borderOpacity multiplies strokeColor alpha', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: HandDrawnContainer(
+              strokeColor: Color(0x80000000), // alpha 0.5
+              borderOpacity: 0.5,
+              child: SizedBox(width: 100, height: 100),
+            ),
+          ),
+        ),
+      );
+
+      final customPaint = tester.widget<CustomPaint>(findHandDrawnPaint());
+      final painter = customPaint.foregroundPainter! as HandDrawnLinePainter;
+      // 0.5 (strokeColor alpha) * 0.5 (borderOpacity) = 0.25
+      expect(painter.color.a, closeTo(0.25, 0.01));
+    });
   });
 
   group('HandDrawnDivider', () {
@@ -177,9 +186,7 @@ void main() {
     });
 
     testWidgets('uses default HandDrawnDefaults for divider', (tester) async {
-      await tester.pumpWidget(
-        const MaterialApp(home: Scaffold(body: HandDrawnDivider())),
-      );
+      await tester.pumpWidget(testApp(const HandDrawnDivider()));
 
       final customPaint = tester.widget<CustomPaint>(findHandDrawnPaint());
       final painter = customPaint.painter! as HandDrawnLinePainter;

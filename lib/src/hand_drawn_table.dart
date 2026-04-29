@@ -7,10 +7,6 @@ import 'hand_drawn_container.dart';
 import 'hand_drawn_divider.dart';
 import 'hand_drawn_toolkit_defaults.dart';
 
-/// Cross-axis extent of a divider for a given thickness.
-double _dividerCrossAxisExtent(double thickness) =>
-    thickness * dividerCrossAxisMultiplier;
-
 /// Definition of a single table column.
 class HandDrawnTableColumn {
   const HandDrawnTableColumn({
@@ -65,11 +61,15 @@ class HandDrawnTableRow {
 /// (`seed + 1`, `seed + 2`, …) for distinct wobble on every line.
 class TableDividerStyle {
   const TableDividerStyle({
+    this.color = HandDrawnDefaults.dividerColor,
     this.seed = HandDrawnDefaults.seed,
     this.irregularity = HandDrawnDefaults.dividerIrregularity,
     this.thickness = HandDrawnDefaults.dividerThickness,
     this.uniform = true,
   });
+
+  /// Stroke color for the dividers. Defaults to the package divider color.
+  final Color color;
 
   /// Random seed for deterministic wobble.
   final int seed;
@@ -88,13 +88,15 @@ class TableDividerStyle {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is TableDividerStyle &&
+          color == other.color &&
           seed == other.seed &&
           irregularity == other.irregularity &&
           thickness == other.thickness &&
           uniform == other.uniform;
 
   @override
-  int get hashCode => Object.hash(seed, irregularity, thickness, uniform);
+  int get hashCode =>
+      Object.hash(color, seed, irregularity, thickness, uniform);
 }
 
 /// A generic hand-drawn table widget.
@@ -129,8 +131,8 @@ class HandDrawnTable extends StatelessWidget {
     required this.columns,
     required this.rows,
     this.title,
-    this.highlightColor = tableHighlightColor,
-    this.highlightAlpha = tableHighlightAlpha,
+    this.highlightColor = HandDrawnDefaults.tableHighlightColor,
+    this.highlightAlpha = HandDrawnDefaults.tableHighlightAlpha,
     this.headerStyle,
     this.cellStyle,
     this.titleStyle,
@@ -138,9 +140,9 @@ class HandDrawnTable extends StatelessWidget {
     this.emptyMessage = 'No data',
     this.rowDividers,
     this.columnDividers,
-    this.padding = const EdgeInsets.all(defaultTablePadding),
-    this.rowPadding = tableRowVerticalPadding,
-    this.titleBottomPadding = tableTitleBottomPadding,
+    this.padding = const EdgeInsets.all(HandDrawnDefaults.tablePadding),
+    this.rowPadding = HandDrawnDefaults.tableRowVerticalPadding,
+    this.titleBottomPadding = HandDrawnDefaults.tableTitleBottomPadding,
     this.textOverflow = TextOverflow.ellipsis,
     this.cellMaxLines = 1,
     this.softWrap = false,
@@ -391,16 +393,19 @@ class HandDrawnTable extends StatelessWidget {
 
   HandDrawnDivider _buildHeaderDivider() {
     if (rowDividers == null) return const HandDrawnDivider();
+    final config = rowDividers!;
     return HandDrawnDivider(
-      seed: rowDividers!.seed,
-      irregularity: rowDividers!.irregularity,
-      thickness: rowDividers!.thickness,
+      color: config.color,
+      seed: config.seed,
+      irregularity: config.irregularity,
+      thickness: config.thickness,
     );
   }
 
   HandDrawnDivider _buildRowDivider(int index) {
     final config = rowDividers!;
     return HandDrawnDivider(
+      color: config.color,
       seed: config.uniform ? config.seed : config.seed + index + 1,
       irregularity: config.irregularity,
       thickness: config.thickness,
@@ -412,7 +417,7 @@ class HandDrawnTable extends StatelessWidget {
   Widget _columnDividerStack(Widget content, List<double> boundaries) {
     final config = columnDividers!;
     final thickness = config.thickness;
-    final halfCross = _dividerCrossAxisExtent(thickness) / 2;
+    final halfCross = dividerCrossAxisExtent(thickness) / 2;
     return IntrinsicHeight(
       child: Stack(
         children: [
@@ -425,6 +430,7 @@ class HandDrawnTable extends StatelessWidget {
               child: HandDrawnDivider(
                 direction: Axis.vertical,
                 height: double.infinity,
+                color: config.color,
                 thickness: thickness,
                 seed: config.uniform ? config.seed : config.seed + i + 1,
                 irregularity: config.irregularity,

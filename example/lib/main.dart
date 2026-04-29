@@ -1744,9 +1744,6 @@ class _InteractiveBarChart extends StatelessWidget {
             final hit = layout.hitTest(details.localPosition);
             if (hit != null) {
               final s = hit.segment;
-              // For grouped charts show inner label ("North"); for legacy
-              // charts the inner label equals the outer (barLabel) so we
-              // avoid the redundancy.
               final header = data.hasGroupedBars
                   ? '${s.barLabel} / ${s.innerBarLabel}'
                   : s.barLabel;

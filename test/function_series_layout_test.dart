@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
 
+import 'test_utils.dart';
+
 // Top-level functions used across tests so closure identity is stable.
 double _xSquared(double x) => x * x;
 double _oneOverX(double x) => 1 / x;
@@ -11,8 +13,6 @@ HandDrawnLineChartPainter _painterFor(LineChartData data) {
 }
 
 void main() {
-  const size = Size(400, 300);
-
   group('Function-series layout: points', () {
     test('pointIndex indexes into displayPoints for function series', () {
       const data = LineChartData(
@@ -32,7 +32,7 @@ void main() {
         ],
       );
 
-      final layout = _painterFor(data).computeLayout(size);
+      final layout = _painterFor(data).computeLayout(kChartTestSize);
 
       // Exactly five visible points despite 40 internal samples.
       expect(layout.points, hasLength(5));
@@ -64,7 +64,7 @@ void main() {
           ),
         ],
       );
-      final layout = _painterFor(data).computeLayout(size);
+      final layout = _painterFor(data).computeLayout(kChartTestSize);
       expect(layout.points, hasLength(2));
       expect(layout.points.map((p) => p.rawPoint.x), [3, 7]);
     });
@@ -89,7 +89,7 @@ void main() {
         ],
       );
 
-      final layout = _painterFor(data).computeLayout(size);
+      final layout = _painterFor(data).computeLayout(kChartTestSize);
 
       // Continuous curve → one run of 40 samples → 39 segments.
       expect(layout.segments, hasLength(39));
@@ -115,7 +115,7 @@ void main() {
         ],
       );
 
-      final layout = _painterFor(data).computeLayout(size);
+      final layout = _painterFor(data).computeLayout(kChartTestSize);
 
       // Run 1: [-2, -1] → 1 segment. Run 2: [1, 2] → 1 segment. Total 2.
       expect(layout.segments, hasLength(2));
@@ -159,7 +159,7 @@ void main() {
         ],
       );
 
-      final layout = _painterFor(data).computeLayout(size);
+      final layout = _painterFor(data).computeLayout(kChartTestSize);
 
       // Ordinary series first (seriesIndex 0), function after (seriesIndex 1).
       final ordinary = layout.points.where((p) => p.seriesIndex == 0).toList();
@@ -247,5 +247,86 @@ void main() {
       expect(p.legend[0].label, 'Ordinary');
       expect(p.legend[1].label, 'Function');
     });
+  });
+
+  group('FunctionSeriesData release-safe validation', () {
+    // Both validation layers (the constructor's debug assert and the
+    // resolver's release-safe ArgumentError) extend Error, so the tests
+    // accept either. Removing either layer would still leave one error
+    // path active; removing both would fail these tests.
+
+    test('sampleCount < 2 is rejected', () {
+      expect(() {
+        final data = LineChartData(
+          series: [],
+          minX: 0,
+          maxX: 1,
+          minY: 0,
+          maxY: 1,
+          functionSeries: [
+            FunctionSeriesData(
+              name: 'f',
+              color: Colors.blue,
+              function: _xSquared,
+              sampleCount: 1,
+            ),
+          ],
+        );
+        _painterFor(data).computeLayout(kChartTestSize);
+      }, throwsA(isA<Error>()));
+    });
+
+    test('wobbleAnchorStride < 1 is rejected', () {
+      expect(() {
+        final data = LineChartData(
+          series: [],
+          minX: 0,
+          maxX: 1,
+          minY: 0,
+          maxY: 1,
+          functionSeries: [
+            FunctionSeriesData(
+              name: 'f',
+              color: Colors.blue,
+              function: _xSquared,
+              wobbleAnchorStride: 0,
+            ),
+          ],
+        );
+        _painterFor(data).computeLayout(kChartTestSize);
+      }, throwsA(isA<Error>()));
+    });
+  });
+
+  test('non-finite displayXs are skipped, finite in-range values kept', () {
+    final data = LineChartData(
+      minX: 0,
+      maxX: 10,
+      minY: 0,
+      maxY: 10,
+      series: const [],
+      functionSeries: [
+        FunctionSeriesData(
+          name: 'f',
+          color: const Color(0xFF000000),
+          function: (x) => x,
+          displayXs: const [
+            double.nan,
+            1.0,
+            double.infinity,
+            5.0,
+            double.negativeInfinity,
+          ],
+        ),
+      ],
+    );
+    final layout = HandDrawnLineChartPainter(
+      data: data,
+    ).computeLayout(kChartTestSize);
+
+    // Assert on the surviving xs (semantic content) rather than .length
+    // (an aggregation count that could change for unrelated reasons).
+    final xs = layout.points.map((p) => p.rawPoint.x).toList();
+    expect(xs, [1.0, 5.0]);
   });
 }

@@ -11,8 +11,9 @@
 ///   stack downward, and a single bar may mix the two. The
 ///   `minY`/`maxY` parameters control the visible Y-range, not the
 ///   stacking origin.
-/// - **Line charts** are numeric on both axes. Points should be sorted
-///   by X for coherent rendering.
+/// - **Line charts** position points by numeric X/Y values and can
+///   render either numeric X ticks or caller-provided categorical X
+///   labels. Points should be sorted by X for coherent rendering.
 /// - **Scatter plots** are numeric on both axes.
 ///
 /// ## Quick start
@@ -44,7 +45,6 @@ library;
 export 'src/charts/chart_data.dart';
 export 'src/charts/chart_interaction.dart';
 export 'src/charts/hand_drawn_bar_chart.dart';
-export 'src/charts/hand_drawn_chart_painter.dart';
 export 'src/charts/hand_drawn_legend.dart';
 export 'src/charts/hand_drawn_line_chart.dart';
 export 'src/charts/hand_drawn_scatter_plot.dart';

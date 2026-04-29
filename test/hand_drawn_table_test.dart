@@ -4,10 +4,6 @@ import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
 
 import 'test_utils.dart';
 
-Widget _wrap(Widget child) {
-  return MaterialApp(home: Scaffold(body: child));
-}
-
 const _columns = [
   HandDrawnTableColumn(header: 'Name', flex: 3),
   HandDrawnTableColumn(header: 'Score', width: 60),
@@ -27,14 +23,14 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        _wrap(const HandDrawnTable(columns: _columns, rows: [])),
+        testApp(const HandDrawnTable(columns: _columns, rows: [])),
       );
       expect(find.text('No data'), findsOneWidget);
     });
 
     testWidgets('shows custom empty message', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: _columns,
             rows: [],
@@ -47,7 +43,7 @@ void main() {
 
     testWidgets('wraps empty message in HandDrawnContainer', (tester) async {
       await tester.pumpWidget(
-        _wrap(const HandDrawnTable(columns: _columns, rows: [])),
+        testApp(const HandDrawnTable(columns: _columns, rows: [])),
       );
       expect(find.byType(HandDrawnContainer), findsOneWidget);
     });
@@ -56,7 +52,7 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(columns: _columns, rows: [], title: 'My Table'),
         ),
       );
@@ -69,7 +65,7 @@ void main() {
     ) async {
       const customPadding = EdgeInsets.all(24);
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: _columns,
             rows: [],
@@ -90,7 +86,7 @@ void main() {
   group('HandDrawnTable with data', () {
     testWidgets('renders all cell values', (tester) async {
       await tester.pumpWidget(
-        _wrap(const HandDrawnTable(columns: _columns, rows: _rows)),
+        testApp(const HandDrawnTable(columns: _columns, rows: _rows)),
       );
       expect(find.text('Alice'), findsOneWidget);
       expect(find.text('42'), findsOneWidget);
@@ -102,7 +98,7 @@ void main() {
 
     testWidgets('renders column headers', (tester) async {
       await tester.pumpWidget(
-        _wrap(const HandDrawnTable(columns: _columns, rows: _rows)),
+        testApp(const HandDrawnTable(columns: _columns, rows: _rows)),
       );
       expect(find.text('Name'), findsOneWidget);
       expect(find.text('Score'), findsOneWidget);
@@ -110,7 +106,7 @@ void main() {
 
     testWidgets('renders header divider', (tester) async {
       await tester.pumpWidget(
-        _wrap(const HandDrawnTable(columns: _columns, rows: _rows)),
+        testApp(const HandDrawnTable(columns: _columns, rows: _rows)),
       );
       expect(find.byType(HandDrawnDivider), findsAtLeastNWidgets(1));
     });
@@ -121,7 +117,7 @@ void main() {
   group('HandDrawnTable title', () {
     testWidgets('renders title when provided', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: _columns,
             rows: _rows,
@@ -134,7 +130,7 @@ void main() {
 
     testWidgets('does not render title when null', (tester) async {
       await tester.pumpWidget(
-        _wrap(const HandDrawnTable(columns: _columns, rows: _rows)),
+        testApp(const HandDrawnTable(columns: _columns, rows: _rows)),
       );
       // Only cell texts and headers should be present, no title widget.
       expect(find.text('Leaderboard'), findsNothing);
@@ -146,7 +142,7 @@ void main() {
   group('HandDrawnTable row dividers', () {
     testWidgets('shows no row dividers by default', (tester) async {
       await tester.pumpWidget(
-        _wrap(const HandDrawnTable(columns: _columns, rows: _rows)),
+        testApp(const HandDrawnTable(columns: _columns, rows: _rows)),
       );
       // Only the header divider should exist.
       expect(find.byType(HandDrawnDivider), findsOneWidget);
@@ -154,7 +150,7 @@ void main() {
 
     testWidgets('shows row dividers when enabled', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: _columns,
             rows: _rows,
@@ -171,7 +167,7 @@ void main() {
         HandDrawnTableRow(cells: ['A', '1']),
       ];
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: _columns,
             rows: singleRow,
@@ -185,7 +181,7 @@ void main() {
 
     testWidgets('non-uniform row dividers have distinct seeds', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: _columns,
             rows: _rows,
@@ -210,7 +206,7 @@ void main() {
   group('HandDrawnTable column dividers', () {
     testWidgets('shows no column dividers by default', (tester) async {
       await tester.pumpWidget(
-        _wrap(const HandDrawnTable(columns: _columns, rows: _rows)),
+        testApp(const HandDrawnTable(columns: _columns, rows: _rows)),
       );
       final verticalDividers = find.byWidgetPredicate(
         (w) => w is HandDrawnDivider && w.direction == Axis.vertical,
@@ -220,7 +216,7 @@ void main() {
 
     testWidgets('shows column dividers when enabled', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: _columns,
             rows: _rows,
@@ -247,7 +243,7 @@ void main() {
         HandDrawnTableRow(cells: ['1', '2', '3']),
       ];
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: threeColumns,
             rows: threeColRows,
@@ -288,7 +284,7 @@ void main() {
       ];
 
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const SizedBox(
             width: 600,
             child: HandDrawnTable(
@@ -331,7 +327,7 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const SizedBox(
             width: 400,
             child: HandDrawnTable(
@@ -370,7 +366,7 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             title: 'Quarterly Revenue Report 2024',
             columns: _columns,
@@ -381,6 +377,60 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       expect(find.text('Quarterly Revenue Report 2024'), findsOneWidget);
+    });
+  });
+
+  // ── Divider color propagation ───────────────────────────────────────
+
+  group('HandDrawnTable divider color', () {
+    const customColor = Color(0xFFAA3344);
+
+    testWidgets('row divider color propagates from TableDividerStyle', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        testApp(
+          const HandDrawnTable(
+            columns: _columns,
+            rows: _rows,
+            rowDividers: TableDividerStyle(color: customColor),
+          ),
+        ),
+      );
+      // Header divider + N-1 row dividers — every one should carry the
+      // configured color.
+      final dividers = tester
+          .widgetList<HandDrawnDivider>(find.byType(HandDrawnDivider))
+          .toList();
+      expect(dividers, isNotEmpty);
+      for (final d in dividers) {
+        expect(d.color, customColor);
+      }
+    });
+
+    testWidgets('column divider color propagates from TableDividerStyle', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        testApp(
+          const HandDrawnTable(
+            columns: _columns,
+            rows: _rows,
+            columnDividers: TableDividerStyle(color: customColor),
+          ),
+        ),
+      );
+      final verticals = tester
+          .widgetList<HandDrawnDivider>(
+            find.byWidgetPredicate(
+              (w) => w is HandDrawnDivider && w.direction == Axis.vertical,
+            ),
+          )
+          .toList();
+      expect(verticals, isNotEmpty);
+      for (final d in verticals) {
+        expect(d.color, customColor);
+      }
     });
   });
 
@@ -402,7 +452,7 @@ void main() {
         'internal geometry errors', (tester) async {
       final errors = await captureFlutterErrors(() async {
         await tester.pumpWidget(
-          _wrap(
+          testApp(
             const SizedBox(
               width: 100,
               child: HandDrawnTable(
@@ -433,7 +483,7 @@ void main() {
         'no internal geometry errors', (tester) async {
       final errors = await captureFlutterErrors(() async {
         await tester.pumpWidget(
-          _wrap(
+          testApp(
             const SizedBox(
               width: 50,
               child: HandDrawnTable(
@@ -468,7 +518,7 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: _columns,
             rows: _rows,
@@ -498,7 +548,7 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        _wrap(const HandDrawnTable(columns: _columns, rows: _rows)),
+        testApp(const HandDrawnTable(columns: _columns, rows: _rows)),
       );
 
       // Find Container widgets that are descendants of HandDrawnTable.
@@ -522,7 +572,7 @@ void main() {
     testWidgets('highlighted row text uses highlight color', (tester) async {
       const highlightColor = Color(0xFF6BAF7A);
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: _columns,
             rows: [
@@ -551,7 +601,7 @@ void main() {
       ];
 
       await tester.pumpWidget(
-        _wrap(HandDrawnTable(columns: _columns, rows: mismatchedRows)),
+        testApp(HandDrawnTable(columns: _columns, rows: mismatchedRows)),
       );
 
       expect(tester.takeException(), isA<ArgumentError>());
@@ -565,7 +615,7 @@ void main() {
       ];
 
       await tester.pumpWidget(
-        _wrap(HandDrawnTable(columns: _columns, rows: mismatchedRows)),
+        testApp(HandDrawnTable(columns: _columns, rows: mismatchedRows)),
       );
 
       final error = tester.takeException();
@@ -584,7 +634,7 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        _wrap(const HandDrawnTable(columns: _columns, rows: _rows)),
+        testApp(const HandDrawnTable(columns: _columns, rows: _rows)),
       );
 
       final nameHeader = tester.widget<Text>(find.text('Name'));
@@ -600,7 +650,7 @@ void main() {
       );
 
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: _columns,
             rows: _rows,
@@ -624,7 +674,7 @@ void main() {
       ];
 
       await tester.pumpWidget(
-        _wrap(HandDrawnTable(columns: _columns, rows: rows)),
+        testApp(HandDrawnTable(columns: _columns, rows: rows)),
       );
 
       final text = tester.widget<Text>(find.text('Styled'));
@@ -638,7 +688,7 @@ void main() {
   group('HandDrawnTable column configuration', () {
     testWidgets('fixed-width column renders with SizedBox', (tester) async {
       await tester.pumpWidget(
-        _wrap(const HandDrawnTable(columns: _columns, rows: _rows)),
+        testApp(const HandDrawnTable(columns: _columns, rows: _rows)),
       );
 
       // The 'Score' column has width: 60, so its cell should be in a SizedBox.
@@ -651,7 +701,7 @@ void main() {
 
     testWidgets('flex column renders with Expanded', (tester) async {
       await tester.pumpWidget(
-        _wrap(const HandDrawnTable(columns: _columns, rows: _rows)),
+        testApp(const HandDrawnTable(columns: _columns, rows: _rows)),
       );
 
       final expandedWidgets = find.descendant(
@@ -667,7 +717,7 @@ void main() {
   group('HandDrawnTable extended configurability', () {
     testWidgets('accepts custom padding', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: _columns,
             rows: _rows,
@@ -680,7 +730,7 @@ void main() {
 
     testWidgets('accepts custom rowPadding', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(columns: _columns, rows: _rows, rowPadding: 12),
         ),
       );
@@ -690,7 +740,7 @@ void main() {
     testWidgets('accepts custom titleStyle', (tester) async {
       const style = TextStyle(fontSize: 20, color: Color(0xFFFF0000));
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: _columns,
             rows: _rows,
@@ -706,7 +756,7 @@ void main() {
 
     testWidgets('accepts custom highlightAlpha', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: _columns,
             rows: [
@@ -722,7 +772,7 @@ void main() {
     testWidgets('accepts custom emptyStyle', (tester) async {
       const style = TextStyle(fontSize: 18, color: Color(0xFFFF0000));
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(columns: _columns, rows: [], emptyStyle: style),
         ),
       );
@@ -732,7 +782,7 @@ void main() {
 
     testWidgets('accepts custom titleBottomPadding', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: _columns,
             rows: _rows,
@@ -750,7 +800,7 @@ void main() {
   group('HandDrawnTable text overflow', () {
     testWidgets('uses ellipsis by default', (tester) async {
       await tester.pumpWidget(
-        _wrap(const HandDrawnTable(columns: _columns, rows: _rows)),
+        testApp(const HandDrawnTable(columns: _columns, rows: _rows)),
       );
       final texts = tester.widgetList<Text>(find.byType(Text));
       final cellTexts = texts.where((t) => t.overflow == TextOverflow.ellipsis);
@@ -759,7 +809,7 @@ void main() {
 
     testWidgets('respects custom textOverflow', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: _columns,
             rows: _rows,
@@ -774,7 +824,7 @@ void main() {
 
     testWidgets('cells default to single line, no soft wrap', (tester) async {
       await tester.pumpWidget(
-        _wrap(const HandDrawnTable(columns: _columns, rows: _rows)),
+        testApp(const HandDrawnTable(columns: _columns, rows: _rows)),
       );
       final cellTexts = tester
           .widgetList<Text>(find.byType(Text))
@@ -791,7 +841,7 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: _columns,
             rows: _rows,
@@ -825,7 +875,7 @@ void main() {
         HandDrawnTableRow(cells: ['1', '2']),
       ];
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: fixedColumns,
             rows: fixedRows,
@@ -840,7 +890,7 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: _columns,
             rows: _rows,
@@ -860,7 +910,7 @@ void main() {
         HandDrawnTableRow(cells: ['1', '2']),
       ];
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: fixedColumns,
             rows: fixedRows,
@@ -889,7 +939,7 @@ void main() {
         HandDrawnTableRow(cells: ['1', '2', '3']),
       ];
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnTable(
             columns: fixedColumns,
             rows: fixedRows,

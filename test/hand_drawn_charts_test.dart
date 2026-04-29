@@ -6,88 +6,7 @@ import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
 
 import 'test_utils.dart';
 
-// ── Test data factories ────────────────────────────────────────────────────
-
-BarChartData _barData({
-  int barCount = 3,
-  String? title,
-  String? yAxisLabel,
-  double? minY,
-  double? maxY,
-}) {
-  return BarChartData(
-    title: title,
-    yAxisLabel: yAxisLabel,
-    minY: minY,
-    maxY: maxY,
-    bars: List.generate(
-      barCount,
-      (i) => BarGroup(
-        label: 'Bar $i',
-        segments: [
-          BarSegment(
-            category: 'cat',
-            value: (i + 1) * 10.0,
-            color: const Color(0xFF6B9BD2),
-          ),
-        ],
-      ),
-    ),
-    legend: [const LegendEntry(label: 'Category', color: Color(0xFF6B9BD2))],
-  );
-}
-
-LineChartData _lineData({
-  int pointCount = 5,
-  int seriesCount = 1,
-  List<String> xLabels = const [],
-  String? title,
-  String? yAxisLabel,
-}) {
-  return LineChartData(
-    title: title,
-    yAxisLabel: yAxisLabel,
-    xLabels: xLabels,
-    minX: 0,
-    maxX: (pointCount - 1).toDouble(),
-    minY: 0,
-    maxY: 100,
-    series: List.generate(
-      seriesCount,
-      (s) => LineSeriesData(
-        name: 'Series $s',
-        color: Color(0xFF000000 + s * 0x110000),
-        points: List.generate(
-          pointCount,
-          (i) => LinePoint(x: i.toDouble(), y: (i + 1) * 10.0),
-        ),
-      ),
-    ),
-  );
-}
-
-ScatterPlotData _scatterData({int pointCount = 5, String? title}) {
-  return ScatterPlotData(
-    title: title,
-    xAxisLabel: 'Weight',
-    yAxisLabel: 'Height',
-    minX: 0,
-    maxX: 100,
-    minY: 0,
-    maxY: 200,
-    points: List.generate(
-      pointCount,
-      (i) => ScatterPoint(x: i * 20.0, y: i * 40.0),
-    ),
-  );
-}
-
 // ── Helpers ────────────────────────────────────────────────────────────────
-
-/// Wraps a widget in MaterialApp + Scaffold for testing.
-Widget _wrap(Widget child) {
-  return MaterialApp(home: Scaffold(body: child));
-}
 
 /// Finds [CustomPaint] widgets that use a chart painter.
 Finder _findChartPaint<T extends CustomPainter>() {
@@ -103,13 +22,13 @@ void main() {
 
   group('HandDrawnBarChart', () {
     testWidgets('shows loading indicator when data is null', (tester) async {
-      await tester.pumpWidget(_wrap(const HandDrawnBarChart(data: null)));
+      await tester.pumpWidget(testApp(const HandDrawnBarChart(data: null)));
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
     testWidgets('shows empty message when data is empty', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnBarChart(
             data: BarChartData(bars: [], legend: []),
           ),
@@ -121,13 +40,13 @@ void main() {
     testWidgets('renders CustomPaint with correct painter for valid data', (
       tester,
     ) async {
-      await tester.pumpWidget(_wrap(HandDrawnBarChart(data: _barData())));
+      await tester.pumpWidget(testApp(HandDrawnBarChart(data: barTestData())));
       expect(_findChartPaint<HandDrawnBarChartPainter>(), findsOneWidget);
     });
 
     testWidgets('applies height parameter', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnBarChart(data: _barData(), height: 300)),
+        testApp(HandDrawnBarChart(data: barTestData(), height: 300)),
       );
       final box = tester.getSize(find.byType(HandDrawnBarChart));
       expect(box.height, 300.0);
@@ -135,7 +54,7 @@ void main() {
 
     testWidgets('passes seed to painter', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnBarChart(data: _barData(), seed: 99)),
+        testApp(HandDrawnBarChart(data: barTestData(), seed: 99)),
       );
       final customPaint = tester.widget<CustomPaint>(
         _findChartPaint<HandDrawnBarChartPainter>(),
@@ -146,7 +65,7 @@ void main() {
 
     testWidgets('accepts custom minY and maxY', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnBarChart(data: _barData(minY: -10, maxY: 50))),
+        testApp(HandDrawnBarChart(data: barTestData(minY: -10, maxY: 50))),
       );
       final customPaint = tester.widget<CustomPaint>(
         _findChartPaint<HandDrawnBarChartPainter>(),
@@ -159,7 +78,7 @@ void main() {
     testWidgets('dense bar chart renders without error', (tester) async {
       // 50 bars in default width — slotWidth will be well below barMinWidth.
       await tester.pumpWidget(
-        _wrap(HandDrawnBarChart(data: _barData(barCount: 50))),
+        testApp(HandDrawnBarChart(data: barTestData(barCount: 50))),
       );
       expect(_findChartPaint<HandDrawnBarChartPainter>(), findsOneWidget);
     });
@@ -169,10 +88,10 @@ void main() {
     ) async {
       // 50 bars in 100px → slotWidth = 2, well below barMinWidth (4).
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           SizedBox(
             width: 100,
-            child: HandDrawnBarChart(data: _barData(barCount: 50)),
+            child: HandDrawnBarChart(data: barTestData(barCount: 50)),
           ),
         ),
       );
@@ -183,7 +102,7 @@ void main() {
       // 5 bars — a typical use case that should be unaffected by the
       // dense-bar fix.
       await tester.pumpWidget(
-        _wrap(HandDrawnBarChart(data: _barData(barCount: 5))),
+        testApp(HandDrawnBarChart(data: barTestData(barCount: 5))),
       );
       final customPaint = tester.widget<CustomPaint>(
         _findChartPaint<HandDrawnBarChartPainter>(),
@@ -199,7 +118,7 @@ void main() {
 
   group('HandDrawnLineChart', () {
     testWidgets('shows loading indicator when data is null', (tester) async {
-      await tester.pumpWidget(_wrap(const HandDrawnLineChart(data: null)));
+      await tester.pumpWidget(testApp(const HandDrawnLineChart(data: null)));
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
@@ -207,7 +126,7 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnLineChart(
             data: LineChartData(
               series: [
@@ -226,7 +145,7 @@ void main() {
 
     testWidgets('renders custom emptyMessage when provided', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnLineChart(
             data: LineChartData(
               series: [
@@ -248,13 +167,15 @@ void main() {
     testWidgets('renders CustomPaint with correct painter for valid data', (
       tester,
     ) async {
-      await tester.pumpWidget(_wrap(HandDrawnLineChart(data: _lineData())));
+      await tester.pumpWidget(
+        testApp(HandDrawnLineChart(data: lineTestData())),
+      );
       expect(_findChartPaint<HandDrawnLineChartPainter>(), findsOneWidget);
     });
 
     testWidgets('passes seed to painter', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnLineChart(data: _lineData(), seed: 77)),
+        testApp(HandDrawnLineChart(data: lineTestData(), seed: 77)),
       );
       final customPaint = tester.widget<CustomPaint>(
         _findChartPaint<HandDrawnLineChartPainter>(),
@@ -265,7 +186,7 @@ void main() {
 
     testWidgets('auto-generates legend for multi-series data', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnLineChart(data: _lineData(seriesCount: 3))),
+        testApp(HandDrawnLineChart(data: lineTestData(seriesCount: 3))),
       );
       final customPaint = tester.widget<CustomPaint>(
         _findChartPaint<HandDrawnLineChartPainter>(),
@@ -279,7 +200,7 @@ void main() {
 
     testWidgets('suppresses legend for single-series data', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnLineChart(data: _lineData(seriesCount: 1))),
+        testApp(HandDrawnLineChart(data: lineTestData(seriesCount: 1))),
       );
       final customPaint = tester.widget<CustomPaint>(
         _findChartPaint<HandDrawnLineChartPainter>(),
@@ -290,9 +211,9 @@ void main() {
 
     testWidgets('passes xLabels for categorical mode', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           HandDrawnLineChart(
-            data: _lineData(xLabels: ['A', 'B', 'C', 'D', 'E']),
+            data: lineTestData(xLabels: ['A', 'B', 'C', 'D', 'E']),
           ),
         ),
       );
@@ -308,7 +229,9 @@ void main() {
     });
 
     testWidgets('uses numeric X when xLabels is empty', (tester) async {
-      await tester.pumpWidget(_wrap(HandDrawnLineChart(data: _lineData())));
+      await tester.pumpWidget(
+        testApp(HandDrawnLineChart(data: lineTestData())),
+      );
       final customPaint = tester.widget<CustomPaint>(
         _findChartPaint<HandDrawnLineChartPainter>(),
       );
@@ -325,13 +248,13 @@ void main() {
 
   group('HandDrawnScatterPlot', () {
     testWidgets('shows loading indicator when data is null', (tester) async {
-      await tester.pumpWidget(_wrap(const HandDrawnScatterPlot(data: null)));
+      await tester.pumpWidget(testApp(const HandDrawnScatterPlot(data: null)));
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
     testWidgets('shows empty message when points are empty', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnScatterPlot(
             data: ScatterPlotData(
               points: [],
@@ -352,16 +275,16 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnScatterPlot(data: _scatterData())),
+        testApp(HandDrawnScatterPlot(data: scatterTestData())),
       );
       expect(_findChartPaint<HandDrawnScatterPlotPainter>(), findsOneWidget);
     });
 
     testWidgets('passes seed and dotColor to painter', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           HandDrawnScatterPlot(
-            data: _scatterData(),
+            data: scatterTestData(),
             seed: 55,
             dotColor: Colors.red,
           ),
@@ -377,7 +300,7 @@ void main() {
 
     testWidgets('passes xAxisLabel to base painter', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnScatterPlot(data: _scatterData())),
+        testApp(HandDrawnScatterPlot(data: scatterTestData())),
       );
       final customPaint = tester.widget<CustomPaint>(
         _findChartPaint<HandDrawnScatterPlotPainter>(),
@@ -398,7 +321,7 @@ void main() {
 
     testWidgets('bar chart passes axisColor to painter', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnBarChart(data: _barData(), axisColor: Colors.red)),
+        testApp(HandDrawnBarChart(data: barTestData(), axisColor: Colors.red)),
       );
       final painter =
           tester
@@ -410,11 +333,11 @@ void main() {
       expect(painter.axisColor, Colors.red);
     });
 
-    testWidgets('bar chart passes gridColor to painter', (tester) async {
+    testWidgets('bar chart forwards grid color via GridConfig', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           HandDrawnBarChart(
-            data: _barData(),
+            data: barTestData(),
             grid: const GridConfig(color: Colors.blue),
           ),
         ),
@@ -434,7 +357,7 @@ void main() {
     ) async {
       const style = TextStyle(fontSize: 14, color: Color(0xFF000000));
       await tester.pumpWidget(
-        _wrap(HandDrawnBarChart(data: _barData(), labelStyle: style)),
+        testApp(HandDrawnBarChart(data: barTestData(), labelStyle: style)),
       );
       final painter =
           tester
@@ -449,7 +372,7 @@ void main() {
     testWidgets('bar chart uses default colors when not specified', (
       tester,
     ) async {
-      await tester.pumpWidget(_wrap(HandDrawnBarChart(data: _barData())));
+      await tester.pumpWidget(testApp(HandDrawnBarChart(data: barTestData())));
       final painter =
           tester
                   .widget<CustomPaint>(
@@ -465,7 +388,9 @@ void main() {
 
     testWidgets('line chart passes axisColor to painter', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnLineChart(data: _lineData(), axisColor: Colors.red)),
+        testApp(
+          HandDrawnLineChart(data: lineTestData(), axisColor: Colors.red),
+        ),
       );
       final painter =
           tester
@@ -477,11 +402,13 @@ void main() {
       expect(painter.axisColor, Colors.red);
     });
 
-    testWidgets('line chart passes gridColor to painter', (tester) async {
+    testWidgets('line chart forwards grid color via GridConfig', (
+      tester,
+    ) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           HandDrawnLineChart(
-            data: _lineData(),
+            data: lineTestData(),
             grid: const GridConfig(color: Colors.blue),
           ),
         ),
@@ -501,7 +428,7 @@ void main() {
     ) async {
       const style = TextStyle(fontSize: 14, color: Color(0xFF000000));
       await tester.pumpWidget(
-        _wrap(HandDrawnLineChart(data: _lineData(), labelStyle: style)),
+        testApp(HandDrawnLineChart(data: lineTestData(), labelStyle: style)),
       );
       final painter =
           tester
@@ -516,7 +443,9 @@ void main() {
     testWidgets('line chart uses default colors when not specified', (
       tester,
     ) async {
-      await tester.pumpWidget(_wrap(HandDrawnLineChart(data: _lineData())));
+      await tester.pumpWidget(
+        testApp(HandDrawnLineChart(data: lineTestData())),
+      );
       final painter =
           tester
                   .widget<CustomPaint>(
@@ -532,8 +461,8 @@ void main() {
 
     testWidgets('scatter plot passes axisColor to painter', (tester) async {
       await tester.pumpWidget(
-        _wrap(
-          HandDrawnScatterPlot(data: _scatterData(), axisColor: Colors.red),
+        testApp(
+          HandDrawnScatterPlot(data: scatterTestData(), axisColor: Colors.red),
         ),
       );
       final painter =
@@ -546,11 +475,13 @@ void main() {
       expect(painter.axisColor, Colors.red);
     });
 
-    testWidgets('scatter plot passes gridColor to painter', (tester) async {
+    testWidgets('scatter plot forwards grid color via GridConfig', (
+      tester,
+    ) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           HandDrawnScatterPlot(
-            data: _scatterData(),
+            data: scatterTestData(),
             grid: const GridConfig(color: Colors.blue),
           ),
         ),
@@ -570,7 +501,9 @@ void main() {
     ) async {
       const style = TextStyle(fontSize: 14, color: Color(0xFF000000));
       await tester.pumpWidget(
-        _wrap(HandDrawnScatterPlot(data: _scatterData(), labelStyle: style)),
+        testApp(
+          HandDrawnScatterPlot(data: scatterTestData(), labelStyle: style),
+        ),
       );
       final painter =
           tester
@@ -586,7 +519,7 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnScatterPlot(data: _scatterData())),
+        testApp(HandDrawnScatterPlot(data: scatterTestData())),
       );
       final painter =
           tester
@@ -608,7 +541,7 @@ void main() {
   group('Chart widget extended configurability', () {
     testWidgets('bar chart forwards irregularity to painter', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnBarChart(data: _barData(), irregularity: 5.0)),
+        testApp(HandDrawnBarChart(data: barTestData(), irregularity: 5.0)),
       );
       final painter =
           tester
@@ -622,7 +555,7 @@ void main() {
 
     testWidgets('line chart forwards segments to painter', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnLineChart(data: _lineData(), segments: 20)),
+        testApp(HandDrawnLineChart(data: lineTestData(), segments: 20)),
       );
       final painter =
           tester
@@ -636,7 +569,7 @@ void main() {
 
     testWidgets('scatter plot forwards yDivisions to painter', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnScatterPlot(data: _scatterData(), yDivisions: 8)),
+        testApp(HandDrawnScatterPlot(data: scatterTestData(), yDivisions: 8)),
       );
       final painter =
           tester
@@ -651,7 +584,7 @@ void main() {
     testWidgets('bar chart forwards custom padding to painter', (tester) async {
       const customPadding = EdgeInsets.all(20);
       await tester.pumpWidget(
-        _wrap(HandDrawnBarChart(data: _barData(), padding: customPadding)),
+        testApp(HandDrawnBarChart(data: barTestData(), padding: customPadding)),
       );
       final painter =
           tester
@@ -666,7 +599,7 @@ void main() {
     testWidgets('line chart forwards titleStyle to painter', (tester) async {
       const style = TextStyle(fontSize: 20, color: Color(0xFFFF0000));
       await tester.pumpWidget(
-        _wrap(HandDrawnLineChart(data: _lineData(), titleStyle: style)),
+        testApp(HandDrawnLineChart(data: lineTestData(), titleStyle: style)),
       );
       final painter =
           tester
@@ -682,7 +615,7 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnBarChart(data: _barData(), axisStrokeWidth: 3.0)),
+        testApp(HandDrawnBarChart(data: barTestData(), axisStrokeWidth: 3.0)),
       );
       final painter =
           tester
@@ -694,13 +627,13 @@ void main() {
       expect(painter.axisStrokeWidth, 3.0);
     });
 
-    testWidgets('line chart forwards gridStrokeWidth to painter', (
+    testWidgets('line chart forwards grid stroke width via GridConfig', (
       tester,
     ) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           HandDrawnLineChart(
-            data: _lineData(),
+            data: lineTestData(),
             grid: const GridConfig(strokeWidth: 2.0),
           ),
         ),
@@ -715,13 +648,13 @@ void main() {
       expect(painter.grid.strokeWidth, 2.0);
     });
 
-    testWidgets('scatter plot forwards gridJitterRatio to painter', (
+    testWidgets('scatter plot forwards grid jitter ratio via GridConfig', (
       tester,
     ) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           HandDrawnScatterPlot(
-            data: _scatterData(),
+            data: scatterTestData(),
             grid: const GridConfig(jitterRatio: 0.8),
           ),
         ),
@@ -743,41 +676,41 @@ void main() {
 
   group('Chart painter shouldRepaint', () {
     test('HandDrawnBarChartPainter: same data → false', () {
-      final data = _barData();
+      final data = barTestData();
       final a = HandDrawnBarChartPainter(data: data, seed: 42);
       final b = HandDrawnBarChartPainter(data: data, seed: 42);
       expect(a.shouldRepaint(b), isFalse);
     });
 
     test('HandDrawnBarChartPainter: different seed → true', () {
-      final data = _barData();
+      final data = barTestData();
       final a = HandDrawnBarChartPainter(data: data, seed: 42);
       final b = HandDrawnBarChartPainter(data: data, seed: 99);
       expect(a.shouldRepaint(b), isTrue);
     });
 
     test('HandDrawnLineChartPainter: same data → false', () {
-      final data = _lineData();
+      final data = lineTestData();
       final a = HandDrawnLineChartPainter(data: data, seed: 42);
       final b = HandDrawnLineChartPainter(data: data, seed: 42);
       expect(a.shouldRepaint(b), isFalse);
     });
 
     test('HandDrawnLineChartPainter: different data → true', () {
-      final a = HandDrawnLineChartPainter(data: _lineData(pointCount: 3));
-      final b = HandDrawnLineChartPainter(data: _lineData(pointCount: 5));
+      final a = HandDrawnLineChartPainter(data: lineTestData(pointCount: 3));
+      final b = HandDrawnLineChartPainter(data: lineTestData(pointCount: 5));
       expect(a.shouldRepaint(b), isTrue);
     });
 
     test('HandDrawnScatterPlotPainter: same data → false', () {
-      final data = _scatterData();
+      final data = scatterTestData();
       final a = HandDrawnScatterPlotPainter(data: data, seed: 42);
       final b = HandDrawnScatterPlotPainter(data: data, seed: 42);
       expect(a.shouldRepaint(b), isFalse);
     });
 
     test('HandDrawnScatterPlotPainter: different dotColor → true', () {
-      final data = _scatterData();
+      final data = scatterTestData();
       final a = HandDrawnScatterPlotPainter(data: data);
       final b = HandDrawnScatterPlotPainter(data: data, dotColor: Colors.red);
       expect(a.shouldRepaint(b), isTrue);
@@ -790,20 +723,20 @@ void main() {
 
   group('Chart painter value formatting', () {
     test('formats whole numbers as integers', () {
-      final painter = HandDrawnBarChartPainter(data: _barData());
+      final painter = HandDrawnBarChartPainter(data: barTestData());
       expect(painter.formatYValue(5), '5');
       expect(painter.formatYValue(100), '100');
       expect(painter.formatYValue(0), '0');
     });
 
     test('formats fractional values with one decimal place', () {
-      final painter = HandDrawnBarChartPainter(data: _barData());
+      final painter = HandDrawnBarChartPainter(data: barTestData());
       expect(painter.formatYValue(0.25), '0.3'); // toStringAsFixed(1)
       expect(painter.formatYValue(3.7), '3.7');
     });
 
     test('does NOT treat fractional values as percentages', () {
-      final painter = HandDrawnBarChartPainter(data: _barData());
+      final painter = HandDrawnBarChartPainter(data: barTestData());
       // This was the old bug: 0.5 should NOT become "50%"
       final result = painter.formatYValue(0.5);
       expect(result, isNot(contains('%')));
@@ -811,7 +744,7 @@ void main() {
     });
 
     test('formats negative values symmetrically with positive', () {
-      final painter = HandDrawnBarChartPainter(data: _barData());
+      final painter = HandDrawnBarChartPainter(data: barTestData());
       final pos = painter.formatYValue(0.5);
       final neg = painter.formatYValue(-0.5);
       // Both should use the same format (no sign asymmetry)
@@ -837,30 +770,30 @@ void main() {
   group('Chart painters render without throwing', () {
     testWidgets('bar chart with single bar', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnBarChart(data: _barData(barCount: 1))),
+        testApp(HandDrawnBarChart(data: barTestData(barCount: 1))),
       );
       expect(tester.takeException(), isNull);
     });
 
     testWidgets('line chart with single point', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnLineChart(data: _lineData(pointCount: 1))),
+        testApp(HandDrawnLineChart(data: lineTestData(pointCount: 1))),
       );
       expect(tester.takeException(), isNull);
     });
 
     testWidgets('scatter plot with single point', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnScatterPlot(data: _scatterData(pointCount: 1))),
+        testApp(HandDrawnScatterPlot(data: scatterTestData(pointCount: 1))),
       );
       expect(tester.takeException(), isNull);
     });
 
     testWidgets('bar chart with title and yAxisLabel', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           HandDrawnBarChart(
-            data: _barData(title: 'Revenue', yAxisLabel: 'USD'),
+            data: barTestData(title: 'Revenue', yAxisLabel: 'USD'),
           ),
         ),
       );
@@ -884,13 +817,15 @@ void main() {
         minY: 0,
         maxY: 30,
       );
-      await tester.pumpWidget(_wrap(const HandDrawnLineChart(data: data)));
+      await tester.pumpWidget(testApp(const HandDrawnLineChart(data: data)));
       expect(tester.takeException(), isNull);
     });
 
     testWidgets('scatter plot with title', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnScatterPlot(data: _scatterData(title: 'Correlation'))),
+        testApp(
+          HandDrawnScatterPlot(data: scatterTestData(title: 'Correlation')),
+        ),
       );
       expect(tester.takeException(), isNull);
     });
@@ -911,7 +846,7 @@ void main() {
         minY: 5,
         maxY: 5,
       );
-      await tester.pumpWidget(_wrap(const HandDrawnLineChart(data: data)));
+      await tester.pumpWidget(testApp(const HandDrawnLineChart(data: data)));
       expect(tester.takeException(), isNull);
     });
 
@@ -927,7 +862,7 @@ void main() {
         minY: 0,
         maxY: 20,
       );
-      await tester.pumpWidget(_wrap(const HandDrawnScatterPlot(data: data)));
+      await tester.pumpWidget(testApp(const HandDrawnScatterPlot(data: data)));
       expect(tester.takeException(), isNull);
     });
   });
@@ -1013,7 +948,10 @@ void main() {
     });
 
     test('accepts positive segment values without error', () {
-      expect(() => HandDrawnBarChartPainter(data: _barData()), returnsNormally);
+      expect(
+        () => HandDrawnBarChartPainter(data: barTestData()),
+        returnsNormally,
+      );
     });
 
     test('default yMin stays at 0 when no negative segments are present', () {
@@ -1183,21 +1121,21 @@ void main() {
   group('Bar chart baseline correctness', () {
     testWidgets('renders without throwing when minY > 0', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnBarChart(data: _barData(minY: 10, maxY: 50))),
+        testApp(HandDrawnBarChart(data: barTestData(minY: 10, maxY: 50))),
       );
       expect(tester.takeException(), isNull);
     });
 
     testWidgets('renders without throwing when minY < 0', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnBarChart(data: _barData(minY: -10, maxY: 50))),
+        testApp(HandDrawnBarChart(data: barTestData(minY: -10, maxY: 50))),
       );
       expect(tester.takeException(), isNull);
     });
 
     testWidgets('renders without throwing with custom Y range', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnBarChart(data: _barData(minY: 5, maxY: 200))),
+        testApp(HandDrawnBarChart(data: barTestData(minY: 5, maxY: 200))),
       );
       expect(tester.takeException(), isNull);
     });
@@ -1210,35 +1148,35 @@ void main() {
   group('Chart division validation', () {
     testWidgets('bar chart rejects yDivisions: 0', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnBarChart(data: _barData(), yDivisions: 0)),
+        testApp(HandDrawnBarChart(data: barTestData(), yDivisions: 0)),
       );
       expect(tester.takeException(), isA<ArgumentError>());
     });
 
     testWidgets('line chart rejects xDivisions: 0', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnLineChart(data: _lineData(), xDivisions: 0)),
+        testApp(HandDrawnLineChart(data: lineTestData(), xDivisions: 0)),
       );
       expect(tester.takeException(), isA<ArgumentError>());
     });
 
     testWidgets('scatter plot rejects yDivisions: -1', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnScatterPlot(data: _scatterData(), yDivisions: -1)),
+        testApp(HandDrawnScatterPlot(data: scatterTestData(), yDivisions: -1)),
       );
       expect(tester.takeException(), isA<ArgumentError>());
     });
 
     testWidgets('bar chart rejects yMin > yMax', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnBarChart(data: _barData(minY: 10, maxY: 5))),
+        testApp(HandDrawnBarChart(data: barTestData(minY: 10, maxY: 5))),
       );
       expect(tester.takeException(), isA<ArgumentError>());
     });
 
     testWidgets('scatter plot rejects xMin > xMax', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnScatterPlot(
             data: ScatterPlotData(
               points: [ScatterPoint(x: 1, y: 2)],
@@ -1255,14 +1193,14 @@ void main() {
 
     testWidgets('line chart accepts valid divisions', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnLineChart(data: _lineData(), xDivisions: 5)),
+        testApp(HandDrawnLineChart(data: lineTestData(), xDivisions: 5)),
       );
       expect(tester.takeException(), isNull);
     });
 
     testWidgets('line chart rejects NaN minY', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnLineChart(
             data: LineChartData(
               series: [
@@ -1285,7 +1223,7 @@ void main() {
 
     testWidgets('scatter plot rejects positive infinity maxY', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnScatterPlot(
             data: ScatterPlotData(
               points: [ScatterPoint(x: 0, y: 0)],
@@ -1302,7 +1240,7 @@ void main() {
 
     testWidgets('scatter plot rejects negative infinity xMin', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnScatterPlot(
             data: ScatterPlotData(
               points: [ScatterPoint(x: 0, y: 0)],
@@ -1319,7 +1257,7 @@ void main() {
 
     testWidgets('bar chart rejects NaN explicit maxY', (tester) async {
       await tester.pumpWidget(
-        _wrap(HandDrawnBarChart(data: _barData(maxY: double.nan))),
+        testApp(HandDrawnBarChart(data: barTestData(maxY: double.nan))),
       );
       expect(tester.takeException(), isA<ArgumentError>());
     });
@@ -1348,7 +1286,7 @@ void main() {
 
     testWidgets('accepts positive ScatterPoint.size', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const HandDrawnScatterPlot(
             data: ScatterPlotData(
               points: [ScatterPoint(x: 1, y: 2, size: 8)],
@@ -1375,7 +1313,7 @@ void main() {
       // With 20 divisions in a 200px-wide widget and a verbose formatter,
       // the thinning logic must skip overlapping labels without crashing.
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           const SizedBox(
             width: 200,
             child: HandDrawnScatterPlot(
@@ -1398,7 +1336,7 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        _wrap(
+        testApp(
           SizedBox(
             width: 150,
             child: HandDrawnLineChart(
@@ -1431,8 +1369,8 @@ void main() {
 
   group('Chart painter shouldRepaint list fields', () {
     test('shouldRepaint true when xLabels differ', () {
-      final a = HandDrawnBarChartPainter(data: _barData());
-      final b = HandDrawnBarChartPainter(data: _barData(barCount: 5));
+      final a = HandDrawnBarChartPainter(data: barTestData());
+      final b = HandDrawnBarChartPainter(data: barTestData(barCount: 5));
       expect(a.shouldRepaint(b), isTrue);
     });
 
@@ -1465,7 +1403,7 @@ void main() {
     });
 
     test('shouldRepaint false when xLabels and legend are identical', () {
-      final data = _barData();
+      final data = barTestData();
       final a = HandDrawnBarChartPainter(data: data);
       final b = HandDrawnBarChartPainter(data: data);
       expect(a.shouldRepaint(b), isFalse);
@@ -1528,11 +1466,11 @@ void main() {
     ) async {
       final errors = await captureFlutterErrors(() async {
         await tester.pumpWidget(
-          _wrap(
+          testApp(
             SizedBox(
               width: 300,
               height: 10,
-              child: HandDrawnBarChart(data: _barData()),
+              child: HandDrawnBarChart(data: barTestData()),
             ),
           ),
         );
@@ -1558,11 +1496,11 @@ void main() {
       (tester) async {
         final errors = await captureFlutterErrors(() async {
           await tester.pumpWidget(
-            _wrap(
+            testApp(
               SizedBox(
                 width: 300,
                 height: 10,
-                child: HandDrawnLineChart(data: _lineData()),
+                child: HandDrawnLineChart(data: lineTestData()),
               ),
             ),
           );
@@ -2336,7 +2274,7 @@ void main() {
         padding: EdgeInsets.all(6),
       );
       final painter = HandDrawnLineChartPainter(
-        data: _lineData(seriesCount: 2),
+        data: lineTestData(seriesCount: 2),
         legendConfig: overlay,
       );
       final recorder = PictureRecorder();
@@ -2345,7 +2283,7 @@ void main() {
       // (overlay legend doesn't carve out space).
       final layoutWith = painter.computeLayout(kChartTestSize);
       final layoutWithout = HandDrawnLineChartPainter(
-        data: _lineData(seriesCount: 2),
+        data: lineTestData(seriesCount: 2),
         legendConfig: ChartLegendConfig.hidden,
       ).computeLayout(kChartTestSize);
       expect(layoutWith.chartArea.height, layoutWithout.chartArea.height);

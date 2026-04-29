@@ -29,9 +29,9 @@ class BarRectSpec {
   final int categoryIndex;
 
   /// Index of the inner bar within its category. For ungrouped charts
-  /// (the legacy single-bar-per-category projection) this is always 0.
-  /// For grouped charts it ranges over `0..N-1` for the side-by-side
-  /// bars under one category.
+  /// (the single-bar-per-category projection) this is always 0. For
+  /// grouped charts it ranges over `0..N-1` for the side-by-side bars
+  /// under one category.
   final int innerBarIndex;
 
   /// Index of this segment within its inner bar (bottom = 0).
@@ -41,9 +41,8 @@ class BarRectSpec {
   final String categoryLabel;
 
   /// Label of the inner bar within its category. For grouped charts
-  /// this is the `BarGroup.label` (e.g. "North"). For legacy ungrouped
-  /// charts (single-bar-per-category projection) this equals
-  /// [categoryLabel].
+  /// this is the `BarGroup.label` (e.g. "North"). For ungrouped charts
+  /// (single-bar-per-category projection) this equals [categoryLabel].
   final String innerBarLabel;
 
   /// The original segment data (color, value, fill overrides).
@@ -70,11 +69,10 @@ class BarRectSpec {
 /// - Each category's bars sit inside a centered "group zone" whose
 ///   width is `_resolveBarWidth(outerSlotWidth)` — i.e. `barWidthRatio`
 ///   is applied ONCE at the outer-slot level, carving out breathing
-///   room around the group as a whole. This matches the pre-grouping
-///   renderer for single-bar charts exactly.
+///   room around the group as a whole.
 /// - Inside the group zone, inner bars tile edge-to-edge with no gap
 ///   between siblings, so groupings read as coherent visual units.
-///   A chart with `innerCount = 1` collapses to the legacy geometry
+///   A chart with `innerCount = 1` collapses to the ungrouped geometry
 ///   (one bar centered in its slot at `barWidthRatio` width).
 /// - Stacked segments accumulate vertically using two **independent**
 ///   accumulators per inner bar — positive segments stack upward from
@@ -185,9 +183,16 @@ List<BarRectSpec> computeBarSegmentRects({
   return result;
 }
 
-/// Same width-clamping logic the bar painter has used since the package
-/// shipped. Extracted here so the geometry helper is self-contained.
+/// Resolves the rendered bar width for a category slot.
+///
+/// Clamps `slotWidth * barWidthRatio` to `[barMinWidth, barMaxWidth]`,
+/// dropping the lower bound when the slot is narrower than `barMinWidth`
+/// so bars never exceed their slot.
 double _resolveBarWidth(double slotWidth) {
+  // First clamp to the preferred [barMinWidth, barMaxWidth] range, but
+  // skip the lower bound when the slot itself is narrower than barMinWidth
+  // (otherwise we'd produce bars wider than their slot). Then cap to
+  // slotWidth as an absolute upper bound for the narrow-slot case.
   return (slotWidth * barWidthRatio)
       .clamp(slotWidth >= barMinWidth ? barMinWidth : 0.0, barMaxWidth)
       .clamp(0.0, slotWidth);

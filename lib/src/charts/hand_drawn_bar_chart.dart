@@ -34,10 +34,10 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
     super.xLabelConfig,
     super.legendConfig,
   }) : super(
-         // Project from resolvedCategories so grouped and legacy inputs
-         // both produce correct X-axis labels. For legacy `bars` input
-         // resolvedCategories yields one single-bar category per
-         // BarGroup with the original label, so behavior is unchanged.
+         // Project from resolvedCategories so grouped and ungrouped inputs
+         // both produce correct X-axis labels. For ungrouped `bars` input,
+         // resolvedCategories yields one single-bar category per BarGroup
+         // with the original label.
          xLabels: [for (final c in data.resolvedCategories) c.label],
          legend: data.legend,
          yMin: data.minY ?? _computeMinY(data),
@@ -45,21 +45,36 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
          yAxisLabel: data.yAxisLabel,
          xAxisLabel: data.xAxisLabel,
          title: data.title,
-         labelStyle: labelStyle ?? chartDefaultLabelStyle,
+         labelStyle: labelStyle ?? HandDrawnDefaults.chartLabelStyle,
          yValueFormatter: data.yValueFormatter,
          axisDisplay: data.axisDisplay,
        ) {
-    // Release-safe validation: reject non-finite segment values in all
-    // build modes. BarSegment's own assert catches this in debug mode at
-    // the point of construction; this guard ensures invalid data never
-    // reaches paintData in release builds. Iterates resolvedCategories
-    // so grouped and legacy inputs are both validated.
+    // Release-safe validation: reject non-finite segment values and
+    // out-of-range fillAlpha in all build modes. BarSegment's own
+    // asserts catch these in debug mode at the point of construction;
+    // these guards ensure invalid data never reaches paintData in
+    // release builds (where const asserts are stripped). Iterates
+    // resolvedCategories so grouped and ungrouped inputs are both
+    // validated.
+    //
+    // Note: the fillAlpha guard cannot be exercised from `flutter test`
+    // because tests run with asserts enabled — the BarSegment const
+    // assert fires first. This is defense-in-depth for production
+    // builds; covered by code review and the companion debug-assert
+    // test in chart_data_test.dart.
     for (final category in data.resolvedCategories) {
       for (final bar in category.bars) {
         for (final segment in bar.segments) {
           if (!segment.value.isFinite) {
             throw ArgumentError(
               'BarSegment.value must be finite, got ${segment.value} '
+              'in bar "${bar.label}" of category "${category.label}".',
+            );
+          }
+          final fa = segment.fillAlpha;
+          if (fa != null && (!fa.isFinite || fa < 0 || fa > 1)) {
+            throw ArgumentError(
+              'BarSegment.fillAlpha must be in [0, 1], got $fa '
               'in bar "${bar.label}" of category "${category.label}".',
             );
           }
@@ -73,18 +88,17 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
   /// Computes the default Y-axis maximum from inner-bar **positive**
   /// stack totals across every category.
   ///
-  /// Per the grouped-bar plan, the chart scales by the **maximum** inner
-  /// bar height (not the sum across siblings) — siblings sit side-by-side,
-  /// so the Y-axis only needs to cover the tallest one. With signed
-  /// segments allowed, "tallest" means the largest positive stack
-  /// total — i.e. summing only the positive segments within each inner
-  /// bar. Negative-only or all-zero data falls back to a sensible
-  /// non-zero upper bound so the plot rect never collapses.
+  /// The chart scales by the **maximum** inner  bar height (not the
+  /// sum across siblings) — siblings sit side-by-side, so the Y-axis
+  /// only needs to cover the tallest one. With signed segments allowed,
+  /// "tallest" means the largest positive stack total — i.e. summing
+  /// only the positive segments within each inner bar. Negative-only
+  /// or all-zero data falls back to a sensible non-zero upper bound
+  /// so the plot rect never collapses.
   ///
-  /// For ungrouped, all-positive charts this collapses to the legacy
-  /// `max(BarGroup.total)` value because positive-only sums equal the
-  /// arithmetic total in that regime, preserving the pre-signed-bar
-  /// default exactly.
+  /// For ungrouped, all-positive charts this is exactly `max(BarGroup.total)`
+  /// — positive-only sums equal the arithmetic total when no segment is
+  /// negative.
   static double _computeMaxY(BarChartData data) {
     double max = 0;
     for (final category in data.resolvedCategories) {
@@ -232,7 +246,7 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
           s.segmentIndex * barSegmentSeedStep;
       final helpers = HandDrawnHelpers(
         seed: barSeed,
-        segments: wobblyRectSegments,
+        segments: defaultWobblyRectSegments,
         irregularity: irregularity,
       );
       final path = helpers.rectBorder(s.rect.size).shift(s.rect.topLeft);
@@ -267,16 +281,16 @@ class HandDrawnBarChart extends StatelessWidget {
     required this.data,
     this.height = HandDrawnDefaults.chartHeight,
     this.seed = HandDrawnDefaults.seed,
-    this.axisColor = chartAxisColor,
+    this.axisColor = HandDrawnDefaults.chartAxisColor,
     this.grid = GridConfig.standard,
     this.labelStyle,
-    this.irregularity = chartIrregularity,
-    this.segments = chartSegments,
-    this.yDivisions = chartYDivisions,
-    this.padding = chartDefaultPadding,
+    this.irregularity = HandDrawnDefaults.chartIrregularity,
+    this.segments = HandDrawnDefaults.chartSegments,
+    this.yDivisions = HandDrawnDefaults.chartYDivisions,
+    this.padding = HandDrawnDefaults.chartPadding,
     this.titleStyle,
     this.legendStyle,
-    this.axisStrokeWidth = chartAxisStrokeWidth,
+    this.axisStrokeWidth = HandDrawnDefaults.chartAxisStrokeWidth,
     this.emptyStyle,
     this.emptyMessage = 'No data for this range',
     this.clipToChartArea = false,

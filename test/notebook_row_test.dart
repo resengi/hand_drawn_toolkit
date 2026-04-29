@@ -6,18 +6,11 @@ import 'test_utils.dart';
 
 void main() {
   group('NotebookRow', () {
-    Widget buildApp({required Widget child}) {
-      return MaterialApp(home: Scaffold(body: child));
-    }
-
     group('layout', () {
       testWidgets('renders child content', (tester) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const NotebookRow(
-              lineHeight: 28.0,
-              child: Text('Row content'),
-            ),
+          testApp(
+            const NotebookRow(lineHeight: 28.0, child: Text('Row content')),
           ),
         );
 
@@ -26,9 +19,7 @@ void main() {
 
       testWidgets('height equals lineHeight when rowSpan is 1', (tester) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const NotebookRow(lineHeight: 28.0, child: Text('Test')),
-          ),
+          testApp(const NotebookRow(lineHeight: 28.0, child: Text('Test'))),
         );
 
         final sizedBoxFinder = find.descendant(
@@ -41,8 +32,8 @@ void main() {
 
       testWidgets('rowSpan multiplies the height', (tester) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const NotebookRow(
+          testApp(
+            const NotebookRow(
               lineHeight: 28.0,
               rowSpan: 3,
               child: Text('Test'),
@@ -60,9 +51,7 @@ void main() {
 
       testWidgets('child is center-left aligned', (tester) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const NotebookRow(lineHeight: 28.0, child: Text('Test')),
-          ),
+          testApp(const NotebookRow(lineHeight: 28.0, child: Text('Test'))),
         );
 
         final alignFinder = find.descendant(
@@ -77,9 +66,7 @@ void main() {
     group('padding', () {
       testWidgets('no Padding widget when padding is null', (tester) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const NotebookRow(lineHeight: 28.0, child: Text('Test')),
-          ),
+          testApp(const NotebookRow(lineHeight: 28.0, child: Text('Test'))),
         );
 
         final paddingFinder = find.descendant(
@@ -94,8 +81,8 @@ void main() {
       ) async {
         const edgeInsets = EdgeInsets.symmetric(horizontal: 16);
         await tester.pumpWidget(
-          buildApp(
-            child: const NotebookRow(
+          testApp(
+            const NotebookRow(
               lineHeight: 28.0,
               padding: edgeInsets,
               child: Text('Test'),
@@ -119,8 +106,8 @@ void main() {
       ) async {
         final errors = await captureFlutterErrors(() async {
           await tester.pumpWidget(
-            buildApp(
-              child: const NotebookRow(
+            testApp(
+              const NotebookRow(
                 lineHeight: 28.0,
                 padding: EdgeInsets.only(bottom: 4),
                 child: Text('Test'),
@@ -140,8 +127,8 @@ void main() {
       ) async {
         final errors = await captureFlutterErrors(() async {
           await tester.pumpWidget(
-            buildApp(
-              child: const NotebookRow(
+            testApp(
+              const NotebookRow(
                 lineHeight: 28.0,
                 padding: EdgeInsetsDirectional.only(top: 8),
                 child: Text('Test'),
@@ -160,8 +147,8 @@ void main() {
         tester,
       ) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const NotebookRow(
+          testApp(
+            const NotebookRow(
               lineHeight: 28.0,
               padding: EdgeInsetsDirectional.only(start: 16, end: 16),
               child: Text('Test'),
@@ -176,15 +163,11 @@ void main() {
   });
 
   group('NotebookSnappedBlock', () {
-    Widget buildApp({required Widget child}) {
-      return MaterialApp(home: Scaffold(body: child));
-    }
-
     group('layout', () {
       testWidgets('renders child content', (tester) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const NotebookSnappedBlock(
+          testApp(
+            const NotebookSnappedBlock(
               lineHeight: 28.0,
               child: Text('Block content'),
             ),
@@ -196,8 +179,8 @@ void main() {
 
       testWidgets('uses ConstrainedBox with correct minHeight', (tester) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const NotebookSnappedBlock(
+          testApp(
+            const NotebookSnappedBlock(
               lineHeight: 28.0,
               minRows: 3,
               child: SizedBox(height: 10),
@@ -215,8 +198,8 @@ void main() {
 
       testWidgets('default minRows is 1', (tester) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const NotebookSnappedBlock(
+          testApp(
+            const NotebookSnappedBlock(
               lineHeight: 28.0,
               child: SizedBox(height: 10),
             ),
@@ -235,11 +218,8 @@ void main() {
     group('padding', () {
       testWidgets('no Padding widget when padding is null', (tester) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const NotebookSnappedBlock(
-              lineHeight: 28.0,
-              child: Text('Test'),
-            ),
+          testApp(
+            const NotebookSnappedBlock(lineHeight: 28.0, child: Text('Test')),
           ),
         );
 
@@ -255,8 +235,8 @@ void main() {
       ) async {
         const edgeInsets = EdgeInsets.symmetric(horizontal: 12);
         await tester.pumpWidget(
-          buildApp(
-            child: const NotebookSnappedBlock(
+          testApp(
+            const NotebookSnappedBlock(
               lineHeight: 28.0,
               padding: edgeInsets,
               child: Text('Test'),

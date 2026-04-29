@@ -9,37 +9,6 @@ import 'test_utils.dart';
 
 // ── Test data factories ───────────────────────────────────────────────────
 
-BarChartData _barData({
-  int barCount = 3,
-  String? title,
-  String? yAxisLabel,
-  String? xAxisLabel,
-  double? minY,
-  double? maxY,
-}) {
-  return BarChartData(
-    title: title,
-    yAxisLabel: yAxisLabel,
-    xAxisLabel: xAxisLabel,
-    minY: minY,
-    maxY: maxY,
-    bars: List.generate(
-      barCount,
-      (i) => BarGroup(
-        label: 'Bar $i',
-        segments: [
-          BarSegment(
-            category: 'cat',
-            value: (i + 1) * 10.0,
-            color: const Color(0xFF6B9BD2),
-          ),
-        ],
-      ),
-    ),
-    legend: [const LegendEntry(label: 'Category', color: Color(0xFF6B9BD2))],
-  );
-}
-
 BarChartData _stackedBarData() {
   return const BarChartData(
     bars: [
@@ -65,56 +34,16 @@ BarChartData _stackedBarData() {
   );
 }
 
-LineChartData _lineData({
-  int pointCount = 5,
-  int seriesCount = 1,
-  List<String> xLabels = const [],
-  String? title,
-}) {
-  return LineChartData(
-    title: title,
-    xLabels: xLabels,
-    minX: 0,
-    maxX: (pointCount - 1).toDouble(),
-    minY: 0,
-    maxY: 100,
-    series: List.generate(
-      seriesCount,
-      (s) => LineSeriesData(
-        name: 'Series $s',
-        color: Color(0xFF000000 + s * 0x110000),
-        points: List.generate(
-          pointCount,
-          (i) => LinePoint(x: i.toDouble(), y: (i + 1) * 10.0),
-        ),
-      ),
-    ),
-  );
-}
-
-ScatterPlotData _scatterData({int pointCount = 5}) {
-  return ScatterPlotData(
-    minX: 0,
-    maxX: 100,
-    minY: 0,
-    maxY: 200,
-    points: List.generate(
-      pointCount,
-      (i) => ScatterPoint(x: i * 20.0, y: i * 40.0),
-    ),
-  );
-}
-
 HandDrawnBarChartPainter _barPainter({BarChartData? data}) {
-  return HandDrawnBarChartPainter(data: data ?? _barData());
+  return HandDrawnBarChartPainter(data: data ?? barTestData());
 }
 
 HandDrawnLineChartPainter _linePainter({LineChartData? data}) {
-  return HandDrawnLineChartPainter(data: data ?? _lineData());
+  return HandDrawnLineChartPainter(data: data ?? lineTestData());
 }
 
 HandDrawnScatterPlotPainter _scatterPainter({ScatterPlotData? data}) {
-  return HandDrawnScatterPlotPainter(data: data ?? _scatterData());
+  return HandDrawnScatterPlotPainter(data: data ?? scatterTestData());
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -351,7 +280,7 @@ void main() {
 
     test('multi-series produces points and segments for all series', () {
       final layout = _linePainter(
-        data: _lineData(seriesCount: 3),
+        data: lineTestData(seriesCount: 3),
       ).computeLayout(kChartTestSize);
 
       // 3 series × 5 points = 15 points
@@ -459,7 +388,7 @@ void main() {
     });
 
     test('hitTest finds nearest point across multiple series', () {
-      final data = _lineData(seriesCount: 2, pointCount: 3);
+      final data = lineTestData(seriesCount: 2, pointCount: 3);
       final layout = _linePainter(data: data).computeLayout(kChartTestSize);
 
       // All points from both series at pointIndex=1 share the same x
@@ -564,7 +493,7 @@ void main() {
 
     test('seriesName is preserved in point and segment layouts', () {
       final layout = _linePainter(
-        data: _lineData(seriesCount: 2),
+        data: lineTestData(seriesCount: 2),
       ).computeLayout(kChartTestSize);
 
       for (final pt in layout.points) {
@@ -629,10 +558,10 @@ void main() {
 
     test('title affects chart area position', () {
       final noTitle = _barPainter(
-        data: _barData(),
+        data: barTestData(),
       ).computeLayout(kChartTestSize);
       final withTitle = _barPainter(
-        data: _barData(title: 'My Chart'),
+        data: barTestData(title: 'My Chart'),
       ).computeLayout(kChartTestSize);
 
       // Title pushes chart area down
