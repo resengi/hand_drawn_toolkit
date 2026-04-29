@@ -2,33 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
 
-/// Finds [CustomPaint] widgets that use a [HandDrawnLinePainter] as either
-/// their `painter` or `foregroundPainter`. Duplicated from `widget_test.dart`
-/// to keep test files independent.
-Finder findHandDrawnPaint() {
-  return find.byWidgetPredicate(
-    (widget) =>
-        widget is CustomPaint &&
-        (widget.painter is HandDrawnLinePainter ||
-            widget.foregroundPainter is HandDrawnLinePainter),
-  );
-}
+import 'test_utils.dart';
 
 void main() {
   group('HandDrawnTextField', () {
-    Widget buildApp({required Widget child}) {
-      return MaterialApp(home: Scaffold(body: child));
-    }
-
     group('rendering', () {
       testWidgets('renders without error with no params', (tester) async {
-        await tester.pumpWidget(buildApp(child: const HandDrawnTextField()));
+        await tester.pumpWidget(testApp(const HandDrawnTextField()));
 
         expect(find.byType(HandDrawnTextField), findsOneWidget);
       });
 
       testWidgets('contains a TextField descendant', (tester) async {
-        await tester.pumpWidget(buildApp(child: const HandDrawnTextField()));
+        await tester.pumpWidget(testApp(const HandDrawnTextField()));
 
         final textFieldFinder = find.descendant(
           of: find.byType(HandDrawnTextField),
@@ -38,7 +24,7 @@ void main() {
       });
 
       testWidgets('contains a HandDrawnDivider descendant', (tester) async {
-        await tester.pumpWidget(buildApp(child: const HandDrawnTextField()));
+        await tester.pumpWidget(testApp(const HandDrawnTextField()));
 
         // The HandDrawnDivider internally uses a HandDrawnLinePainter.
         expect(findHandDrawnPaint(), findsOneWidget);
@@ -47,7 +33,7 @@ void main() {
       testWidgets('applies the correct backgroundColor', (tester) async {
         const testColor = Color(0xFFAABBCC);
         await tester.pumpWidget(
-          buildApp(child: const HandDrawnTextField(backgroundColor: testColor)),
+          testApp(const HandDrawnTextField(backgroundColor: testColor)),
         );
 
         final containerFinder = find.descendant(
@@ -61,7 +47,7 @@ void main() {
 
       testWidgets('applies the correct borderRadius', (tester) async {
         await tester.pumpWidget(
-          buildApp(child: const HandDrawnTextField(borderRadius: 12.0)),
+          testApp(const HandDrawnTextField(borderRadius: 12.0)),
         );
 
         final containerFinder = find.descendant(
@@ -80,11 +66,8 @@ void main() {
       ) async {
         const testColor = Color(0xFF112233);
         await tester.pumpWidget(
-          buildApp(
-            child: const HandDrawnTextField(
-              textColor: testColor,
-              fontSize: 20.0,
-            ),
+          testApp(
+            const HandDrawnTextField(textColor: testColor, fontSize: 20.0),
           ),
         );
 
@@ -106,8 +89,8 @@ void main() {
           fontWeight: FontWeight.bold,
         );
         await tester.pumpWidget(
-          buildApp(
-            child: const HandDrawnTextField(
+          testApp(
+            const HandDrawnTextField(
               style: customStyle,
               textColor: Colors.blue, // Should be ignored.
               fontSize: 12.0, // Should be ignored.
@@ -126,8 +109,8 @@ void main() {
       testWidgets('hintColor is applied to the hint style', (tester) async {
         const testHintColor = Color(0xFF445566);
         await tester.pumpWidget(
-          buildApp(
-            child: const HandDrawnTextField(
+          testApp(
+            const HandDrawnTextField(
               hintText: 'Placeholder',
               hintColor: testHintColor,
             ),
@@ -146,7 +129,7 @@ void main() {
         tester,
       ) async {
         await tester.pumpWidget(
-          buildApp(child: const HandDrawnTextField(fontSize: 18.0)),
+          testApp(const HandDrawnTextField(fontSize: 18.0)),
         );
 
         final textFieldFinder = find.descendant(
@@ -160,7 +143,7 @@ void main() {
 
       testWidgets('hintText appears in the InputDecoration', (tester) async {
         await tester.pumpWidget(
-          buildApp(child: const HandDrawnTextField(hintText: 'Type here')),
+          testApp(const HandDrawnTextField(hintText: 'Type here')),
         );
 
         final textFieldFinder = find.descendant(
@@ -176,7 +159,7 @@ void main() {
       testWidgets('passes dividerColor to HandDrawnDivider', (tester) async {
         const testColor = Color(0xFFDDEEFF);
         await tester.pumpWidget(
-          buildApp(child: const HandDrawnTextField(dividerColor: testColor)),
+          testApp(const HandDrawnTextField(dividerColor: testColor)),
         );
 
         final dividerFinder = find.descendant(
@@ -191,7 +174,7 @@ void main() {
         tester,
       ) async {
         await tester.pumpWidget(
-          buildApp(child: const HandDrawnTextField(dividerThickness: 2.5)),
+          testApp(const HandDrawnTextField(dividerThickness: 2.5)),
         );
 
         final dividerFinder = find.descendant(
@@ -203,9 +186,7 @@ void main() {
       });
 
       testWidgets('passes seed to HandDrawnDivider', (tester) async {
-        await tester.pumpWidget(
-          buildApp(child: const HandDrawnTextField(seed: 99)),
-        );
+        await tester.pumpWidget(testApp(const HandDrawnTextField(seed: 99)));
 
         final dividerFinder = find.descendant(
           of: find.byType(HandDrawnTextField),
@@ -220,7 +201,7 @@ void main() {
       testWidgets('forwards controller', (tester) async {
         final controller = TextEditingController(text: 'initial');
         await tester.pumpWidget(
-          buildApp(child: HandDrawnTextField(controller: controller)),
+          testApp(HandDrawnTextField(controller: controller)),
         );
 
         final textFieldFinder = find.descendant(
@@ -234,7 +215,7 @@ void main() {
       testWidgets('forwards focusNode', (tester) async {
         final focusNode = FocusNode();
         await tester.pumpWidget(
-          buildApp(child: HandDrawnTextField(focusNode: focusNode)),
+          testApp(HandDrawnTextField(focusNode: focusNode)),
         );
 
         final textFieldFinder = find.descendant(
@@ -246,7 +227,7 @@ void main() {
       });
 
       testWidgets('forwards maxLines with default of 1', (tester) async {
-        await tester.pumpWidget(buildApp(child: const HandDrawnTextField()));
+        await tester.pumpWidget(testApp(const HandDrawnTextField()));
 
         final textFieldFinder = find.descendant(
           of: find.byType(HandDrawnTextField),
@@ -257,7 +238,7 @@ void main() {
       });
 
       testWidgets('forwards autofocus with default of false', (tester) async {
-        await tester.pumpWidget(buildApp(child: const HandDrawnTextField()));
+        await tester.pumpWidget(testApp(const HandDrawnTextField()));
 
         final textFieldFinder = find.descendant(
           of: find.byType(HandDrawnTextField),
@@ -269,8 +250,8 @@ void main() {
 
       testWidgets('forwards textCapitalization', (tester) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const HandDrawnTextField(
+          testApp(
+            const HandDrawnTextField(
               textCapitalization: TextCapitalization.words,
             ),
           ),
@@ -287,7 +268,7 @@ void main() {
       testWidgets('onChanged fires when text changes', (tester) async {
         String? changed;
         await tester.pumpWidget(
-          buildApp(child: HandDrawnTextField(onChanged: (v) => changed = v)),
+          testApp(HandDrawnTextField(onChanged: (v) => changed = v)),
         );
 
         await tester.enterText(find.byType(TextField), 'hello');
@@ -297,9 +278,7 @@ void main() {
       testWidgets('onSubmitted fires on submission', (tester) async {
         String? submitted;
         await tester.pumpWidget(
-          buildApp(
-            child: HandDrawnTextField(onSubmitted: (v) => submitted = v),
-          ),
+          testApp(HandDrawnTextField(onSubmitted: (v) => submitted = v)),
         );
 
         await tester.enterText(find.byType(TextField), 'done');
@@ -310,7 +289,7 @@ void main() {
 
     group('padding', () {
       testWidgets('uses default padding', (tester) async {
-        await tester.pumpWidget(buildApp(child: const HandDrawnTextField()));
+        await tester.pumpWidget(testApp(const HandDrawnTextField()));
 
         final containerFinder = find.descendant(
           of: find.byType(HandDrawnTextField),
@@ -326,7 +305,7 @@ void main() {
       testWidgets('custom padding is applied', (tester) async {
         const customPadding = EdgeInsets.all(16);
         await tester.pumpWidget(
-          buildApp(child: const HandDrawnTextField(padding: customPadding)),
+          testApp(const HandDrawnTextField(padding: customPadding)),
         );
 
         final containerFinder = find.descendant(
@@ -353,7 +332,7 @@ void main() {
     });
   });
 
-  // ── TextField passthroughs (Step 3.2) ───────────────────────────────
+  // ── TextField passthroughs ──────────────────────────────────────────
 
   group('HandDrawnTextField passthroughs', () {
     testWidgets('enabled: false produces disabled TextField', (tester) async {

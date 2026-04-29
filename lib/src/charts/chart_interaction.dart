@@ -68,19 +68,19 @@ class BarSegmentLayout {
 
   /// Index of the inner bar within its outer category.
   ///
-  /// Always `0` for ungrouped charts (the legacy single-bar-per-tick
-  /// shape). For grouped charts this is `0..N-1` where N is the number
-  /// of side-by-side bars under that category's x-axis tick.
+  /// Always `0` for ungrouped charts (the single-bar-per-tick shape).
+  /// For grouped charts this is `0..N-1` where N is the number of
+  /// side-by-side bars under that category's x-axis tick.
   final int innerBarIndex;
 
   /// Label of the inner bar within its outer category.
   ///
   /// For grouped charts this is the inner `BarGroup.label` (e.g.
-  /// "North" when the outer category is "Q4"). For legacy ungrouped
-  /// charts this equals [barLabel] — the category-level label IS the
-  /// bar label in that shape. Consumers building tooltips, analytics,
-  /// or accessibility labels should read this field when grouped,
-  /// since [barLabel] returns the outer category instead.
+  /// "North" when the outer category is "Q4"). For ungrouped charts
+  /// this equals [barLabel] — the category-level label IS the bar
+  /// label in that shape. Consumers building tooltips, analytics, or
+  /// accessibility labels should read this field when grouped, since
+  /// [barLabel] returns the outer category instead.
   final String innerBarLabel;
 
   /// Index of this segment within its bar group.
@@ -95,10 +95,10 @@ class BarSegmentLayout {
   /// The segment's original data value.
   final double value;
 
-  /// Cumulative value at the bottom of this segment.
+  /// Cumulative value before this segment is added to its accumulator.
   final double cumulativeStart;
 
-  /// Cumulative value at the top of this segment.
+  /// Cumulative value after this segment is added.
   final double cumulativeEnd;
 
   /// The logical (non-wobbly) bounding rectangle of this segment.

@@ -365,26 +365,64 @@ class _JournalPageState extends State<JournalPage> {
               _sectionHeading('Stacked Bar Chart'),
               const SizedBox(height: 4),
               const Text(
-                'Each bar is composed of multiple segments that '
-                'stack on top of each other.',
+                'Each bar is composed of multiple stacked segments. '
+                'Legend renders in a boxed band below.',
                 style: TextStyle(fontSize: 13, height: 1.55, color: _inkLight),
               ),
               const SizedBox(height: 12),
-              HandDrawnBarChart(data: _sampleBarData(), height: 260, seed: 10),
+              HandDrawnBarChart(
+                data: _sampleBarData(),
+                legendConfig: ChartLegendConfig.externalBottomBoxed,
+                height: 280,
+                seed: 10,
+              ),
               const SizedBox(height: 24),
 
               _sectionHeading('Grouped Bar Chart'),
               const SizedBox(height: 4),
               const Text(
-                'Multiple bars share one category label. Q4 combines '
-                'grouped + stacked — each region adds a stacked bonus segment.',
+                'Multiple bars share one category label, with a right-side '
+                'boxed legend. Q4 combines grouped + stacked — each region '
+                'adds a stacked bonus segment.',
                 style: TextStyle(fontSize: 13, height: 1.55, color: _inkLight),
               ),
               const SizedBox(height: 12),
               HandDrawnBarChart(
                 data: _sampleGroupedBarData(),
+                legendConfig: ChartLegendConfig.externalRightBoxed,
                 height: 280,
                 seed: 11,
+              ),
+              const SizedBox(height: 24),
+
+              _sectionHeading('Bar Chart with Negative Values'),
+              const SizedBox(height: 4),
+              const Text(
+                'Positive segments stack up from y = 0; negative segments '
+                'stack down. Zero values still occupy a slot.',
+                style: TextStyle(fontSize: 13, height: 1.55, color: _inkLight),
+              ),
+              const SizedBox(height: 12),
+              HandDrawnBarChart(
+                data: _sampleNegativeBarData(),
+                height: 260,
+                seed: 12,
+              ),
+              const SizedBox(height: 24),
+
+              _sectionHeading('Bar Chart with Rotated Labels'),
+              const SizedBox(height: 4),
+              const Text(
+                'Long category names stay readable when rotated; the X tick '
+                "band's reserved height adjusts automatically.",
+                style: TextStyle(fontSize: 13, height: 1.55, color: _inkLight),
+              ),
+              const SizedBox(height: 12),
+              HandDrawnBarChart(
+                data: _sampleRotatedLabelsBarData(),
+                xLabelConfig: ChartLabelConfig.diagonalLeft,
+                height: 280,
+                seed: 13,
               ),
               const SizedBox(height: 24),
 
@@ -506,6 +544,67 @@ class _JournalPageState extends State<JournalPage> {
               ),
               const SizedBox(height: 24),
 
+              _sectionHeading('Line Chart with Boxed Bottom Legend'),
+              const SizedBox(height: 4),
+              const Text(
+                'External boxed legend below the chart, wrapping for many '
+                'series.',
+                style: TextStyle(fontSize: 13, height: 1.55, color: _inkLight),
+              ),
+              const SizedBox(height: 12),
+              HandDrawnLineChart(
+                data: _sampleLineData(),
+                legendConfig: ChartLegendConfig.externalBottomBoxed,
+                grid: GridConfig.standard,
+                height: 280,
+                seed: 27,
+              ),
+              const SizedBox(height: 24),
+
+              _sectionHeading('Line Chart with Boxed Right Legend'),
+              const SizedBox(height: 4),
+              const Text(
+                'Right-side boxed legend; the plot area shrinks horizontally '
+                'to make room.',
+                style: TextStyle(fontSize: 13, height: 1.55, color: _inkLight),
+              ),
+              const SizedBox(height: 12),
+              HandDrawnLineChart(
+                data: _sampleLineData(),
+                legendConfig: ChartLegendConfig.externalRightBoxed,
+                grid: GridConfig.standard,
+                height: 260,
+                seed: 28,
+              ),
+              const SizedBox(height: 24),
+
+              _sectionHeading('Standalone Legend Composition'),
+              const SizedBox(height: 4),
+              const Text(
+                "Suppress the chart's legend, then place HandDrawnLegend "
+                'wherever the layout calls for it.',
+                style: TextStyle(fontSize: 13, height: 1.55, color: _inkLight),
+              ),
+              const SizedBox(height: 12),
+              Column(
+                children: [
+                  HandDrawnLegend(
+                    entries: ChartLegendEntries.fromLineChartData(
+                      _sampleLineData(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  HandDrawnLineChart(
+                    data: _sampleLineData(),
+                    legendConfig: ChartLegendConfig.hidden,
+                    grid: GridConfig.standard,
+                    height: 240,
+                    seed: 29,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
               _sectionHeading('Scatter Plot'),
               const SizedBox(height: 12),
               HandDrawnScatterPlot(
@@ -622,7 +721,7 @@ class _JournalPageState extends State<JournalPage> {
               const Text(
                 'Every chart type exposes computeLayout() and hitTest(), so '
                 'consumers can build their own tap, hover, and drag behaviors. '
-                'Below, each of the 12 charts above is wired to report what '
+                'Below, each chart above is wired to report what '
                 'you tap.',
                 style: TextStyle(fontSize: 14, height: 1.55, color: _inkLight),
               ),
@@ -647,6 +746,7 @@ class _JournalPageState extends State<JournalPage> {
               _InteractiveBarChart(
                 data: _sampleBarData(),
                 seed: 10,
+                legendConfig: ChartLegendConfig.externalBottomBoxed,
                 onHit: (l) => _setHit('bar_stacked', l),
               ),
               const SizedBox(height: 24),
@@ -659,7 +759,33 @@ class _JournalPageState extends State<JournalPage> {
                 data: _sampleGroupedBarData(),
                 seed: 11,
                 unitLabel: 'k',
+                legendConfig: ChartLegendConfig.externalRightBoxed,
                 onHit: (l) => _setHit('bar_grouped', l),
+              ),
+              const SizedBox(height: 24),
+
+              _sectionHeading('Bar Chart with Negative Values — tap a segment'),
+              const SizedBox(height: 4),
+              _hitLabel(_hits['bar_negative']),
+              const SizedBox(height: 8),
+              _InteractiveBarChart(
+                data: _sampleNegativeBarData(),
+                seed: 12,
+                unitLabel: 'k',
+                onHit: (l) => _setHit('bar_negative', l),
+              ),
+              const SizedBox(height: 24),
+
+              _sectionHeading('Bar Chart with Rotated Labels — tap a bar'),
+              const SizedBox(height: 4),
+              _hitLabel(_hits['bar_rotated']),
+              const SizedBox(height: 8),
+              _InteractiveBarChart(
+                data: _sampleRotatedLabelsBarData(),
+                seed: 13,
+                unitLabel: 'k users',
+                xLabelConfig: ChartLabelConfig.diagonalLeft,
+                onHit: (l) => _setHit('bar_rotated', l),
               ),
               const SizedBox(height: 24),
 
@@ -777,6 +903,59 @@ class _JournalPageState extends State<JournalPage> {
                 grid: _subGrid,
                 onHit: (l) => _setHit('line_discontinuous', l),
                 clipToChartArea: true,
+              ),
+              const SizedBox(height: 24),
+
+              _sectionHeading(
+                'Line Chart with Boxed Bottom Legend — tap a series',
+              ),
+              const SizedBox(height: 4),
+              _hitLabel(_hits['line_legend_bottom']),
+              const SizedBox(height: 8),
+              _InteractiveLineChart(
+                data: _sampleLineData(),
+                seed: 27,
+                grid: GridConfig.standard,
+                legendConfig: ChartLegendConfig.externalBottomBoxed,
+                onHit: (l) => _setHit('line_legend_bottom', l),
+              ),
+              const SizedBox(height: 24),
+
+              _sectionHeading(
+                'Line Chart with Boxed Right Legend — tap a series',
+              ),
+              const SizedBox(height: 4),
+              _hitLabel(_hits['line_legend_right']),
+              const SizedBox(height: 8),
+              _InteractiveLineChart(
+                data: _sampleLineData(),
+                seed: 28,
+                grid: GridConfig.standard,
+                legendConfig: ChartLegendConfig.externalRightBoxed,
+                onHit: (l) => _setHit('line_legend_right', l),
+              ),
+              const SizedBox(height: 24),
+
+              _sectionHeading('Standalone Legend Composition — tap a series'),
+              const SizedBox(height: 4),
+              _hitLabel(_hits['line_legend_standalone']),
+              const SizedBox(height: 8),
+              Column(
+                children: [
+                  HandDrawnLegend(
+                    entries: ChartLegendEntries.fromLineChartData(
+                      _sampleLineData(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _InteractiveLineChart(
+                    data: _sampleLineData(),
+                    seed: 29,
+                    grid: GridConfig.standard,
+                    legendConfig: ChartLegendConfig.hidden,
+                    onHit: (l) => _setHit('line_legend_standalone', l),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
 
@@ -909,6 +1088,7 @@ BarChartData _sampleSimpleBarData() {
   return const BarChartData(
     title: 'Daily Steps',
     yAxisLabel: 'Steps (k)',
+    maxY: 12,
     bars: [
       BarGroup(
         label: 'Mon',
@@ -939,6 +1119,7 @@ BarChartData _sampleBarData() {
   return const BarChartData(
     title: 'Weekly Activity',
     yAxisLabel: 'Minutes',
+    maxY: 120,
     bars: [
       BarGroup(
         label: 'Mon',
@@ -997,6 +1178,7 @@ BarChartData _sampleGroupedBarData() {
   return const BarChartData(
     title: 'Quarterly Revenue by Region',
     yAxisLabel: 'USD (k)',
+    maxY: 100,
     bars: [],
     categories: [
       BarCategory(
@@ -1083,6 +1265,83 @@ BarChartData _sampleGroupedBarData() {
       LegendEntry(label: 'West', color: purple),
       LegendEntry(label: 'Bonus', color: green),
     ],
+  );
+}
+
+BarChartData _sampleNegativeBarData() {
+  const green = Color(0xFF6BAF7A);
+  const red = Color(0xFFD46B6B);
+  return const BarChartData(
+    title: 'Quarterly P/L',
+    yAxisLabel: 'USD (k)',
+    minY: -30,
+    maxY: 50,
+    axisDisplay: AxisDisplay(horizontal: AxisDisplayMode.zeroCrossing),
+    bars: [
+      // Mixed-sign stack: gains dominate.
+      BarGroup(
+        label: 'Q1',
+        segments: [
+          BarSegment(category: 'Gain', value: 30, color: green),
+          BarSegment(category: 'Loss', value: -5, color: red),
+        ],
+      ),
+      // All-negative bar.
+      BarGroup(
+        label: 'Q2',
+        segments: [BarSegment(category: 'Loss', value: -18, color: red)],
+      ),
+      // Zero bar — occupies its slot, renders nothing.
+      BarGroup(
+        label: 'Q3',
+        segments: [BarSegment(category: 'Gain', value: 0, color: green)],
+      ),
+      // All-positive bar.
+      BarGroup(
+        label: 'Q4',
+        segments: [BarSegment(category: 'Gain', value: 38, color: green)],
+      ),
+    ],
+    legend: [
+      LegendEntry(label: 'Gain', color: green),
+      LegendEntry(label: 'Loss', color: red),
+    ],
+  );
+}
+
+BarChartData _sampleRotatedLabelsBarData() {
+  const blue = Color(0xFF6B9BD2);
+  return const BarChartData(
+    title: 'Monthly Active Users',
+    yAxisLabel: 'Users (k)',
+    maxY: 28,
+    bars: [
+      BarGroup(
+        label: 'October 2024',
+        segments: [BarSegment(category: 'Users', value: 13.1, color: blue)],
+      ),
+      BarGroup(
+        label: 'November 2024',
+        segments: [BarSegment(category: 'Users', value: 14.8, color: blue)],
+      ),
+      BarGroup(
+        label: 'December 2024',
+        segments: [BarSegment(category: 'Users', value: 16.2, color: blue)],
+      ),
+      BarGroup(
+        label: 'January 2025',
+        segments: [BarSegment(category: 'Users', value: 18.5, color: blue)],
+      ),
+      BarGroup(
+        label: 'February 2025',
+        segments: [BarSegment(category: 'Users', value: 19.7, color: blue)],
+      ),
+      BarGroup(
+        label: 'March 2025',
+        segments: [BarSegment(category: 'Users', value: 21.3, color: blue)],
+      ),
+    ],
+    legend: [LegendEntry(label: 'Users', color: blue)],
   );
 }
 
@@ -1457,16 +1716,25 @@ class _InteractiveBarChart extends StatelessWidget {
     required this.onHit,
     this.seed = 10,
     this.unitLabel = 'min',
+    this.xLabelConfig = ChartLabelConfig.horizontal,
+    this.legendConfig = ChartLegendConfig.inlineBottom,
   });
 
   final BarChartData data;
   final ValueChanged<String?> onHit;
   final int seed;
   final String unitLabel;
+  final ChartLabelConfig xLabelConfig;
+  final ChartLegendConfig legendConfig;
 
   @override
   Widget build(BuildContext context) {
-    final painter = HandDrawnBarChartPainter(data: data, seed: seed);
+    final painter = HandDrawnBarChartPainter(
+      data: data,
+      seed: seed,
+      xLabelConfig: xLabelConfig,
+      legendConfig: legendConfig,
+    );
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = Size(constraints.maxWidth, 240);
@@ -1476,9 +1744,6 @@ class _InteractiveBarChart extends StatelessWidget {
             final hit = layout.hitTest(details.localPosition);
             if (hit != null) {
               final s = hit.segment;
-              // For grouped charts show inner label ("North"); for legacy
-              // charts the inner label equals the outer (barLabel) so we
-              // avoid the redundancy.
               final header = data.hasGroupedBars
                   ? '${s.barLabel} / ${s.innerBarLabel}'
                   : s.barLabel;
@@ -1505,6 +1770,7 @@ class _InteractiveLineChart extends StatelessWidget {
     this.seed = 20,
     this.grid = GridConfig.standard,
     this.clipToChartArea = true,
+    this.legendConfig = ChartLegendConfig.inlineBottom,
   });
 
   final LineChartData data;
@@ -1512,6 +1778,7 @@ class _InteractiveLineChart extends StatelessWidget {
   final int seed;
   final GridConfig grid;
   final bool clipToChartArea;
+  final ChartLegendConfig legendConfig;
 
   @override
   Widget build(BuildContext context) {
@@ -1520,6 +1787,7 @@ class _InteractiveLineChart extends StatelessWidget {
       seed: seed,
       grid: grid,
       clipToChartArea: clipToChartArea,
+      legendConfig: legendConfig,
     );
     return LayoutBuilder(
       builder: (context, constraints) {

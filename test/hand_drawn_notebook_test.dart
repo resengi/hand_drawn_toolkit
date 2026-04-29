@@ -2,20 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
 
+import 'test_utils.dart';
+
 void main() {
   group('HandDrawnNotebook', () {
-    Widget buildApp({required Widget child}) {
-      return MaterialApp(home: Scaffold(body: child));
-    }
-
     group('rendering', () {
       testWidgets('renders without error with required params', (tester) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const HandDrawnNotebook(
-              lineHeight: 28.0,
-              child: Text('Hello'),
-            ),
+          testApp(
+            const HandDrawnNotebook(lineHeight: 28.0, child: Text('Hello')),
           ),
         );
 
@@ -24,8 +19,8 @@ void main() {
 
       testWidgets('renders child content', (tester) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const HandDrawnNotebook(
+          testApp(
+            const HandDrawnNotebook(
               lineHeight: 28.0,
               child: Text('Notebook text'),
             ),
@@ -39,8 +34,8 @@ void main() {
         tester,
       ) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const HandDrawnNotebook(
+          testApp(
+            const HandDrawnNotebook(
               lineHeight: 28.0,
               child: SizedBox(height: 100),
             ),
@@ -59,11 +54,8 @@ void main() {
 
       testWidgets('inner SizedBox has width double.infinity', (tester) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const HandDrawnNotebook(
-              lineHeight: 28.0,
-              child: Text('Test'),
-            ),
+          testApp(
+            const HandDrawnNotebook(lineHeight: 28.0, child: Text('Test')),
           ),
         );
 
@@ -81,11 +73,8 @@ void main() {
         tester,
       ) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const HandDrawnNotebook(
-              lineHeight: 28.0,
-              child: Text('Test'),
-            ),
+          testApp(
+            const HandDrawnNotebook(lineHeight: 28.0, child: Text('Test')),
           ),
         );
 
@@ -102,8 +91,8 @@ void main() {
 
       testWidgets('custom strokeWidth changes bottom padding', (tester) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const HandDrawnNotebook(
+          testApp(
+            const HandDrawnNotebook(
               lineHeight: 28.0,
               strokeWidth: 2.5,
               child: Text('Test'),
@@ -125,8 +114,8 @@ void main() {
         tester,
       ) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const HandDrawnNotebook(
+          testApp(
+            const HandDrawnNotebook(
               lineHeight: 32.0,
               lineColor: Colors.red,
               strokeWidth: 2.0,

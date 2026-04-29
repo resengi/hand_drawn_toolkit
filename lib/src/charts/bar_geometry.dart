@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' show Rect;
 
 import '../hand_drawn_constants.dart';
@@ -28,9 +29,9 @@ class BarRectSpec {
   final int categoryIndex;
 
   /// Index of the inner bar within its category. For ungrouped charts
-  /// (the legacy single-bar-per-category projection) this is always 0.
-  /// For grouped charts it ranges over `0..N-1` for the side-by-side
-  /// bars under one category.
+  /// (the single-bar-per-category projection) this is always 0. For
+  /// grouped charts it ranges over `0..N-1` for the side-by-side bars
+  /// under one category.
   final int innerBarIndex;
 
   /// Index of this segment within its inner bar (bottom = 0).
@@ -40,9 +41,8 @@ class BarRectSpec {
   final String categoryLabel;
 
   /// Label of the inner bar within its category. For grouped charts
-  /// this is the `BarGroup.label` (e.g. "North"). For legacy ungrouped
-  /// charts (single-bar-per-category projection) this equals
-  /// [categoryLabel].
+  /// this is the `BarGroup.label` (e.g. "North"). For ungrouped charts
+  /// (single-bar-per-category projection) this equals [categoryLabel].
   final String innerBarLabel;
 
   /// The original segment data (color, value, fill overrides).
@@ -69,17 +69,25 @@ class BarRectSpec {
 /// - Each category's bars sit inside a centered "group zone" whose
 ///   width is `_resolveBarWidth(outerSlotWidth)` — i.e. `barWidthRatio`
 ///   is applied ONCE at the outer-slot level, carving out breathing
-///   room around the group as a whole. This matches the pre-grouping
-///   renderer for single-bar charts exactly.
+///   room around the group as a whole.
 /// - Inside the group zone, inner bars tile edge-to-edge with no gap
 ///   between siblings, so groupings read as coherent visual units.
-///   A chart with `innerCount = 1` collapses to the legacy geometry
+///   A chart with `innerCount = 1` collapses to the ungrouped geometry
 ///   (one bar centered in its slot at `barWidthRatio` width).
-/// - Stacked segments accumulate vertically using the frame's
-///   `yToCanvas`, so negative-value semantics are inherited unchanged
-///   (callers already enforce non-negative segment values).
-/// - Zero-value segments are skipped (they would render as zero-height
-///   rects and just add noise to hit testing).
+/// - Stacked segments accumulate vertically using two **independent**
+///   accumulators per inner bar — positive segments stack upward from
+///   the data baseline `0.0`, negative segments stack downward from
+///   the same baseline. A segment's rect spans from the appropriate
+///   accumulator's pre-add value (its `cumulativeStart`) to its
+///   post-add value (its `cumulativeEnd`); whichever side of zero the
+///   segment lives on, that side's accumulator advances and the other
+///   stays put. Mixing signs in a single stack therefore produces a
+///   bar with two visual halves growing out of the zero line.
+/// - Zero-value segments still produce a (zero-height) layout entry,
+///   so segment indices, hit-test metadata, and any introspection of
+///   the layout output remain stable across data shapes that contain
+///   zero placeholders. They will be unhittable in practice because
+///   `Rect.contains` excludes the bottom edge.
 List<BarRectSpec> computeBarSegmentRects({
   required ChartFrameLayout frame,
   required List<BarCategory> categories,
@@ -96,19 +104,9 @@ List<BarRectSpec> computeBarSegmentRects({
     final category = categories[c];
     final outerCenterX = chartArea.left + outerSlotWidth * (c + 0.5);
 
-    // Inner subdivision.
-    //
-    // `barWidthRatio` is applied ONCE at the outer-slot level to carve
-    // out a single "group zone" with breathing room around the whole
-    // group (this matches the legacy visual — ungrouped bars also sit
-    // narrower than their slot with gaps either side). The inner bars
-    // then tile that group zone edge-to-edge with no gap between
-    // siblings, so groupings read as coherent units instead of looking
-    // indistinguishable from separate categories.
-    //
-    // For ungrouped charts (innerCount == 1), groupZoneWidth ==
-    // _resolveBarWidth(outerSlotWidth) and that is also the single
-    // inner bar's width — bit-identical to the pre-grouping renderer.
+    // Inner subdivision — see class-level comment for the geometry
+    // rationale (group zone = one barWidthRatio carve-out per category;
+    // inner bars tile that zone edge-to-edge).
     final innerCount = category.bars.length;
     // Empty category — nothing to draw and no slots to subdivide.
     // Skip explicitly rather than relying on IEEE infinity + a
@@ -122,15 +120,43 @@ List<BarRectSpec> computeBarSegmentRects({
       final innerCenterX = groupZoneLeft + innerBarWidth * (b + 0.5);
       final bar = category.bars[b];
 
-      double cumulative = 0.0;
+      // Two independent stacks per inner bar. Positive segments
+      // accumulate upward from zero into [positiveCumulative];
+      // negative segments accumulate downward into [negativeCumulative].
+      // A zero-value segment doesn't move either accumulator but still
+      // produces a layout entry below to preserve segment indices.
+      double positiveCumulative = 0.0;
+      double negativeCumulative = 0.0;
+
       for (int s = 0; s < bar.segments.length; s++) {
         final seg = bar.segments[s];
-        if (seg.value == 0) continue;
+        final value = seg.value;
 
-        final bottomY = frame.yToCanvas(cumulative);
-        final start = cumulative;
-        cumulative += seg.value;
-        final topY = frame.yToCanvas(cumulative);
+        final double dataStart;
+        final double dataEnd;
+        if (value > 0) {
+          dataStart = positiveCumulative;
+          positiveCumulative += value;
+          dataEnd = positiveCumulative;
+        } else if (value < 0) {
+          dataStart = negativeCumulative;
+          negativeCumulative += value;
+          dataEnd = negativeCumulative;
+        } else {
+          // Zero-value segment: park it at whichever accumulator the
+          // stack has been growing into (positive by default for an
+          // all-zero stack). The choice is arbitrary because the rect
+          // has zero height regardless — this just keeps the layout
+          // metadata in a sensible place.
+          final anchor = negativeCumulative != 0 && positiveCumulative == 0
+              ? negativeCumulative
+              : positiveCumulative;
+          dataStart = anchor;
+          dataEnd = anchor;
+        }
+
+        final startY = frame.yToCanvas(dataStart);
+        final endY = frame.yToCanvas(dataEnd);
 
         result.add(
           BarRectSpec(
@@ -140,13 +166,13 @@ List<BarRectSpec> computeBarSegmentRects({
             categoryLabel: category.label,
             innerBarLabel: category.bars[b].label,
             segment: seg,
-            cumulativeStart: start,
-            cumulativeEnd: cumulative,
+            cumulativeStart: dataStart,
+            cumulativeEnd: dataEnd,
             rect: Rect.fromLTRB(
               innerCenterX - innerBarWidth / 2,
-              topY,
+              math.min(startY, endY),
               innerCenterX + innerBarWidth / 2,
-              bottomY,
+              math.max(startY, endY),
             ),
           ),
         );
@@ -157,9 +183,16 @@ List<BarRectSpec> computeBarSegmentRects({
   return result;
 }
 
-/// Same width-clamping logic the bar painter has used since the package
-/// shipped. Extracted here so the geometry helper is self-contained.
+/// Resolves the rendered bar width for a category slot.
+///
+/// Clamps `slotWidth * barWidthRatio` to `[barMinWidth, barMaxWidth]`,
+/// dropping the lower bound when the slot is narrower than `barMinWidth`
+/// so bars never exceed their slot.
 double _resolveBarWidth(double slotWidth) {
+  // First clamp to the preferred [barMinWidth, barMaxWidth] range, but
+  // skip the lower bound when the slot itself is narrower than barMinWidth
+  // (otherwise we'd produce bars wider than their slot). Then cap to
+  // slotWidth as an absolute upper bound for the narrow-slot case.
   return (slotWidth * barWidthRatio)
       .clamp(slotWidth >= barMinWidth ? barMinWidth : 0.0, barMaxWidth)
       .clamp(0.0, slotWidth);

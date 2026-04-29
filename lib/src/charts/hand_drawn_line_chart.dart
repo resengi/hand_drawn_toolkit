@@ -14,7 +14,14 @@ import 'line_series_resolver.dart';
 ///
 /// Points are positioned using [LinePoint.x] within the `minX`–`maxX` range.
 /// Supports both numeric and categorical X-axis modes.
-/// Auto-generates legend for multi-series charts.
+///
+/// Legend entries follow [ChartLegendEntries.fromLineChartData] — when
+/// the data contains multiple series (point + function combined),
+/// entries are auto-generated from each series' name and color. With
+/// one or zero series the chart renders no legend by default. The
+/// helper is the single source of truth, so a standalone
+/// [HandDrawnLegend] fed the same data renders the exact same
+/// entries.
 class HandDrawnLineChartPainter extends HandDrawnChartPainter {
   HandDrawnLineChartPainter({
     required this.data,
@@ -31,16 +38,11 @@ class HandDrawnLineChartPainter extends HandDrawnChartPainter {
     super.titleStyle,
     super.legendStyle,
     super.axisStrokeWidth,
+    super.xLabelConfig,
+    super.legendConfig,
   }) : super(
          xLabels: data.xLabels,
-         legend: (data.series.length + data.functionSeries.length) > 1
-             ? [
-                 for (final s in data.series)
-                   LegendEntry(label: s.name, color: s.color),
-                 for (final f in data.functionSeries)
-                   LegendEntry(label: f.name, color: f.color),
-               ]
-             : const [],
+         legend: ChartLegendEntries.fromLineChartData(data),
          yMin: data.minY,
          yMax: data.maxY,
          xMin: data.minX,
@@ -48,11 +50,24 @@ class HandDrawnLineChartPainter extends HandDrawnChartPainter {
          yAxisLabel: data.yAxisLabel,
          xAxisLabel: data.xAxisLabel,
          title: data.title,
-         labelStyle: labelStyle ?? chartDefaultLabelStyle,
+         labelStyle: labelStyle ?? HandDrawnDefaults.chartLabelStyle,
          yValueFormatter: data.yValueFormatter,
          xValueFormatter: data.xValueFormatter,
          axisDisplay: data.axisDisplay,
-       );
+       ) {
+    for (int s = 0; s < data.series.length; s++) {
+      final series = data.series[s];
+      for (int i = 0; i < series.points.length; i++) {
+        final p = series.points[i];
+        if (!p.x.isFinite || !p.y.isFinite) {
+          throw ArgumentError(
+            'LinePoint coordinates must be finite, got (${p.x}, ${p.y}) at '
+            'series "${series.name}" index $i.',
+          );
+        }
+      }
+    }
+  }
 
   final LineChartData data;
 
@@ -141,7 +156,7 @@ class HandDrawnLineChartPainter extends HandDrawnChartPainter {
   void paintData(Canvas canvas, Size size) {
     // Resolve the fill baseline once per paint. Falls back to the chart
     // bottom whenever zero-crossing is off OR zero isn't inside the
-    // visible Y range — both of which preserve the original behavior.
+    // visible Y range.
     final useZeroBaseline =
         data.axisDisplay.horizontal == AxisDisplayMode.zeroCrossing &&
         frame.isZeroVisibleY;
@@ -273,19 +288,22 @@ class HandDrawnLineChart extends StatelessWidget {
     required this.data,
     this.height = HandDrawnDefaults.chartHeight,
     this.seed = HandDrawnDefaults.seed,
-    this.axisColor = chartAxisColor,
+    this.axisColor = HandDrawnDefaults.chartAxisColor,
     this.grid = GridConfig.standard,
     this.labelStyle,
-    this.irregularity = chartIrregularity,
-    this.segments = chartSegments,
-    this.yDivisions = chartYDivisions,
-    this.xDivisions = chartXDivisions,
-    this.padding = chartDefaultPadding,
+    this.irregularity = HandDrawnDefaults.chartIrregularity,
+    this.segments = HandDrawnDefaults.chartSegments,
+    this.yDivisions = HandDrawnDefaults.chartYDivisions,
+    this.xDivisions = HandDrawnDefaults.chartXDivisions,
+    this.padding = HandDrawnDefaults.chartPadding,
     this.titleStyle,
     this.legendStyle,
-    this.axisStrokeWidth = chartAxisStrokeWidth,
+    this.axisStrokeWidth = HandDrawnDefaults.chartAxisStrokeWidth,
     this.emptyStyle,
+    this.emptyMessage = 'No data for this range',
     this.clipToChartArea = false,
+    this.xLabelConfig = ChartLabelConfig.horizontal,
+    this.legendConfig = ChartLegendConfig.inlineBottom,
     super.key,
   });
 
@@ -307,10 +325,25 @@ class HandDrawnLineChart extends StatelessWidget {
   final double axisStrokeWidth;
   final TextStyle? emptyStyle;
 
+  /// Message shown when [data] is non-null but empty.
+  final String emptyMessage;
+
   /// When `true`, data rendering is clipped to the chart's plot area so
   /// values outside `[minY, maxY]` can't paint outside the chart. See
   /// [HandDrawnLineChartPainter.clipToChartArea] for details.
   final bool clipToChartArea;
+
+  /// X-axis tick label configuration (rotation, thinning sensitivity).
+  /// Defaults to horizontal labels. See [ChartLabelConfig] for usage
+  /// and named presets.
+  final ChartLabelConfig xLabelConfig;
+
+  /// Legend layout configuration. Defaults to
+  /// [ChartLegendConfig.inlineBottom] — a single inline row at the
+  /// bottom of the chart, no box, hard-truncates on overflow. See
+  /// [ChartLegendConfig] for external boxed presets and the
+  /// standalone-widget composition pattern.
+  final ChartLegendConfig legendConfig;
 
   @override
   Widget build(BuildContext context) {
@@ -319,6 +352,7 @@ class HandDrawnLineChart extends StatelessWidget {
       isEmpty: data?.isEmpty ?? true,
       height: height,
       emptyStyle: emptyStyle,
+      emptyMessage: emptyMessage,
       builder: () => CustomPaint(
         size: Size.infinite,
         painter: HandDrawnLineChartPainter(
@@ -336,6 +370,8 @@ class HandDrawnLineChart extends StatelessWidget {
           legendStyle: legendStyle,
           axisStrokeWidth: axisStrokeWidth,
           clipToChartArea: clipToChartArea,
+          xLabelConfig: xLabelConfig,
+          legendConfig: legendConfig,
         ),
       ),
     );

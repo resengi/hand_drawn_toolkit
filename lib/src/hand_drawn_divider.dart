@@ -4,10 +4,6 @@ import 'hand_drawn_constants.dart';
 import 'hand_drawn_line_painter.dart';
 import 'hand_drawn_toolkit_defaults.dart';
 
-/// Returns the cross-axis extent used by divider layout for a given thickness.
-double _dividerCrossAxisExtent(double thickness) =>
-    thickness * dividerCrossAxisMultiplier;
-
 /// A horizontal or vertical divider rendered with a hand-drawn, sketchy stroke.
 ///
 /// Behaves like Flutter's built-in [Divider] but renders a jittered line
@@ -103,9 +99,9 @@ class HandDrawnDivider extends StatelessWidget {
     final isHorizontal = direction == Axis.horizontal;
 
     // The drawing area needs a small cross-axis extent to contain the
-    // jittered stroke without clipping. See [dividerCrossAxisMultiplier]
-    // for the multiplier used to give the wobble comfortable room.
-    final crossAxis = _dividerCrossAxisExtent(thickness);
+    // jittered stroke without clipping. See [dividerCrossAxisExtent]
+    // for the geometry.
+    final crossAxis = dividerCrossAxisExtent(thickness);
 
     return Padding(
       padding: isHorizontal

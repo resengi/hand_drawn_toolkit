@@ -13,7 +13,7 @@ BarSegment _seg(double v, [String cat = 'cat']) =>
 BarGroup _bar(String label, List<double> values) =>
     BarGroup(label: label, segments: values.map(_seg).toList());
 
-BarChartData _legacy({int n = 3}) => BarChartData(
+BarChartData _ungrouped({int n = 3}) => BarChartData(
   bars: List.generate(n, (i) => _bar('B$i', [(i + 1) * 10.0])),
   legend: const [LegendEntry(label: 'cat', color: _color)],
 );
@@ -38,23 +38,23 @@ HandDrawnBarChartPainter _painter(BarChartData data) =>
     HandDrawnBarChartPainter(data: data);
 
 void main() {
-  // ── Backward-compat (regression) ─────────────────────────────────────
+  // ── Backward-compat ──────────────────────────────────────────────────
 
-  group('Legacy bars input — backward compat', () {
+  group('Ungrouped bars input — backward compat', () {
     test('every layout segment has innerBarIndex == 0', () {
-      final layout = _painter(_legacy(n: 4)).computeLayout(kChartTestSize);
+      final layout = _painter(_ungrouped(n: 4)).computeLayout(kChartTestSize);
       for (final s in layout.segments) {
         expect(s.innerBarIndex, 0);
       }
     });
 
-    test('one segment per legacy bar (no zero values)', () {
-      final layout = _painter(_legacy(n: 4)).computeLayout(kChartTestSize);
+    test('one segment per ungrouped bar (no zero values)', () {
+      final layout = _painter(_ungrouped(n: 4)).computeLayout(kChartTestSize);
       expect(layout.segments, hasLength(4));
     });
 
     test('barIndex covers 0..N-1 in order', () {
-      final layout = _painter(_legacy(n: 4)).computeLayout(kChartTestSize);
+      final layout = _painter(_ungrouped(n: 4)).computeLayout(kChartTestSize);
       expect(layout.segments.map((s) => s.barIndex).toList(), [0, 1, 2, 3]);
     });
   });
@@ -109,27 +109,30 @@ void main() {
       expect((avg - layout.chartArea.center.dx).abs(), lessThan(0.5));
     });
 
-    test('single inner bar collapses to outer slot center (legacy parity)', () {
-      final grouped = _painter(
-        _grouped(categoryCount: 3, innerCount: 1),
-      ).computeLayout(kChartTestSize);
-      final legacy = _painter(
-        BarChartData(
-          bars: List.generate(3, (i) => _bar('inner-$i-0', [10.0 + i * 5])),
-          legend: const [LegendEntry(label: 'cat', color: _color)],
-        ),
-      ).computeLayout(kChartTestSize);
-      // Single-inner-bar grouped charts must produce identical X centers
-      // to the legacy projection — this is the geometry contract.
-      for (int i = 0; i < 3; i++) {
-        expect(
-          (grouped.segments[i].bounds.center.dx -
-                  legacy.segments[i].bounds.center.dx)
-              .abs(),
-          lessThan(0.01),
-        );
-      }
-    });
+    test(
+      'single inner bar collapses to outer slot center (ungrouped parity)',
+      () {
+        final grouped = _painter(
+          _grouped(categoryCount: 3, innerCount: 1),
+        ).computeLayout(kChartTestSize);
+        final ungrouped = _painter(
+          BarChartData(
+            bars: List.generate(3, (i) => _bar('inner-$i-0', [10.0 + i * 5])),
+            legend: const [LegendEntry(label: 'cat', color: _color)],
+          ),
+        ).computeLayout(kChartTestSize);
+        // Single-inner-bar grouped charts must produce identical X centers
+        // to the ungrouped projection — this is the geometry contract.
+        for (int i = 0; i < 3; i++) {
+          expect(
+            (grouped.segments[i].bounds.center.dx -
+                    ungrouped.segments[i].bounds.center.dx)
+                .abs(),
+            lessThan(0.01),
+          );
+        }
+      },
+    );
 
     test('sibling inner bars touch edge-to-edge within a category', () {
       // The key visual property of grouped bars: siblings in one
@@ -177,9 +180,9 @@ void main() {
       expect((tallest.bounds.top - layout.chartArea.top).abs(), lessThan(0.5));
     });
 
-    test('legacy maxY default unchanged: max(BarGroup.total)', () {
+    test('ungrouped maxY default unchanged: max(BarGroup.total)', () {
       // Bars 10, 20, 30 → max should be 30 → tallest segment top at chart top.
-      final layout = _painter(_legacy(n: 3)).computeLayout(kChartTestSize);
+      final layout = _painter(_ungrouped(n: 3)).computeLayout(kChartTestSize);
       final tallest = layout.segments.firstWhere((s) => s.value == 30);
       expect((tallest.bounds.top - layout.chartArea.top).abs(), lessThan(0.5));
     });
@@ -249,16 +252,16 @@ void main() {
       );
     });
 
-    test('legacy chart — innerBarLabel equals barLabel', () {
-      // For legacy (ungrouped) charts, the inner and outer labels are
+    test('ungrouped chart — innerBarLabel equals barLabel', () {
+      // For ungrouped charts, the inner and outer labels are
       // the same value — BarGroup.label is both the X-axis tick label
       // and the bar's own label.
-      final layout = _painter(_legacy(n: 3)).computeLayout(kChartTestSize);
+      final layout = _painter(_ungrouped(n: 3)).computeLayout(kChartTestSize);
       for (final s in layout.segments) {
         expect(
           s.innerBarLabel,
           equals(s.barLabel),
-          reason: 'Legacy bars: inner == outer label',
+          reason: 'Ungrouped bars: inner == outer label',
         );
       }
     });
@@ -267,7 +270,12 @@ void main() {
   // ── Edge cases ───────────────────────────────────────────────────────
 
   group('Edge cases', () {
-    test('zero-value segments are skipped', () {
+    test('zero-value segments preserve layout entries', () {
+      // Zero-value segments still produce a rect entry — just with
+      // zero height — so segment indices and hit-test metadata stay
+      // stable across data shapes that contain zero placeholders.
+      // Hit testing on a zero-height rect naturally returns false
+      // because Rect.contains excludes the bottom edge.
       final data = BarChartData(
         bars: [
           _bar('B', [0, 10, 0, 5]),
@@ -275,9 +283,47 @@ void main() {
         legend: const [LegendEntry(label: 'cat', color: _color)],
       );
       final layout = _painter(data).computeLayout(kChartTestSize);
-      // Only the two non-zero segments should produce rects.
-      expect(layout.segments, hasLength(2));
-      expect(layout.segments.map((s) => s.value).toList(), [10, 5]);
+      expect(layout.segments, hasLength(4));
+      expect(layout.segments.map((s) => s.value).toList(), [0, 10, 0, 5]);
+      // The two zero-valued entries have zero-height rects.
+      expect(layout.segments[0].bounds.height, 0);
+      expect(layout.segments[2].bounds.height, 0);
+      // The non-zero entries still have positive height.
+      expect(layout.segments[1].bounds.height, greaterThan(0));
+      expect(layout.segments[3].bounds.height, greaterThan(0));
+    });
+
+    test('mixed-sign stack: positives stack up, negatives stack down', () {
+      // A single bar with segments [10, -4, 6, -3] should produce two
+      // independent accumulators:
+      //   positive stack: 0 → 10 → 16
+      //   negative stack: 0 → -4 → -7
+      final data = BarChartData(
+        bars: [
+          _bar('B', [10, -4, 6, -3]),
+        ],
+        legend: const [LegendEntry(label: 'cat', color: _color)],
+      );
+      final layout = _painter(data).computeLayout(kChartTestSize);
+
+      expect(layout.segments, hasLength(4));
+
+      // Segment 0 (value 10): positive accumulator 0 → 10.
+      expect(layout.segments[0].cumulativeStart, 0);
+      expect(layout.segments[0].cumulativeEnd, 10);
+
+      // Segment 1 (value -4): negative accumulator 0 → -4. The
+      // positive accumulator is untouched.
+      expect(layout.segments[1].cumulativeStart, 0);
+      expect(layout.segments[1].cumulativeEnd, -4);
+
+      // Segment 2 (value 6): positive accumulator 10 → 16.
+      expect(layout.segments[2].cumulativeStart, 10);
+      expect(layout.segments[2].cumulativeEnd, 16);
+
+      // Segment 3 (value -3): negative accumulator -4 → -7.
+      expect(layout.segments[3].cumulativeStart, -4);
+      expect(layout.segments[3].cumulativeEnd, -7);
     });
 
     test('uneven inner-bar counts across categories render without crash', () {
@@ -337,6 +383,31 @@ void main() {
         returnsNormally,
       );
       recorder.endRecording();
+    });
+
+    test('grouped-only data does not require explicit bars argument', () {
+      // Categories take precedence over bars, so a grouped chart can
+      // omit `bars:` entirely. The data class const-constructs and
+      // renders normally.
+      const data = BarChartData(
+        categories: [
+          BarCategory(
+            label: 'A',
+            bars: [
+              BarGroup(
+                label: 'a',
+                segments: [BarSegment(category: 'x', value: 10, color: _color)],
+              ),
+            ],
+          ),
+        ],
+      );
+      expect(data.bars, isEmpty);
+      expect(data.resolvedCategories, hasLength(1));
+
+      final painter = _painter(data);
+      final layout = painter.computeLayout(kChartTestSize);
+      expect(layout.segments, hasLength(1));
     });
   });
 }

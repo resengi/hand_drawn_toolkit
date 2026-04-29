@@ -10,7 +10,7 @@ library;
 
 import 'dart:ui' show Color;
 
-import 'package:flutter/painting.dart' show EdgeInsets;
+import 'package:flutter/painting.dart' show EdgeInsets, TextStyle;
 
 import 'hand_drawn_constants.dart';
 
@@ -156,6 +156,59 @@ abstract final class HandDrawnDefaults {
   /// Default height for chart widgets.
   static const double chartHeight = defaultChartHeight;
 
+  /// Default color for chart axes.
+  static const Color chartAxisColor = defaultChartAxisColor;
+
+  /// Default text style for chart tick labels and X-axis labels.
+  static const TextStyle chartLabelStyle = defaultChartLabelStyle;
+
+  /// Default irregularity for chart strokes (axes, lines, bars).
+  static const double chartIrregularity = defaultChartIrregularity;
+
+  /// Default segment count for chart strokes.
+  static const int chartSegments = defaultChartSegments;
+
+  /// Default number of horizontal divisions on chart Y axes.
+  static const int chartYDivisions = defaultChartYDivisions;
+
+  /// Default number of vertical divisions on chart X axes (line and
+  /// scatter charts).
+  static const int chartXDivisions = defaultChartXDivisions;
+
+  /// Default outer padding inside chart widgets.
+  static const EdgeInsets chartPadding = defaultChartPadding;
+
+  /// Default stroke width for chart axis lines.
+  static const double chartAxisStrokeWidth = defaultChartAxisStrokeWidth;
+
+  /// Default color for scatter plot dots.
+  static const Color scatterDotColor = defaultScatterDotColor;
+
+  /// Default color for chart grid lines.
+  static const Color chartGridColor = defaultChartGridColor;
+
+  /// Default stroke width for chart grid lines.
+  static const double chartGridStrokeWidth = defaultChartGridStrokeWidth;
+
+  /// Default jitter ratio applied to chart grid lines.
+  static const double chartGridJitterRatio = defaultChartGridJitterRatio;
+
+  /// Default minimum visible gap between X-axis labels before thinning kicks in.
+  static const double chartLabelThinningGap = defaultChartLabelThinningGap;
+
+  /// Default horizontal gap between legend entries.
+  static const double chartLegendEntryGap = defaultChartLegendEntryGap;
+
+  /// Default segment count for wobbly rectangle borders (legend boxes,
+  /// inline label backgrounds).
+  static const int wobblyRectSegments = defaultWobblyRectSegments;
+
+  /// Default number of samples used by [FunctionSeriesData].
+  static const int functionSampleCount = defaultSampleCount;
+
+  /// Default wobble-anchor stride used by [FunctionSeriesData].
+  static const int functionWobbleAnchorStride = defaultWobbleAnchorStride;
+
   // ── Table defaults ──────────────────────────────────────────────────
 
   /// Default font size for table header text.
@@ -169,4 +222,16 @@ abstract final class HandDrawnDefaults {
 
   /// Default inner padding for the table container.
   static const double tablePadding = defaultTablePadding;
+
+  /// Default highlight color applied to highlighted rows.
+  static const Color tableHighlightColor = defaultTableHighlightColor;
+
+  /// Default alpha multiplier for highlighted rows.
+  static const double tableHighlightAlpha = defaultTableHighlightAlpha;
+
+  /// Default vertical padding around table rows.
+  static const double tableRowVerticalPadding = defaultTableRowVerticalPadding;
+
+  /// Default bottom padding below the table title.
+  static const double tableTitleBottomPadding = defaultTableTitleBottomPadding;
 }

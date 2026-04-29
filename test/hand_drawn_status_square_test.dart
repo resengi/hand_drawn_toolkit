@@ -2,18 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
 
+import 'test_utils.dart';
+
 void main() {
   group('HandDrawnStatusSquare', () {
-    Widget buildApp({required Widget child}) {
-      return MaterialApp(home: Scaffold(body: child));
-    }
-
     group('rendering', () {
       testWidgets('renders without error with only required params', (
         tester,
       ) async {
         await tester.pumpWidget(
-          buildApp(child: const HandDrawnStatusSquare(color: Colors.black)),
+          testApp(const HandDrawnStatusSquare(color: Colors.black)),
         );
 
         expect(find.byType(HandDrawnStatusSquare), findsOneWidget);
@@ -21,7 +19,7 @@ void main() {
 
       testWidgets('contains a CustomPaint descendant', (tester) async {
         await tester.pumpWidget(
-          buildApp(child: const HandDrawnStatusSquare(color: Colors.black)),
+          testApp(const HandDrawnStatusSquare(color: Colors.black)),
         );
 
         final customPaintFinder = find.descendant(
@@ -33,7 +31,7 @@ void main() {
 
       testWidgets('renders a SizedBox at the default size', (tester) async {
         await tester.pumpWidget(
-          buildApp(child: const HandDrawnStatusSquare(color: Colors.black)),
+          testApp(const HandDrawnStatusSquare(color: Colors.black)),
         );
 
         final sizedBoxFinder = find.descendant(
@@ -47,11 +45,8 @@ void main() {
 
       testWidgets('applies scaleFactor correctly', (tester) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const HandDrawnStatusSquare(
-              color: Colors.black,
-              scaleFactor: 2.0,
-            ),
+          testApp(
+            const HandDrawnStatusSquare(color: Colors.black, scaleFactor: 2.0),
           ),
         );
 
@@ -66,9 +61,7 @@ void main() {
 
       testWidgets('custom size is respected', (tester) async {
         await tester.pumpWidget(
-          buildApp(
-            child: const HandDrawnStatusSquare(color: Colors.black, size: 20.0),
-          ),
+          testApp(const HandDrawnStatusSquare(color: Colors.black, size: 20.0)),
         );
 
         final sizedBoxFinder = find.descendant(
@@ -84,7 +77,7 @@ void main() {
     group('tap behavior', () {
       testWidgets('no GestureDetector when onTap is null', (tester) async {
         await tester.pumpWidget(
-          buildApp(child: const HandDrawnStatusSquare(color: Colors.black)),
+          testApp(const HandDrawnStatusSquare(color: Colors.black)),
         );
 
         final detectorFinder = find.descendant(
@@ -99,8 +92,8 @@ void main() {
       ) async {
         var tapped = false;
         await tester.pumpWidget(
-          buildApp(
-            child: HandDrawnStatusSquare(
+          testApp(
+            HandDrawnStatusSquare(
               color: Colors.black,
               onTap: () => tapped = true,
             ),
@@ -121,9 +114,7 @@ void main() {
         tester,
       ) async {
         await tester.pumpWidget(
-          buildApp(
-            child: HandDrawnStatusSquare(color: Colors.black, onTap: () {}),
-          ),
+          testApp(HandDrawnStatusSquare(color: Colors.black, onTap: () {})),
         );
 
         final paddingFinder = find.descendant(
@@ -141,8 +132,8 @@ void main() {
 
       testWidgets('custom tapPadding is applied', (tester) async {
         await tester.pumpWidget(
-          buildApp(
-            child: HandDrawnStatusSquare(
+          testApp(
+            HandDrawnStatusSquare(
               color: Colors.black,
               tapPadding: 12.0,
               onTap: () {},

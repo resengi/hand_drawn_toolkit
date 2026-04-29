@@ -109,11 +109,7 @@ class _HandDrawnNotebookLinesPainter extends CustomPainter {
     required this.uniformLines,
     required this.irregularity,
     required this.segments,
-  }) {
-    if (lineHeight <= 0) {
-      throw ArgumentError.value(lineHeight, 'lineHeight', 'must be positive');
-    }
-  }
+  });
 
   final double lineHeight;
   final Color lineColor;
@@ -124,6 +120,13 @@ class _HandDrawnNotebookLinesPainter extends CustomPainter {
   final int segments;
 
   // ── Path caching ─────────────────────────────────────────────────────────
+  //
+  // The generated paths are cached on the painter instance and reused
+  // when [paint] is called multiple times on the same instance for
+  // the same size. Flutter typically constructs a new painter each
+  // rebuild, so this cache primarily helps when the painter is
+  // retained or when the parent triggers a repaint without
+  // rebuilding the [CustomPaint].
 
   List<Path>? _cachedPaths;
   Size? _lastSize;
@@ -186,17 +189,12 @@ class _HandDrawnNotebookLinesPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _HandDrawnNotebookLinesPainter old) {
-    final paramsChanged =
-        lineHeight != old.lineHeight ||
+    return lineHeight != old.lineHeight ||
         lineColor != old.lineColor ||
         strokeWidth != old.strokeWidth ||
         seed != old.seed ||
         uniformLines != old.uniformLines ||
         irregularity != old.irregularity ||
         segments != old.segments;
-    if (paramsChanged) {
-      _cachedPaths = null;
-    }
-    return paramsChanged;
   }
 }
