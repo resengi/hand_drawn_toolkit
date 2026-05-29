@@ -67,6 +67,11 @@ jobs:
 
       - name: Fetch tags
         run: git fetch --tags
+      
+      - name: Debug tag visibility
+        run: |
+          git tag --list 'v*' --sort=-v:refname
+          git describe --tags --abbrev=0 || echo "NO TAG FOUND — this is the bug"
 
       - name: Bump version (local files only — no git tag, no commit)
         run: melos version --no-git-commit-version --yes
