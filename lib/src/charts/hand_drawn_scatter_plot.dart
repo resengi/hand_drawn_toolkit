@@ -205,6 +205,59 @@ class HandDrawnScatterPlot extends StatelessWidget {
   /// derives from [labelStyle] at the chart's legend font size.
   final TextStyle? legendStyle;
 
+  /// Returns a copy of this widget with the given fields replaced.
+  /// Fields not specified retain their current value. Nullable fields
+  /// cannot be cleared via [copyWith] — construct a new
+  /// [HandDrawnScatterPlot] directly when that's needed. Follows the same
+  /// convention as [ScatterPlotData.copyWith].
+  HandDrawnScatterPlot copyWith({
+    ScatterPlotData? data,
+    double? height,
+    Color? dotColor,
+    int? seed,
+    Color? axisColor,
+    GridConfig? grid,
+    TextStyle? labelStyle,
+    double? irregularity,
+    int? segments,
+    int? yDivisions,
+    int? xDivisions,
+    EdgeInsets? padding,
+    TextStyle? titleStyle,
+    double? axisStrokeWidth,
+    TextStyle? emptyStyle,
+    String? emptyMessage,
+    bool? clipToChartArea,
+    ChartLabelConfig? xLabelConfig,
+    ChartLegendConfig? legendConfig,
+    TextStyle? legendStyle,
+    Key? key,
+  }) {
+    return HandDrawnScatterPlot(
+      data: data ?? this.data,
+      height: height ?? this.height,
+      dotColor: dotColor ?? this.dotColor,
+      seed: seed ?? this.seed,
+      axisColor: axisColor ?? this.axisColor,
+      grid: grid ?? this.grid,
+      labelStyle: labelStyle ?? this.labelStyle,
+      irregularity: irregularity ?? this.irregularity,
+      segments: segments ?? this.segments,
+      yDivisions: yDivisions ?? this.yDivisions,
+      xDivisions: xDivisions ?? this.xDivisions,
+      padding: padding ?? this.padding,
+      titleStyle: titleStyle ?? this.titleStyle,
+      axisStrokeWidth: axisStrokeWidth ?? this.axisStrokeWidth,
+      emptyStyle: emptyStyle ?? this.emptyStyle,
+      emptyMessage: emptyMessage ?? this.emptyMessage,
+      clipToChartArea: clipToChartArea ?? this.clipToChartArea,
+      xLabelConfig: xLabelConfig ?? this.xLabelConfig,
+      legendConfig: legendConfig ?? this.legendConfig,
+      legendStyle: legendStyle ?? this.legendStyle,
+      key: key ?? this.key,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return buildChartBody(

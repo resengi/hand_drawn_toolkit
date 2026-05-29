@@ -250,6 +250,67 @@ class HandDrawnTable extends StatelessWidget {
   /// Background fill color for the outer container.
   final Color backgroundColor;
 
+  /// Returns a copy of this widget with the given fields replaced.
+  /// Fields not specified retain their current value. Nullable fields
+  /// cannot be cleared via [copyWith] — construct a new
+  /// [HandDrawnTable] directly when that's needed. Follows the same
+  /// convention as [BarChartData.copyWith].
+  HandDrawnTable copyWith({
+    List<HandDrawnTableColumn>? columns,
+    List<HandDrawnTableRow>? rows,
+    String? title,
+    Color? highlightColor,
+    double? highlightAlpha,
+    TextStyle? headerStyle,
+    TextStyle? cellStyle,
+    TextStyle? titleStyle,
+    TextStyle? emptyStyle,
+    String? emptyMessage,
+    TableDividerStyle? rowDividers,
+    TableDividerStyle? columnDividers,
+    EdgeInsets? padding,
+    double? rowPadding,
+    double? titleBottomPadding,
+    TextOverflow? textOverflow,
+    int? cellMaxLines,
+    bool? softWrap,
+    bool? horizontalScroll,
+    int? seed,
+    double? irregularity,
+    double? strokeWidth,
+    Color? strokeColor,
+    Color? backgroundColor,
+    Key? key,
+  }) {
+    return HandDrawnTable(
+      columns: columns ?? this.columns,
+      rows: rows ?? this.rows,
+      title: title ?? this.title,
+      highlightColor: highlightColor ?? this.highlightColor,
+      highlightAlpha: highlightAlpha ?? this.highlightAlpha,
+      headerStyle: headerStyle ?? this.headerStyle,
+      cellStyle: cellStyle ?? this.cellStyle,
+      titleStyle: titleStyle ?? this.titleStyle,
+      emptyStyle: emptyStyle ?? this.emptyStyle,
+      emptyMessage: emptyMessage ?? this.emptyMessage,
+      rowDividers: rowDividers ?? this.rowDividers,
+      columnDividers: columnDividers ?? this.columnDividers,
+      padding: padding ?? this.padding,
+      rowPadding: rowPadding ?? this.rowPadding,
+      titleBottomPadding: titleBottomPadding ?? this.titleBottomPadding,
+      textOverflow: textOverflow ?? this.textOverflow,
+      cellMaxLines: cellMaxLines ?? this.cellMaxLines,
+      softWrap: softWrap ?? this.softWrap,
+      horizontalScroll: horizontalScroll ?? this.horizontalScroll,
+      seed: seed ?? this.seed,
+      irregularity: irregularity ?? this.irregularity,
+      strokeWidth: strokeWidth ?? this.strokeWidth,
+      strokeColor: strokeColor ?? this.strokeColor,
+      backgroundColor: backgroundColor ?? this.backgroundColor,
+      key: key ?? this.key,
+    );
+  }
+
   TextStyle get _headerStyle =>
       headerStyle ??
       const TextStyle(
