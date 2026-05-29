@@ -336,55 +336,6 @@ class HandDrawnBarChart extends StatelessWidget {
   /// standalone-widget composition pattern.
   final ChartLegendConfig legendConfig;
 
-  /// Returns a copy of this widget with the given fields replaced.
-  /// Fields not specified retain their current value. Nullable fields
-  /// cannot be cleared via [copyWith] — construct a new
-  /// [HandDrawnBarChart] directly when that's needed. Follows the same
-  /// convention as [BarChartData.copyWith].
-  HandDrawnBarChart copyWith({
-    BarChartData? data,
-    double? height,
-    int? seed,
-    Color? axisColor,
-    GridConfig? grid,
-    TextStyle? labelStyle,
-    double? irregularity,
-    int? segments,
-    int? yDivisions,
-    EdgeInsets? padding,
-    TextStyle? titleStyle,
-    TextStyle? legendStyle,
-    double? axisStrokeWidth,
-    TextStyle? emptyStyle,
-    String? emptyMessage,
-    bool? clipToChartArea,
-    ChartLabelConfig? xLabelConfig,
-    ChartLegendConfig? legendConfig,
-    Key? key,
-  }) {
-    return HandDrawnBarChart(
-      data: data ?? this.data,
-      height: height ?? this.height,
-      seed: seed ?? this.seed,
-      axisColor: axisColor ?? this.axisColor,
-      grid: grid ?? this.grid,
-      labelStyle: labelStyle ?? this.labelStyle,
-      irregularity: irregularity ?? this.irregularity,
-      segments: segments ?? this.segments,
-      yDivisions: yDivisions ?? this.yDivisions,
-      padding: padding ?? this.padding,
-      titleStyle: titleStyle ?? this.titleStyle,
-      legendStyle: legendStyle ?? this.legendStyle,
-      axisStrokeWidth: axisStrokeWidth ?? this.axisStrokeWidth,
-      emptyStyle: emptyStyle ?? this.emptyStyle,
-      emptyMessage: emptyMessage ?? this.emptyMessage,
-      clipToChartArea: clipToChartArea ?? this.clipToChartArea,
-      xLabelConfig: xLabelConfig ?? this.xLabelConfig,
-      legendConfig: legendConfig ?? this.legendConfig,
-      key: key ?? this.key,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return buildChartBody(
