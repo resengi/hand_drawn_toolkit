@@ -2,6 +2,39 @@
 
 
 
+## 2026-05-29
+
+### Changes
+
+---
+
+Packages with breaking changes:
+
+ - There are no breaking changes in this release.
+
+Packages with other changes:
+
+ - [`hand_drawn_toolkit` - `v0.4.1`](#hand_drawn_toolkit---v041)
+
+---
+
+#### `hand_drawn_toolkit` - `v0.4.1`
+
+ - **FIX**: changing some more around the melos commands ([#12](https://github.com/resengi/hand_drawn_toolkit/issues/12)). ([2217ed3b](https://github.com/resengi/hand_drawn_toolkit/commit/2217ed3bcef4575c16af2b479e316939da827b27))
+ - **FIX**: minor CI pipeline patch ([#11](https://github.com/resengi/hand_drawn_toolkit/issues/11)). ([81976960](https://github.com/resengi/hand_drawn_toolkit/commit/819769607767c84bb4d5e2b689803145dfa9858c))
+ - **FIX**: very minor feature to add a copyWith method to the charts and table ([#10](https://github.com/resengi/hand_drawn_toolkit/issues/10)). ([2ef6fc2a](https://github.com/resengi/hand_drawn_toolkit/commit/2ef6fc2a8d4a7c99b6f5878e1fda9223f2fea76d))
+ - **FEAT**: very minor feature to add a copyWith method to the charts and table" ([#9](https://github.com/resengi/hand_drawn_toolkit/issues/9)). ([93df4d99](https://github.com/resengi/hand_drawn_toolkit/commit/93df4d997a4066cbc41cc616e256c059ccfaa424))
+ - **FEAT**: very minor feature to add a copyWith method to the charts and table ([#8](https://github.com/resengi/hand_drawn_toolkit/issues/8)). ([1afb3b9f](https://github.com/resengi/hand_drawn_toolkit/commit/1afb3b9f2e51dd1d571eb59713d1ee1ef2d90846))
+
+## 0.4.1
+
+ - **FIX**: changing some more around the melos commands ([#12](https://github.com/resengi/hand_drawn_toolkit/issues/12)). ([2217ed3b](https://github.com/resengi/hand_drawn_toolkit/commit/2217ed3bcef4575c16af2b479e316939da827b27))
+ - **FIX**: minor CI pipeline patch ([#11](https://github.com/resengi/hand_drawn_toolkit/issues/11)). ([81976960](https://github.com/resengi/hand_drawn_toolkit/commit/819769607767c84bb4d5e2b689803145dfa9858c))
+ - **FIX**: very minor feature to add a copyWith method to the charts and table ([#10](https://github.com/resengi/hand_drawn_toolkit/issues/10)). ([2ef6fc2a](https://github.com/resengi/hand_drawn_toolkit/commit/2ef6fc2a8d4a7c99b6f5878e1fda9223f2fea76d))
+ - **FEAT**: very minor feature to add a copyWith method to the charts and table" ([#9](https://github.com/resengi/hand_drawn_toolkit/issues/9)). ([93df4d99](https://github.com/resengi/hand_drawn_toolkit/commit/93df4d997a4066cbc41cc616e256c059ccfaa424))
+ - **FEAT**: very minor feature to add a copyWith method to the charts and table ([#8](https://github.com/resengi/hand_drawn_toolkit/issues/8)). ([1afb3b9f](https://github.com/resengi/hand_drawn_toolkit/commit/1afb3b9f2e51dd1d571eb59713d1ee1ef2d90846))
+
+
 ## 2026-04-29
 
 ### Changes
@@ -195,6 +228,9 @@ Packages with other changes:
 - `HandDrawnContainer` — convenience widget wrapping content with a sketchy rectangular border.
 - `HandDrawnDivider` — horizontal or vertical divider with hand-drawn wobble.
 - `HandDrawnToolkitDefaults` — centralized default constants for all parameters.
+Divider` — horizontal or vertical divider with hand-drawn wobble.
+- `HandDrawnToolkitDefaults` — centralized default constants for all parameters.
+ll parameters.
 Divider` — horizontal or vertical divider with hand-drawn wobble.
 - `HandDrawnToolkitDefaults` — centralized default constants for all parameters.
 ll parameters.
