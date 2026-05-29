@@ -567,15 +567,6 @@ All chart widgets (`HandDrawnBarChart`, `HandDrawnLineChart`, `HandDrawnScatterP
 | `clipToChartArea` | `bool` | `false` | Clip data rendering to the plot area |
 | `emptyStyle` | `TextStyle?` | `null` | Empty-state message style |
 
-All three chart widgets also expose a `copyWith` method mirroring their constructor; one optional parameter per field, including `data` and `key`. It returns a new widget with the given fields replaced and the rest carried over, which is handy for threading shared styling through charts that differ only in data, swapping a single config at a width breakpoint, or re-rolling `seed`:
-
-```dart
-final base = HandDrawnLineChart(data: null, grid: GridConfig.horizontalOnly, seed: 7);
-final filled = base.copyWith(data: temperatureData);
-```
-
-Following the `BarChartData.copyWith` convention, nullable fields cannot be cleared back to `null` via `copyWith` — construct the widget directly when you need that.
-
 ### Chart Layout Bands
 
 The chart area is divided into vertical bands computed automatically:
@@ -837,8 +828,6 @@ HandDrawnTable(
 | `cellMaxLines` | `int` | `1` | Maximum number of lines per cell. Pair with `softWrap: true` to wrap long content. |
 | `softWrap` | `bool` | `false` | Whether cell text wraps at soft break points. Has no effect when `cellMaxLines` is `1`. |
 | `horizontalScroll` | `bool` | `false` | Enable horizontal scrolling |
-
-`HandDrawnTable` also exposes a `copyWith` method mirroring its constructor (one optional parameter per field, including `columns`, `rows`, and `key`) returning a new table with the given fields replaced and the rest carried over. As with the chart widgets and `BarChartData.copyWith`, nullable fields cannot be cleared back to `null` via `copyWith`; construct the table directly when you need that.
 
 ### HandDrawnTableColumn Properties
 
