@@ -2577,4 +2577,122 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  // ── copyWith ─────────────────────────────────────────────────────────
+
+  group('Chart widget copyWith', () {
+    test('HandDrawnBarChart.copyWith round-trips and overrides', () {
+      final original = HandDrawnBarChart(
+        data: barTestData(),
+        height: 250,
+        seed: 7,
+        clipToChartArea: true,
+      );
+
+      // Round trip: no args preserves every field. Widgets don't
+      // override ==, so assert field-by-field rather than via equals().
+      final copy = original.copyWith();
+      expect(copy.data, original.data);
+      expect(copy.height, original.height);
+      expect(copy.seed, original.seed);
+      expect(copy.axisColor, original.axisColor);
+      expect(copy.grid, original.grid);
+      expect(copy.labelStyle, original.labelStyle);
+      expect(copy.irregularity, original.irregularity);
+      expect(copy.segments, original.segments);
+      expect(copy.yDivisions, original.yDivisions);
+      expect(copy.padding, original.padding);
+      expect(copy.titleStyle, original.titleStyle);
+      expect(copy.legendStyle, original.legendStyle);
+      expect(copy.axisStrokeWidth, original.axisStrokeWidth);
+      expect(copy.emptyStyle, original.emptyStyle);
+      expect(copy.emptyMessage, original.emptyMessage);
+      expect(copy.clipToChartArea, original.clipToChartArea);
+      expect(copy.xLabelConfig, original.xLabelConfig);
+      expect(copy.legendConfig, original.legendConfig);
+      expect(copy.key, original.key);
+
+      // Single-field override leaves the rest untouched.
+      final reseeded = original.copyWith(seed: 99);
+      expect(reseeded.seed, 99);
+      expect(reseeded.height, original.height);
+      expect(reseeded.clipToChartArea, original.clipToChartArea);
+      expect(reseeded.data, original.data);
+    });
+
+    test('HandDrawnLineChart.copyWith round-trips and overrides', () {
+      final original = HandDrawnLineChart(
+        data: lineTestData(),
+        seed: 7,
+        yDivisions: 6,
+        xDivisions: 8,
+      );
+
+      final copy = original.copyWith();
+      expect(copy.data, original.data);
+      expect(copy.height, original.height);
+      expect(copy.seed, original.seed);
+      expect(copy.axisColor, original.axisColor);
+      expect(copy.grid, original.grid);
+      expect(copy.labelStyle, original.labelStyle);
+      expect(copy.irregularity, original.irregularity);
+      expect(copy.segments, original.segments);
+      expect(copy.yDivisions, original.yDivisions);
+      expect(copy.xDivisions, original.xDivisions);
+      expect(copy.padding, original.padding);
+      expect(copy.titleStyle, original.titleStyle);
+      expect(copy.legendStyle, original.legendStyle);
+      expect(copy.axisStrokeWidth, original.axisStrokeWidth);
+      expect(copy.emptyStyle, original.emptyStyle);
+      expect(copy.emptyMessage, original.emptyMessage);
+      expect(copy.clipToChartArea, original.clipToChartArea);
+      expect(copy.xLabelConfig, original.xLabelConfig);
+      expect(copy.legendConfig, original.legendConfig);
+      expect(copy.key, original.key);
+
+      // Override the line-specific field; confirm siblings hold.
+      final morevDivs = original.copyWith(xDivisions: 12);
+      expect(morevDivs.xDivisions, 12);
+      expect(morevDivs.yDivisions, original.yDivisions);
+      expect(morevDivs.seed, original.seed);
+      expect(morevDivs.data, original.data);
+    });
+
+    test('HandDrawnScatterPlot.copyWith round-trips and overrides', () {
+      final original = HandDrawnScatterPlot(
+        data: scatterTestData(),
+        dotColor: const Color(0xFF112233),
+        seed: 7,
+      );
+
+      final copy = original.copyWith();
+      expect(copy.data, original.data);
+      expect(copy.height, original.height);
+      expect(copy.dotColor, original.dotColor);
+      expect(copy.seed, original.seed);
+      expect(copy.axisColor, original.axisColor);
+      expect(copy.grid, original.grid);
+      expect(copy.labelStyle, original.labelStyle);
+      expect(copy.irregularity, original.irregularity);
+      expect(copy.segments, original.segments);
+      expect(copy.yDivisions, original.yDivisions);
+      expect(copy.xDivisions, original.xDivisions);
+      expect(copy.padding, original.padding);
+      expect(copy.titleStyle, original.titleStyle);
+      expect(copy.axisStrokeWidth, original.axisStrokeWidth);
+      expect(copy.emptyStyle, original.emptyStyle);
+      expect(copy.emptyMessage, original.emptyMessage);
+      expect(copy.clipToChartArea, original.clipToChartArea);
+      expect(copy.xLabelConfig, original.xLabelConfig);
+      expect(copy.legendConfig, original.legendConfig);
+      expect(copy.legendStyle, original.legendStyle);
+      expect(copy.key, original.key);
+
+      // Override the scatter-specific field; confirm siblings hold.
+      final recolored = original.copyWith(dotColor: const Color(0xFFAABBCC));
+      expect(recolored.dotColor, const Color(0xFFAABBCC));
+      expect(recolored.seed, original.seed);
+      expect(recolored.data, original.data);
+    });
+  });
 }
