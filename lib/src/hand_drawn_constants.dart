@@ -79,6 +79,7 @@ const double defaultTextFieldContentVerticalPadding = 6.0;
 
 // ── Notebook ───────────────────────────────────────────────────────────────
 
+const double defaultNotebookLineHeight = 28.0;
 const double defaultNotebookStrokeWidth = 1.0;
 const double defaultNotebookIrregularity = 1.0;
 const int defaultNotebookSegments = 30;

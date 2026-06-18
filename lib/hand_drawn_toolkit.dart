@@ -57,5 +57,6 @@ export 'src/hand_drawn_table.dart';
 export 'src/hand_drawn_text_field.dart';
 export 'src/hand_drawn_toolkit_defaults.dart';
 export 'src/hand_drawn_toolkit_helpers.dart';
-export 'src/notebook_row.dart';
+export 'src/notebook_entry.dart';
+export 'src/notebook_style.dart';
 export 'src/status_indicator.dart';
