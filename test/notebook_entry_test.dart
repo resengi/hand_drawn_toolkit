@@ -252,6 +252,37 @@ void main() {
       expect(rect.height, moreOrLessEquals(_scaleDownBand, epsilon: 0.01));
     });
 
+    testWidgets('scaleDownContentFraction sets how much of the row a scaled '
+        'widget fills', (tester) async {
+      const key = ValueKey('tall');
+      await tester.pumpWidget(
+        _host(
+          child: NotebookEntry(
+            children: [_box(key, 56, 56)],
+            fit: NotebookFit.scaleDown,
+            scaleDownContentFraction: 0.5,
+          ),
+        ),
+      );
+      // 56 -> 14 (0.5 * 28), overriding the default band.
+      expect(
+        tester.getRect(find.byKey(key)).height,
+        moreOrLessEquals(_lineHeight * 0.5, epsilon: 0.01),
+      );
+    });
+
+    test('scaleDownContentFraction must be in the range (0, 1]', () {
+      expect(
+        () => NotebookEntry(children: const ['x'], scaleDownContentFraction: 0),
+        throwsAssertionError,
+      );
+      expect(
+        () =>
+            NotebookEntry(children: const ['x'], scaleDownContentFraction: 1.5),
+        throwsAssertionError,
+      );
+    });
+
     testWidgets('clip keeps a tall widget at natural size on one row', (
       tester,
     ) async {

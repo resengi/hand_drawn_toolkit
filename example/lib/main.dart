@@ -222,7 +222,6 @@ class _JournalPageState extends State<JournalPage> {
                 child: DefaultTextStyle(
                   style: const TextStyle(
                     fontSize: _notebookFontSize,
-                    height: _notebookLineHeight / _notebookFontSize,
                     color: _ink,
                   ),
                   child: NotebookEntry(
@@ -324,11 +323,10 @@ class _JournalPageState extends State<JournalPage> {
                   child: DefaultTextStyle(
                     style: const TextStyle(
                       fontSize: _notebookFontSize,
-                      height: _notebookLineHeight / _notebookFontSize,
                       color: _ink,
                     ),
                     child: NotebookEntry(
-                      children: const [
+                      children: [
                         'First line on the grid\n'
                             'Second line sits neatly\n'
                             'Third line, same wobble',
@@ -2252,7 +2250,6 @@ Widget _notebookCard({
   required Widget entry,
   TextStyle textStyle = const TextStyle(
     fontSize: _notebookFontSize,
-    height: _notebookLineHeight / _notebookFontSize,
     color: _ink,
   ),
   double irregularity = 2.5,

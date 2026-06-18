@@ -15,12 +15,22 @@ const double _kWidthTolerance = 0.5;
 /// height constraint, in logical pixels.
 const double _kHeightTolerance = 0.01;
 
-/// The fraction of a row's height that a scaled-down *widget* may occupy.
-/// Fitting an oversized widget to this fraction (rather than the full row)
-/// leaves a little space above and below it, so a box-filling widget reads as
-/// smaller instead of touching both rules. Text is exempt — its line metrics
-/// already include leading.
+/// The default for [NotebookEntry.scaleDownContentFraction]: the fraction of a
+/// row's height that a scaled-down *widget* may occupy. Fitting an oversized
+/// widget to this fraction (rather than the full row) leaves a little space
+/// above and below it, so a box-filling widget reads as smaller instead of
+/// touching both rules. Text is exempt — its line metrics already include
+/// leading.
 const double _kScaleDownContentFraction = 0.8;
+
+/// Splits a line's height leading evenly above and below the text so glyphs sit
+/// centered in their line box. Flutter's default proportional distribution
+/// parks glyphs low in a tall line box (e.g. one inflated by a large `height`
+/// multiplier); centering them keeps inline widgets — which are centered on
+/// their own box — aligned to the visible text rather than to the line box.
+const TextHeightBehavior _kEvenLeading = TextHeightBehavior(
+  leadingDistribution: TextLeadingDistribution.even,
+);
 
 /// How a [NotebookEntry] fits a piece of content that is taller than one row.
 ///
@@ -72,12 +82,12 @@ class NotebookSpan {
 // ── Internal content pieces (not exported) ──────────────────────────────────
 
 /// One normalized unit of content: a text run, a hard break, or a widget.
-sealed class Piece {
-  const Piece();
+sealed class _Piece {
+  const _Piece();
 }
 
 /// A run of text to lay out and paint, carrying an optional layered style.
-class _TextPiece extends Piece {
+class _TextPiece extends _Piece {
   const _TextPiece(this.text, this.style);
 
   final String text;
@@ -92,7 +102,7 @@ class _TextPiece extends Piece {
 }
 
 /// A hard line break: the next piece starts on a new row.
-class _BreakPiece extends Piece {
+class _BreakPiece extends _Piece {
   const _BreakPiece();
 
   @override
@@ -103,7 +113,7 @@ class _BreakPiece extends Piece {
 }
 
 /// A widget piece, referencing its child by index into the widget list.
-class _WidgetPiece extends Piece {
+class _WidgetPiece extends _Piece {
   const _WidgetPiece(this.childIndex);
 
   final int childIndex;
@@ -125,7 +135,7 @@ class _NotebookContent {
   /// runs separated by hard breaks); a `Widget` becomes a widget piece; `''`
   /// is a no-op; any other type throws.
   factory _NotebookContent.parse(List<Object> children) {
-    final pieces = <Piece>[];
+    final pieces = <_Piece>[];
     final widgets = <Widget>[];
 
     void appendText(String text, TextStyle? style) {
@@ -159,7 +169,7 @@ class _NotebookContent {
   }
   _NotebookContent(this.pieces, this.widgets);
 
-  final List<Piece> pieces;
+  final List<_Piece> pieces;
   final List<Widget> widgets;
 }
 
@@ -212,17 +222,23 @@ class NotebookEntry extends MultiChildRenderObjectWidget {
     Key? key,
     NotebookStyle? style,
     NotebookFit fit = NotebookFit.scaleDown,
+    double scaleDownContentFraction = _kScaleDownContentFraction,
     TextAlignVertical textAlignVertical = TextAlignVertical.center,
     int minRows = 1,
     bool wrap = true,
     TextDirection? direction,
   }) {
+    assert(
+      scaleDownContentFraction > 0 && scaleDownContentFraction <= 1,
+      'scaleDownContentFraction must be in the range (0, 1].',
+    );
     final content = _NotebookContent.parse(children);
     return NotebookEntry._(
       key: key,
       pieces: content.pieces,
       style: style,
       fit: fit,
+      scaleDownContentFraction: scaleDownContentFraction,
       textAlignVertical: textAlignVertical,
       minRows: minRows,
       wrap: wrap,
@@ -232,9 +248,10 @@ class NotebookEntry extends MultiChildRenderObjectWidget {
   }
 
   const NotebookEntry._({
-    required List<Piece> pieces,
+    required List<_Piece> pieces,
     required this.style,
     required this.fit,
+    required this.scaleDownContentFraction,
     required this.textAlignVertical,
     required this.minRows,
     required this.wrap,
@@ -244,7 +261,7 @@ class NotebookEntry extends MultiChildRenderObjectWidget {
   }) : _pieces = pieces,
        assert(minRows >= 1, 'minRows must be at least 1');
 
-  final List<Piece> _pieces;
+  final List<_Piece> _pieces;
 
   /// The ruling style, or null to resolve from an enclosing [NotebookScope]
   /// (else `const NotebookStyle()`).
@@ -252,6 +269,13 @@ class NotebookEntry extends MultiChildRenderObjectWidget {
 
   /// How content taller than one row is handled.
   final NotebookFit fit;
+
+  /// Under [NotebookFit.scaleDown], the fraction of the row height an oversized
+  /// *widget* is shrunk to occupy, leaving a little margin above and below so it
+  /// reads as smaller rather than touching both rules. Must be in `(0, 1]`;
+  /// `1.0` fills the row edge to edge. Has no effect on text, or under
+  /// [NotebookFit.clip].
+  final double scaleDownContentFraction;
 
   /// Where the assembled line sits within its row.
   final TextAlignVertical textAlignVertical;
@@ -274,12 +298,13 @@ class NotebookEntry extends MultiChildRenderObjectWidget {
   @override
   RenderObject createRenderObject(BuildContext context) {
     final resolved = _resolveStyle(context);
-    return RenderNotebookEntry(
+    return _RenderNotebookEntry(
       pieces: _pieces,
       baseTextStyle: DefaultTextStyle.of(context).style,
       textDirection: _resolveDirection(context),
       textScaler: MediaQuery.textScalerOf(context),
       fit: fit,
+      scaleDownContentFraction: scaleDownContentFraction,
       textAlignVertical: textAlignVertical,
       minRows: minRows,
       wrap: wrap,
@@ -294,17 +319,17 @@ class NotebookEntry extends MultiChildRenderObjectWidget {
   }
 
   @override
-  void updateRenderObject(
-    BuildContext context,
-    covariant RenderNotebookEntry renderObject,
-  ) {
+  void updateRenderObject(BuildContext context, RenderObject renderObject) {
+    final entry = renderObject as _RenderNotebookEntry;
     final resolved = _resolveStyle(context);
-    renderObject
+
+    entry
       ..pieces = _pieces
       ..baseTextStyle = DefaultTextStyle.of(context).style
       ..textDirection = _resolveDirection(context)
       ..textScaler = MediaQuery.textScalerOf(context)
       ..fit = fit
+      ..scaleDownContentFraction = scaleDownContentFraction
       ..textAlignVertical = textAlignVertical
       ..minRows = minRows
       ..wrap = wrap
@@ -376,14 +401,15 @@ class _Fragment {
   Offset localOffset = Offset.zero;
 }
 
-class RenderNotebookEntry extends RenderBox
+class _RenderNotebookEntry extends RenderBox
     with ContainerRenderObjectMixin<RenderBox, _NotebookEntryParentData> {
-  RenderNotebookEntry({
-    required List<Piece> pieces,
+  _RenderNotebookEntry({
+    required List<_Piece> pieces,
     required TextStyle baseTextStyle,
     required TextDirection textDirection,
     required TextScaler textScaler,
     required NotebookFit fit,
+    required double scaleDownContentFraction,
     required TextAlignVertical textAlignVertical,
     required int minRows,
     required bool wrap,
@@ -399,6 +425,7 @@ class RenderNotebookEntry extends RenderBox
        _textDirection = textDirection,
        _textScaler = textScaler,
        _fit = fit,
+       _scaleDownContentFraction = scaleDownContentFraction,
        _textAlignVertical = textAlignVertical,
        _minRows = minRows,
        _wrap = wrap,
@@ -412,8 +439,8 @@ class RenderNotebookEntry extends RenderBox
 
   // ── Layout-affecting inputs (a change relays out) ─────────────────────────
 
-  List<Piece> _pieces;
-  set pieces(List<Piece> value) {
+  List<_Piece> _pieces;
+  set pieces(List<_Piece> value) {
     if (listEquals(value, _pieces)) return;
     _pieces = value;
     markNeedsLayout();
@@ -446,6 +473,13 @@ class RenderNotebookEntry extends RenderBox
   set fit(NotebookFit value) {
     if (value == _fit) return;
     _fit = value;
+    markNeedsLayout();
+  }
+
+  double _scaleDownContentFraction;
+  set scaleDownContentFraction(double value) {
+    if (value == _scaleDownContentFraction) return;
+    _scaleDownContentFraction = value;
     markNeedsLayout();
   }
 
@@ -593,7 +627,7 @@ class RenderNotebookEntry extends RenderBox
           // Scale an oversized widget down to the row's content band, not the
           // full row, so it keeps a little space above and below rather than
           // touching both rules.
-          final maxContentHeight = _lineHeight * _kScaleDownContentFraction;
+          final maxContentHeight = _lineHeight * _scaleDownContentFraction;
           final scale =
               (_fit == NotebookFit.scaleDown &&
                   natH > maxContentHeight &&
@@ -744,6 +778,7 @@ class RenderNotebookEntry extends RenderBox
       text: TextSpan(text: text, style: style),
       textDirection: _textDirection,
       textScaler: scaler,
+      textHeightBehavior: _kEvenLeading,
     )..layout(maxWidth: maxWidth);
 
     final metrics = probe.computeLineMetrics();
@@ -764,6 +799,7 @@ class RenderNotebookEntry extends RenderBox
       text: TextSpan(text: firstLine, style: style),
       textDirection: _textDirection,
       textScaler: scaler,
+      textHeightBehavior: _kEvenLeading,
     )..layout();
 
     final double width;
