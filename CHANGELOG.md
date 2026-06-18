@@ -2,6 +2,33 @@
 
 
 
+## 2026-06-18
+
+### Changes
+
+---
+
+Packages with breaking changes:
+
+ - [`hand_drawn_toolkit` - `v0.5.0`](#hand_drawn_toolkit---v050)
+
+Packages with other changes:
+
+ - There are no other changes in this release.
+
+---
+
+#### `hand_drawn_toolkit` - `v0.5.0`
+
+ - **BREAKING** **FIX**: Breaking change fix to the Notebook Row ([#13](https://github.com/resengi/hand_drawn_toolkit/issues/13)). ([0a7a534f](https://github.com/resengi/hand_drawn_toolkit/commit/0a7a534fc56bd7dc971e0abac3de53a552c835f9))
+
+## 0.5.0
+
+> Note: This release has breaking changes.
+
+ - **BREAKING** **FIX**: Breaking change fix to the Notebook Row ([#13](https://github.com/resengi/hand_drawn_toolkit/issues/13)). ([0a7a534f](https://github.com/resengi/hand_drawn_toolkit/commit/0a7a534fc56bd7dc971e0abac3de53a552c835f9))
+
+
 ## 2026-05-29
 
 ### Changes
@@ -228,6 +255,9 @@ Packages with other changes:
 - `HandDrawnContainer` — convenience widget wrapping content with a sketchy rectangular border.
 - `HandDrawnDivider` — horizontal or vertical divider with hand-drawn wobble.
 - `HandDrawnToolkitDefaults` — centralized default constants for all parameters.
+Divider` — horizontal or vertical divider with hand-drawn wobble.
+- `HandDrawnToolkitDefaults` — centralized default constants for all parameters.
+ll parameters.
 Divider` — horizontal or vertical divider with hand-drawn wobble.
 - `HandDrawnToolkitDefaults` — centralized default constants for all parameters.
 ll parameters.
