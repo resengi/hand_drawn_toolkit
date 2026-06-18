@@ -24,11 +24,11 @@ A lightweight Flutter package for rendering hand-drawn, sketchy UI elements: con
 - **Chart interaction foundation** — layout computation and typed hit-testing so consumers can build tap, hover, and drag behaviors without the package owning any interaction logic
 - Tappable status squares with check/dash indicators
 - Text fields with hand-drawn underlines
-- Notebook-paper ruled lines with grid-snapping layout primitives
+- **Notebook entries** — `HandDrawnNotebook` publishes paper/ruling style, while `NotebookEntry` lays out flowing text, styled spans, and inline widgets onto ruled rows with wrapping, hard breaks, fit modes, min rows, and interactive children
 - Smooth, organic wobble via 3-point moving average smoothing
 - Fully customizable styling (irregularity, segments, stroke width)
 - Deterministic seed-based generation — identical parameters always produce the same output
-- Internal path caching for efficient repaints
+- Path caching in the low-level painter for efficient repaints
 - Zero external dependencies — only the Flutter SDK
 
 ## Installation
@@ -72,14 +72,16 @@ HandDrawnTextField(
   hintText: 'Write something…',
 )
 
-// Notebook paper with ruled lines:
+// Notebook paper with flowing ruled content:
 HandDrawnNotebook(
   lineHeight: 28.0,
-  child: Column(
-    children: [
-      NotebookRow(lineHeight: 28.0, child: Text('First line')),
-      NotebookRow(lineHeight: 28.0, child: Text('Second line')),
-    ],
+  child: DefaultTextStyle(
+    style: const TextStyle(fontSize: 16, color: Colors.black87),
+    child: NotebookEntry(
+      children: const [
+        'First line\nSecond line',
+      ],
+    ),
   ),
 )
 
@@ -997,56 +999,94 @@ HandDrawnTextField(
 
 When a custom `style` is provided, it completely replaces the default text style built from `textColor` and `fontSize`. The hint style always uses `fontSize` and `hintColor` independently.
 
-### HandDrawnNotebook
+### HandDrawnNotebook and NotebookEntry
 
-Draws hand-drawn horizontal ruled lines behind child content, mimicking notebook paper. Pair it with `NotebookRow` to snap content to the line grid:
+`HandDrawnNotebook` represents the paper. It optionally paints a `paperColor` and publishes a `NotebookStyle` through `NotebookScope` for descendants to read. The page itself does **not** draw rules; ruled content widgets such as `NotebookEntry` read the style and paint their own rules.
+
+`NotebookEntry` is the primary notebook content widget. Give it one flowing run of mixed content (plain strings, styled `NotebookSpan`s, and inline widgets) and it lays that content onto fixed-height ruled rows. Text wraps to the available width, `\n` starts a hard new row, widgets remain whole and interactive, and the entry sizes itself to exactly the row count it needs.
 
 ```dart
 HandDrawnNotebook(
   lineHeight: 28.0,
   lineColor: Colors.grey.shade300,
-  child: Column(
-    children: [
-      NotebookRow(
-        lineHeight: 28.0,
-        child: Text(
-          'This text sits on the ruled line',
-          style: TextStyle(fontSize: 16, height: 28.0 / 16),
+  uniformLines: false,
+  child: DefaultTextStyle(
+    style: const TextStyle(fontSize: 16, color: Colors.black87),
+    child: NotebookEntry(
+      children: [
+        'Shopping list: ',
+        HandDrawnStatusSquare(
+          color: Colors.green,
+          isFilled: true,
+          indicator: StatusIndicator.check,
+          size: 16,
         ),
-      ),
+        ' eggs, ',
+        NotebookSpan(
+          'whole milk',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        ', sourdough, basil, and parmesan.',
+      ],
+    ),
+  ),
+)
+```
+
+#### Hard Breaks and Minimum Rows
+
+Embedded newlines start new ruled rows. Use `minRows` when you want extra blank ruled space below short content or an initially empty note:
+
+```dart
+NotebookEntry(
+  minRows: 3,
+  children: const [
+    'Line one\nLine two\nLine three',
+  ],
+)
+```
+
+#### Oversized Content
+
+By default, `NotebookEntry` uses `NotebookFit.scaleDown`: oversized text or widgets are scaled down so each piece fits within one row. Use `NotebookFit.clip` when you want content to keep its natural size and be cropped to the row instead:
+
+```dart
+NotebookEntry(
+  fit: NotebookFit.clip,
+  children: const [
+    'A large status square is clipped to the row: ',
+    HandDrawnStatusSquare(size: 44, color: Colors.green, isFilled: true),
+  ],
+)
+```
+
+#### Single-Line Horizontal Scrolling
+
+Set `wrap: false` to lay content on one horizontal line. The entry is not scrollable by itself, so place it in a horizontal scroll view when the content may exceed the viewport:
+
+```dart
+SingleChildScrollView(
+  scrollDirection: Axis.horizontal,
+  child: NotebookEntry(
+    wrap: false,
+    children: const [
+      'This line keeps going to the right instead of wrapping.',
     ],
   ),
 )
 ```
 
-For text to align with the ruled lines, the `TextStyle.height` must equal `lineHeight / fontSize`.
+#### Style Resolution
 
-#### Multiline Notebook Content
-For dynamic-height content like multiline text or editors, use `NotebookSnappedBlock` to ensure the content's total height remains a whole multiple of the notebook grid:
+Notebook ruling comes from the explicit `NotebookEntry(style: ...)`, then the nearest `NotebookScope` — for example one created by `HandDrawnNotebook` — then `const NotebookStyle()`. Plain text takes its base style from the ambient `DefaultTextStyle`; use `NotebookSpan` to override style for a text run.
 
-```dart
-HandDrawnNotebook(
-  lineHeight: 28.0,
-  child: NotebookSnappedBlock(
-    lineHeight: 28.0,
-    minRows: 3,
-    child: HandDrawnTextField(maxLines: null),
-  ),
-)
-```
+#### Layout Notes
 
-#### Uniform vs Unique Lines
+`NotebookEntry` wraps text to a finite width, so a wrapping entry cannot sit directly in an unbounded horizontal space such as a `Row` or horizontal scroll view. Constrain its width, or set `wrap: false` for scrollable single-line content.
 
-By default, every ruled line uses the same seed and looks identical (`uniformLines: true`). Set it to false to give each line its own wobble pattern:
+The entry owns its height: it is always `rowCount * lineHeight`. Do not force it into a fixed height with `SizedBox(height: ...)` or `Expanded`; use `minRows` when you need a taller ruled block.
 
-```dart
-HandDrawnNotebook(
-  lineHeight: 28.0,
-  uniformLines: false,
-  irregularity: 2.5,
-  child: myContent,
-)
-```
+Inline widget children are laid out with unbounded constraints. Wrap width- or height-hungry widgets in `SizedBox` or `ConstrainedBox`.
 
 ### Using HandDrawnLinePainter
 
@@ -1072,17 +1112,19 @@ CustomPaint(
 
 3. **Path assembly** — Built-in helpers (`lineHorizontal`, `lineVertical`, `rectBorder`) stitch smoothed offsets into Flutter `Path` objects. `rectBorder` uses four independent offset sets so irregularity varies around the perimeter.
 
-4. **Caching** — `HandDrawnLinePainter` and `HandDrawnNotebook` cache generated paths and only recompute when the widget size or numeric generation parameters change. Note that `buildPath` shape changes are not detected automatically; see `HandDrawnLinePainter`'s class docs for the contract.
+4. **Caching** — `HandDrawnLinePainter` caches its generated path and only recomputes when the widget size or numeric generation parameters change. Note that `buildPath` shape changes are not detected automatically; see `HandDrawnLinePainter`'s class docs for the contract.
 
-5. **Determinism** — All randomness flows through `dart:math.Random(seed)`, so identical parameters always produce identical strokes.
+5. **Notebook layout** — `HandDrawnNotebook` publishes a `NotebookStyle` and optional paper fill. `NotebookEntry` consumes that style, lays mixed content into fixed-height rows, paints one hand-drawn rule per row, exposes painted text to semantics, and keeps inline widget children interactive through ordinary Flutter hit-testing.
 
-6. **Chart geometry** — Chart layout is computed from a single canonical frame builder shared by both `paint()` and `computeLayout()`. Coordinate helpers are pure functions of immutable frame data, ensuring layout snapshots always match the rendered output. In debug, the frame builder asserts when the available height is insufficient for the configured title, axis, and legend bands; in release, the plot region is clamped so it can never invert.
+6. **Determinism** — All randomness flows through `dart:math.Random(seed)`, so identical parameters always produce identical strokes.
 
-7. **Function-series resolution** — A small internal resolver layer transforms `LineChartData` into a render-ready list of resolved series. Ordinary `LineSeriesData` passes through unchanged; `FunctionSeriesData` is uniformly sampled across `[minX, maxX]`, with non-finite samples splitting the curve into independent runs at each discontinuity. Sparse `displayPoints` are evaluated separately at the user-provided `displayXs`. The painter consumes resolved series uniformly — it doesn't need to know whether a series came from points or a function.
+7. **Chart geometry** — Chart layout is computed from a single canonical frame builder shared by both `paint()` and `computeLayout()`. Coordinate helpers are pure functions of immutable frame data, ensuring layout snapshots always match the rendered output. In debug, the frame builder asserts when the available height is insufficient for the configured title, axis, and legend bands; in release, the plot region is clamped so it can never invert.
 
-8. **Anchor-stride wobble for function curves** — Function curves use a different wobble strategy than ordinary line series. Rather than wobbling between every consecutive sample (which would over-pin a 120-vertex polyline), the painter walks the polyline in fixed strides, treating every Nth sample as a pinned anchor and wobbling the samples between anchors with a single coherent phase. Wobble amplitude is automatically capped relative to the anchor segment's length so short segments don't get overwhelmed by jitter.
+8. **Function-series resolution** — A small internal resolver layer transforms `LineChartData` into a render-ready list of resolved series. Ordinary `LineSeriesData` passes through unchanged; `FunctionSeriesData` is uniformly sampled across `[minX, maxX]`, with non-finite samples splitting the curve into independent runs at each discontinuity. Sparse `displayPoints` are evaluated separately at the user-provided `displayXs`. The painter consumes resolved series uniformly — it doesn't need to know whether a series came from points or a function.
 
-9. **Interaction foundation** — Hit-testing uses logical (non-wobbly) geometry so results are stable regardless of rendering style. Point hits take priority over segment hits in line charts, and bar hit-testing iterates in reverse paint order so the topmost segment wins.
+9. **Anchor-stride wobble for function curves** — Function curves use a different wobble strategy than ordinary line series. Rather than wobbling between every consecutive sample (which would over-pin a 120-vertex polyline), the painter walks the polyline in fixed strides, treating every Nth sample as a pinned anchor and wobbling the samples between anchors with a single coherent phase. Wobble amplitude is automatically capped relative to the anchor segment's length so short segments don't get overwhelmed by jitter.
+
+10. **Interaction foundation** — Hit-testing uses logical (non-wobbly) geometry so results are stable regardless of rendering style. Point hits take priority over segment hits in line charts, and bar hit-testing iterates in reverse paint order so the topmost segment wins.
 
 ## Best Practices
 
@@ -1107,7 +1149,7 @@ ListView.builder(
 
 **Recompute chart layouts when size changes** — `computeLayout()` returns a size-bound snapshot. Cache it if size and painter configuration are unchanged, but invalidate when either changes.
 
-**Align text to the notebook grid** by setting `TextStyle.height` to `lineHeight / fontSize`. This ensures each rendered text line occupies exactly one notebook row.
+**Use `NotebookEntry` for ruled notebook content.** Plain text, `NotebookSpan`s, and inline widgets flow together on the notebook grid without manually setting `TextStyle.height`. Let entries size themselves to their rows, use `minRows` for extra blank space, and constrain wrapping entries to a finite width.
 
 **Hoist function-series functions to top-level or static** — `FunctionSeriesData.function` is compared by closure identity. Two inline `(x) => x * x` literals compare unequal, which can defeat memoization and cause unnecessary repaints. Define the function once at top level (`double parabola(double x) => x * x;`) and pass the reference.
 
