@@ -2,7 +2,7 @@
 
 A demo app showcasing the `hand_drawn_toolkit` package. It renders a journal-style
 page that exercises every major feature: containers, dividers, status squares,
-text fields, notebooks, charts (bar, line, scatter, function-backed),
+text fields, notebook entries, charts (bar, line, scatter, function-backed),
 discontinuous functions, tables (including resizable columns), interactive
 hit-testing across every chart variant, plot-area clipping, and custom path
 building.
@@ -25,11 +25,13 @@ flutter run
 - **`HandDrawnLinePainter`** used directly with `CustomPaint` for a title
   underline via `lineHorizontal`
 - **`HandDrawnStatusSquare`** with tap-to-cycle state (empty → checked → dashed),
-  embedded in a notebook grid
+  embedded inline in a `NotebookEntry` checklist
 - **`HandDrawnTextField`** in single-line and multiline configurations
-- **`HandDrawnNotebook`** with ruled lines and `NotebookRow` grid snapping,
-  shown in both non-uniform (status-square section) and uniform
-  (notebook section) line modes
+- **`HandDrawnNotebook` + `NotebookEntry`** with ruled notebook paper and flowing
+  mixed content: plain text, `NotebookSpan`s, inline `HandDrawnStatusSquare`
+  widgets, hard line breaks, wrapping, interactive inline widgets, oversized
+  content handling via `NotebookFit.scaleDown` / `NotebookFit.clip`,
+  `wrap: false` horizontal scrolling, and `textAlignVertical` placement
 - **`HandDrawnBarChart`** in five variants:
   - Simple single-segment bars (Daily Steps)
   - Stacked bars with multiple segments per bar (Weekly Activity)
@@ -69,8 +71,8 @@ flutter run
   positive-only, negative-Y with zero-crossing, negative-X with zero-crossing,
   and a four-quadrant variant. Three of the four use variable per-point dot
   sizes via `ScatterPoint.size`.
-- **`HandDrawnTable`** with a title, row dividers, highlighted rows, and
-  mixed column alignment (flex and fixed width)
+- **`HandDrawnTable`** with a title, row dividers, column dividers, highlighted
+  rows, and mixed column alignment (flex and fixed width)
 - **Resizable table columns** built on top of `HandDrawnTable` with a
   `Stack` + drag handles, demonstrating how to extend the package's widgets
   with consumer-side interactivity
@@ -107,20 +109,25 @@ package API:
 
 1. **High-level widgets** — `HandDrawnContainer`, `HandDrawnDivider`,
    `HandDrawnStatusSquare`, `HandDrawnTextField`, `HandDrawnNotebook`,
-   `HandDrawnBarChart`, `HandDrawnLineChart`, `HandDrawnScatterPlot`,
-   `HandDrawnLegend`, and `HandDrawnTable` cover most use cases out of
-   the box.
-2. **Painter + interaction** — `HandDrawnBarChartPainter`,
+   `NotebookEntry`, `HandDrawnBarChart`, `HandDrawnLineChart`,
+   `HandDrawnScatterPlot`, `HandDrawnLegend`, and `HandDrawnTable` cover
+   most use cases out of the box.
+2. **Notebook composition** — `HandDrawnNotebook` provides the ruled-paper style,
+   while `NotebookEntry` lays out one flowing run of strings, `NotebookSpan`s,
+   and inline widgets onto ruled rows. The example shows normal wrapping, hard
+   breaks, interactive inline widgets, scale-down vs. clip behavior, horizontal
+   scrolling with `wrap: false`, and vertical row alignment.
+3. **Painter + interaction** — `HandDrawnBarChartPainter`,
    `HandDrawnLineChartPainter`, and `HandDrawnScatterPlotPainter` are used
    with `CustomPaint` inside `LayoutBuilder` and `GestureDetector` to
    demonstrate `computeLayout()` and `hitTest()` for consumer-owned
    tap behavior.
-3. **Stateful composition** — `_ResizableTableDemo` wraps `HandDrawnTable`
+4. **Stateful composition** — `_ResizableTableDemo` wraps `HandDrawnTable`
    in a `Stack` with drag handles to show how to layer interactivity on
    top of a high-level widget without modifying the package.
-4. **Mid-level painter** — `HandDrawnLinePainter` with a built-in helper
+5. **Mid-level painter** — `HandDrawnLinePainter` with a built-in helper
    (`lineHorizontal`) draws the title underline.
-5. **Low-level path building** — a `buildPath` callback calls
+6. **Low-level path building** — a `buildPath` callback calls
    `smoothedOffsets()` directly to construct a custom diagonal line.
 
 This layered approach mirrors how you would use the package in a real app:

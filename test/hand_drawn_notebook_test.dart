@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
 
@@ -6,165 +6,184 @@ import 'test_utils.dart';
 
 void main() {
   group('HandDrawnNotebook', () {
-    group('rendering', () {
-      testWidgets('renders without error with required params', (tester) async {
+    group('content', () {
+      testWidgets('renders its child', (tester) async {
         await tester.pumpWidget(
-          testApp(
-            const HandDrawnNotebook(lineHeight: 28.0, child: Text('Hello')),
-          ),
+          testApp(const HandDrawnNotebook(child: Text('Paper content'))),
         );
 
-        expect(find.byType(HandDrawnNotebook), findsOneWidget);
+        expect(find.text('Paper content'), findsOneWidget);
       });
 
-      testWidgets('renders child content', (tester) async {
+      testWidgets('accepts all parameters without error', (tester) async {
         await tester.pumpWidget(
           testApp(
             const HandDrawnNotebook(
-              lineHeight: 28.0,
-              child: Text('Notebook text'),
-            ),
-          ),
-        );
-
-        expect(find.text('Notebook text'), findsOneWidget);
-      });
-
-      testWidgets('uses CustomPaint with painter (not foregroundPainter)', (
-        tester,
-      ) async {
-        await tester.pumpWidget(
-          testApp(
-            const HandDrawnNotebook(
-              lineHeight: 28.0,
-              child: SizedBox(height: 100),
-            ),
-          ),
-        );
-
-        final customPaintFinder = find.descendant(
-          of: find.byType(HandDrawnNotebook),
-          matching: find.byType(CustomPaint),
-        );
-        // Find the first CustomPaint — the one HandDrawnNotebook creates.
-        final customPaint = tester.widget<CustomPaint>(customPaintFinder.first);
-        expect(customPaint.painter, isNotNull);
-        expect(customPaint.foregroundPainter, isNull);
-      });
-
-      testWidgets('inner SizedBox has width double.infinity', (tester) async {
-        await tester.pumpWidget(
-          testApp(
-            const HandDrawnNotebook(lineHeight: 28.0, child: Text('Test')),
-          ),
-        );
-
-        final sizedBoxFinder = find.descendant(
-          of: find.byType(HandDrawnNotebook),
-          matching: find.byType(SizedBox),
-        );
-        final sizedBox = tester.widget<SizedBox>(sizedBoxFinder);
-        expect(sizedBox.width, double.infinity);
-      });
-    });
-
-    group('bottom padding', () {
-      testWidgets('default strokeWidth produces correct bottom padding', (
-        tester,
-      ) async {
-        await tester.pumpWidget(
-          testApp(
-            const HandDrawnNotebook(lineHeight: 28.0, child: Text('Test')),
-          ),
-        );
-
-        final paddingFinder = find.descendant(
-          of: find.byType(HandDrawnNotebook),
-          matching: find.byType(Padding),
-        );
-        final padding = tester.widget<Padding>(paddingFinder);
-        expect(
-          padding.padding,
-          const EdgeInsets.only(bottom: HandDrawnDefaults.notebookStrokeWidth),
-        );
-      });
-
-      testWidgets('custom strokeWidth changes bottom padding', (tester) async {
-        await tester.pumpWidget(
-          testApp(
-            const HandDrawnNotebook(
-              lineHeight: 28.0,
-              strokeWidth: 2.5,
-              child: Text('Test'),
-            ),
-          ),
-        );
-
-        final paddingFinder = find.descendant(
-          of: find.byType(HandDrawnNotebook),
-          matching: find.byType(Padding),
-        );
-        final padding = tester.widget<Padding>(paddingFinder);
-        expect(padding.padding, const EdgeInsets.only(bottom: 2.5));
-      });
-    });
-
-    group('parameter acceptance', () {
-      testWidgets('accepts all optional parameters without error', (
-        tester,
-      ) async {
-        await tester.pumpWidget(
-          testApp(
-            const HandDrawnNotebook(
-              lineHeight: 32.0,
-              lineColor: Colors.red,
-              strokeWidth: 2.0,
-              seed: 99,
+              lineHeight: 32,
+              lineColor: Color(0xFF112233),
+              strokeWidth: 2,
+              seed: 9,
               uniformLines: false,
-              irregularity: 3.0,
-              segments: 50,
-              child: SizedBox(height: 200),
+              irregularity: 3,
+              segments: 40,
+              paperColor: Color(0xFFEFEFEF),
+              child: SizedBox(height: 80),
             ),
           ),
         );
 
+        expect(tester.takeException(), isNull);
         expect(find.byType(HandDrawnNotebook), findsOneWidget);
       });
     });
 
-    group('defaults', () {
-      test('notebookStrokeWidth is 1.0', () {
-        expect(HandDrawnDefaults.notebookStrokeWidth, 1.0);
+    group('paper', () {
+      testWidgets('paints paper with the default color', (tester) async {
+        await tester.pumpWidget(
+          const HandDrawnNotebook(child: SizedBox(height: 50)),
+        );
+
+        final coloredBox = tester.widget<ColoredBox>(
+          find.descendant(
+            of: find.byType(HandDrawnNotebook),
+            matching: find.byType(ColoredBox),
+          ),
+        );
+        expect(coloredBox.color, const Color(0xFFFCFAF5));
       });
 
-      test('notebookIrregularity is 1.0', () {
-        expect(HandDrawnDefaults.notebookIrregularity, 1.0);
+      testWidgets('paints paper with a custom color', (tester) async {
+        await tester.pumpWidget(
+          const HandDrawnNotebook(
+            paperColor: Color(0xFF010203),
+            child: SizedBox(height: 50),
+          ),
+        );
+
+        final coloredBox = tester.widget<ColoredBox>(
+          find.descendant(
+            of: find.byType(HandDrawnNotebook),
+            matching: find.byType(ColoredBox),
+          ),
+        );
+        expect(coloredBox.color, const Color(0xFF010203));
       });
 
-      test('notebookSegments is 30', () {
-        expect(HandDrawnDefaults.notebookSegments, 30);
+      testWidgets('paints no paper when paperColor is null', (tester) async {
+        await tester.pumpWidget(
+          const HandDrawnNotebook(
+            paperColor: null,
+            child: SizedBox(height: 50),
+          ),
+        );
+
+        expect(
+          find.descendant(
+            of: find.byType(HandDrawnNotebook),
+            matching: find.byType(ColoredBox),
+          ),
+          findsNothing,
+        );
+      });
+
+      testWidgets('paints no ruled lines', (tester) async {
+        await tester.pumpWidget(
+          const HandDrawnNotebook(child: SizedBox(height: 100)),
+        );
+
+        expect(
+          find.descendant(
+            of: find.byType(HandDrawnNotebook),
+            matching: find.byType(CustomPaint),
+          ),
+          findsNothing,
+        );
       });
     });
 
-    group('lineHeight validation', () {
-      test('rejects lineHeight of zero', () {
-        // The assert fires in the const widget constructor (debug mode),
-        // before any widget tree processing.
-        expect(
-          () => HandDrawnNotebook(lineHeight: 0, child: const Text('test')),
-          throwsA(isA<AssertionError>()),
-        );
-      });
-
-      testWidgets('accepts positive lineHeight', (tester) async {
+    group('published style', () {
+      testWidgets('publishes the default style when no parameters are given', (
+        tester,
+      ) async {
+        NotebookStyle? captured;
         await tester.pumpWidget(
-          const MaterialApp(
-            home: Scaffold(
-              body: HandDrawnNotebook(lineHeight: 28.0, child: Text('test')),
+          HandDrawnNotebook(
+            child: Builder(
+              builder: (context) {
+                captured = NotebookScope.maybeOf(context);
+                return const SizedBox();
+              },
             ),
           ),
         );
-        expect(tester.takeException(), isNull);
+
+        expect(captured, const NotebookStyle());
+      });
+
+      testWidgets('publishes a style assembled from its parameters', (
+        tester,
+      ) async {
+        NotebookStyle? captured;
+        await tester.pumpWidget(
+          HandDrawnNotebook(
+            lineHeight: 30,
+            lineColor: const Color(0xFF112233),
+            strokeWidth: 2,
+            seed: 7,
+            uniformLines: false,
+            irregularity: 3,
+            segments: 40,
+            child: Builder(
+              builder: (context) {
+                captured = NotebookScope.maybeOf(context);
+                return const SizedBox();
+              },
+            ),
+          ),
+        );
+
+        expect(
+          captured,
+          const NotebookStyle(
+            lineHeight: 30,
+            lineColor: Color(0xFF112233),
+            strokeWidth: 2,
+            seed: 7,
+            uniformLines: false,
+            irregularity: 3,
+            segments: 40,
+          ),
+        );
+      });
+    });
+
+    group('parameter validation', () {
+      test('asserts on non-positive lineHeight', () {
+        expect(
+          () => HandDrawnNotebook(lineHeight: 0, child: const SizedBox()),
+          throwsAssertionError,
+        );
+      });
+
+      test('asserts on non-positive strokeWidth', () {
+        expect(
+          () => HandDrawnNotebook(strokeWidth: 0, child: const SizedBox()),
+          throwsAssertionError,
+        );
+      });
+
+      test('asserts on non-positive segments', () {
+        expect(
+          () => HandDrawnNotebook(segments: 0, child: const SizedBox()),
+          throwsAssertionError,
+        );
+      });
+
+      test('asserts on negative irregularity', () {
+        expect(
+          () => HandDrawnNotebook(irregularity: -1, child: const SizedBox()),
+          throwsAssertionError,
+        );
       });
     });
   });

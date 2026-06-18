@@ -1,75 +1,65 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 
 import 'hand_drawn_toolkit_defaults.dart';
-import 'hand_drawn_toolkit_helpers.dart';
+import 'notebook_style.dart';
 
-/// Draws hand-drawn horizontal ruled lines at [lineHeight] intervals behind
-/// child content, mimicking notebook paper.
+/// Notebook paper: a colored page that publishes a [NotebookStyle] to the
+/// notebook content placed on it.
 ///
-/// For a [Text] widget with `style: TextStyle(fontSize: f, height: h)`,
-/// pass `f * h` as [lineHeight] and the lines will align with text
-/// baselines.
+/// [HandDrawnNotebook] does two things. It fills its area with [paperColor]
+/// (pass null for no fill), and it publishes a [NotebookStyle] — assembled from
+/// the ruling parameters below — to its descendants through a [NotebookScope].
+/// The page itself draws no rules; content reads the published style and paints
+/// its own.
+///
+/// Set the ruling once here and it applies to every descendant that reads it:
 ///
 /// ```dart
 /// HandDrawnNotebook(
-///   lineHeight: 28.0,
-///   lineColor: Colors.grey.shade300,
-///   child: Text(
-///     'Dear diary…',
-///     style: TextStyle(fontSize: 16, height: 28.0 / 16),
-///   ),
+///   lineHeight: 32,
+///   lineColor: Color(0xFFBDBDBD),
+///   child: myNotebookContent,
 /// )
 /// ```
 ///
-/// ## Uniform vs unique lines
-///
-/// By default every ruled line uses the same [seed] and looks identical
-/// ([uniformLines] = true). Set [uniformLines] to false to give each line
-/// its own wobble pattern: line *n* (zero-indexed) uses `seed + n`, so the
-/// result is unique per line but still deterministic for a given [seed].
-///
-/// ## Deterministic rendering
-///
-/// The line shapes are fully determined by [seed], [segments], and
-/// [irregularity]. Identical parameters always produce the same ruled
-/// lines, so the page won't shift during rebuilds or animations.
+/// The page sizes itself to [child]. To cover a larger region, size the
+/// notebook (for example with a surrounding [SizedBox] or by giving [child] a
+/// size).
 class HandDrawnNotebook extends StatelessWidget {
-  /// Creates a notebook-paper background with hand-drawn ruled lines.
+  /// Creates notebook paper that publishes a [NotebookStyle] to [child].
   const HandDrawnNotebook({
     required this.child,
-    required this.lineHeight,
+    this.lineHeight = HandDrawnDefaults.notebookLineHeight,
     this.lineColor = HandDrawnDefaults.notebookLineColor,
     this.strokeWidth = HandDrawnDefaults.notebookStrokeWidth,
     this.seed = HandDrawnDefaults.seed,
     this.uniformLines = true,
     this.irregularity = HandDrawnDefaults.notebookIrregularity,
     this.segments = HandDrawnDefaults.notebookSegments,
+    this.paperColor = const Color(0xFFFCFAF5),
     super.key,
-  }) : assert(lineHeight > 0, 'lineHeight must be positive');
+  }) : assert(lineHeight > 0, 'lineHeight must be positive'),
+       assert(strokeWidth > 0, 'strokeWidth must be positive'),
+       assert(segments > 0, 'segments must be positive'),
+       assert(irregularity >= 0, 'irregularity must be non-negative');
 
-  /// The content displayed on top of the ruled lines.
+  /// The content placed on the page.
   final Widget child;
 
-  /// Pixel height of one grid row. Must equal the wrapped text's
-  /// `fontSize * TextStyle.height` for lines to align.
+  /// The row height (rule spacing) published to descendants.
   final double lineHeight;
 
-  /// The color of the ruled lines.
+  /// The color of the ruled lines published to descendants.
   final Color lineColor;
 
   /// The width of each ruled line stroke in logical pixels.
   final double strokeWidth;
 
   /// The base random seed for deterministic line generation.
-  ///
-  /// When [uniformLines] is true, every line uses this seed. When false,
-  /// line *n* (zero-indexed) uses `seed + n`.
   final int seed;
 
-  /// Whether every ruled line should look identical.
-  ///
-  /// When true, all lines share the same wobble pattern. When false, each
-  /// line gets a unique pattern derived from [seed].
+  /// Whether every ruled line should look identical. When false, the line at
+  /// row index *n* uses `seed + n`.
   final bool uniformLines;
 
   /// The roughness of the hand-drawn wobble on each ruled line.
@@ -78,123 +68,28 @@ class HandDrawnNotebook extends StatelessWidget {
   /// The number of linear segments used to draw each ruled line.
   final int segments;
 
+  /// The paper fill color. When null, no paper is painted.
+  final Color? paperColor;
+
   @override
   Widget build(BuildContext context) {
-    // Bottom padding extends the canvas past the last line so it is not
-    // clipped at the widget edge.
-    return CustomPaint(
-      painter: _HandDrawnNotebookLinesPainter(
-        lineHeight: lineHeight,
-        lineColor: lineColor,
-        strokeWidth: strokeWidth,
-        seed: seed,
-        uniformLines: uniformLines,
-        irregularity: irregularity,
-        segments: segments,
-      ),
-      child: Padding(
-        padding: EdgeInsets.only(bottom: strokeWidth),
-        child: SizedBox(width: double.infinity, child: child),
-      ),
+    final style = NotebookStyle(
+      lineHeight: lineHeight,
+      lineColor: lineColor,
+      strokeWidth: strokeWidth,
+      seed: seed,
+      uniformLines: uniformLines,
+      irregularity: irregularity,
+      segments: segments,
     );
-  }
-}
 
-class _HandDrawnNotebookLinesPainter extends CustomPainter {
-  _HandDrawnNotebookLinesPainter({
-    required this.lineHeight,
-    required this.lineColor,
-    required this.strokeWidth,
-    required this.seed,
-    required this.uniformLines,
-    required this.irregularity,
-    required this.segments,
-  });
+    Widget result = NotebookScope(style: style, child: child);
 
-  final double lineHeight;
-  final Color lineColor;
-  final double strokeWidth;
-  final int seed;
-  final bool uniformLines;
-  final double irregularity;
-  final int segments;
-
-  // ── Path caching ─────────────────────────────────────────────────────────
-  //
-  // The generated paths are cached on the painter instance and reused
-  // when [paint] is called multiple times on the same instance for
-  // the same size. Flutter typically constructs a new painter each
-  // rebuild, so this cache primarily helps when the painter is
-  // retained or when the parent triggers a repaint without
-  // rebuilding the [CustomPaint].
-
-  List<Path>? _cachedPaths;
-  Size? _lastSize;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (size.height < 1) return;
-
-    final paint = Paint()
-      ..color = lineColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    // Use round() so that a single-line text whose rendered height is
-    // very close to (but not exactly equal to) lineHeight still gets
-    // its ruled line.
-    final int lineCount = (size.height / lineHeight).round();
-    if (lineCount < 1) return;
-
-    if (_cachedPaths == null || _lastSize != size) {
-      _buildPaths(size, lineCount);
-      _lastSize = size;
+    final paperColor = this.paperColor;
+    if (paperColor != null) {
+      result = ColoredBox(color: paperColor, child: result);
     }
 
-    // The line size uses height 0 so the path wobbles around y=0.
-    // Canvas translation positions each line at its correct row.
-    final paths = _cachedPaths!;
-    for (int i = 0; i < lineCount; i++) {
-      final y = (i + 1) * lineHeight;
-      canvas.save();
-      canvas.translate(0, y);
-      canvas.drawPath(paths[uniformLines ? 0 : i], paint);
-      canvas.restore();
-    }
-  }
-
-  void _buildPaths(Size size, int lineCount) {
-    final lineSize = Size(size.width, 0);
-
-    if (uniformLines) {
-      final helpers = HandDrawnHelpers(
-        seed: seed,
-        irregularity: irregularity,
-        segments: segments,
-      );
-      _cachedPaths = [helpers.lineHorizontal(lineSize)];
-    } else {
-      _cachedPaths = List.generate(lineCount, (i) {
-        final helpers = HandDrawnHelpers(
-          seed: seed + i,
-          irregularity: irregularity,
-          segments: segments,
-        );
-        return helpers.lineHorizontal(lineSize);
-      });
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _HandDrawnNotebookLinesPainter old) {
-    return lineHeight != old.lineHeight ||
-        lineColor != old.lineColor ||
-        strokeWidth != old.strokeWidth ||
-        seed != old.seed ||
-        uniformLines != old.uniformLines ||
-        irregularity != old.irregularity ||
-        segments != old.segments;
+    return result;
   }
 }

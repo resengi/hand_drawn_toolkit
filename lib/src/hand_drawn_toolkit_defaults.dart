@@ -138,17 +138,20 @@ abstract final class HandDrawnDefaults {
 
   // ── Notebook defaults ──────────────────────────────────────────────────
 
-  /// Default stroke width for [HandDrawnNotebook] ruled lines.
+  /// Default row height (rule spacing) for notebook ruling.
+  static const double notebookLineHeight = defaultNotebookLineHeight;
+
+  /// Default stroke width for notebook ruled lines.
   static const double notebookStrokeWidth = defaultNotebookStrokeWidth;
 
-  /// Default irregularity for [HandDrawnNotebook] ruled lines. Subtle
-  /// wobble appropriate for full-width horizontal strokes.
+  /// Default irregularity for notebook ruled lines. Subtle wobble appropriate
+  /// for full-width horizontal strokes.
   static const double notebookIrregularity = defaultNotebookIrregularity;
 
-  /// Default segment count for [HandDrawnNotebook] ruled lines.
+  /// Default segment count for notebook ruled lines.
   static const int notebookSegments = defaultNotebookSegments;
 
-  /// Default color for [HandDrawnNotebook] ruled lines.
+  /// Default color for notebook ruled lines.
   static const Color notebookLineColor = defaultNotebookLineColor;
 
   // ── Chart defaults ──────────────────────────────────────────────────
