@@ -24,7 +24,7 @@ A lightweight Flutter package for rendering hand-drawn, sketchy UI elements: con
 - **Chart interaction foundation** — layout computation and typed hit-testing so consumers can build tap, hover, and drag behaviors without the package owning any interaction logic
 - Tappable status squares with check/dash indicators
 - Text fields with hand-drawn underlines
-- **Notebook entries** — `HandDrawnNotebook` publishes paper/ruling style, while `NotebookEntry` lays out flowing text, styled spans, and inline widgets onto ruled rows with wrapping, hard breaks, fit modes, min rows, and interactive children
+- **Notebook entries** — `HandDrawnNotebook` publishes paper, ruling, and page-margin style, while `NotebookEntry` lays out flowing text, styled spans, and inline widgets onto ruled rows with wrapping, hard breaks, Word-ruler indents (hanging indents, hanging markers, first-line paragraph indents), fit modes, min rows, and interactive children
 - Smooth, organic wobble via 3-point moving average smoothing
 - Fully customizable styling (irregularity, segments, stroke width)
 - Deterministic seed-based generation — identical parameters always produce the same output
@@ -37,7 +37,7 @@ Add the package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  hand_drawn_toolkit: ^0.5.0
+  hand_drawn_toolkit: ^0.6.0
 ```
 
 Then run:
@@ -75,6 +75,7 @@ HandDrawnTextField(
 // Notebook paper with flowing ruled content:
 HandDrawnNotebook(
   lineHeight: 28.0,
+  leadingMargin: 24.0,
   child: DefaultTextStyle(
     style: const TextStyle(fontSize: 16, color: Colors.black87),
     child: NotebookEntry(
@@ -1001,7 +1002,7 @@ When a custom `style` is provided, it completely replaces the default text style
 
 ### HandDrawnNotebook and NotebookEntry
 
-`HandDrawnNotebook` represents the paper. It optionally paints a `paperColor` and publishes a `NotebookStyle` through `NotebookScope` for descendants to read. The page itself does **not** draw rules; ruled content widgets such as `NotebookEntry` read the style and paint their own rules.
+`HandDrawnNotebook` represents the paper. It optionally paints a `paperColor` and publishes a `NotebookStyle` — ruling plus page margins — through `NotebookScope` for descendants to read. The page itself does **not** draw rules; ruled content widgets such as `NotebookEntry` read the style and paint their own rules.
 
 `NotebookEntry` is the primary notebook content widget. Give it one flowing run of mixed content (plain strings, styled `NotebookSpan`s, and inline widgets) and it lays that content onto fixed-height ruled rows. Text wraps to the available width, `\n` starts a hard new row, widgets remain whole and interactive, and the entry sizes itself to exactly the row count it needs.
 
@@ -1046,6 +1047,40 @@ NotebookEntry(
 )
 ```
 
+#### Page Margins and Indents
+
+Where writing begins follows the Word ruler model. `leadingMargin` and `trailingMargin` — set once on the notebook (or on any `NotebookStyle`) — bound the writable span of every entry on the page. On each entry, `indent` moves every row's start in from the leading margin, and `firstRowIndent` positions row 0 independently. None of this affects the rules: they always span the entry's full width, passing beneath the margins and indents, exactly like the ruling on real paper.
+
+`firstRowIndent` defaults to following `indent`, which yields a uniform hanging indent — wrapped rows return to the same start as row 0. Set it *below* `indent` to hang a marker (a list number, a checkbox) toward the margin while wrapped rows align under the text, or *above* `indent` for a classic first-line paragraph indent.
+
+Hierarchies compose as one entry per item, stacked flush so the ruling stays continuous down the page. A blank ruled line is itself an entry (`children: const []`), not layout spacing:
+
+```dart
+HandDrawnNotebook(
+  leadingMargin: 24,
+  child: Column(
+    children: [
+      NotebookEntry(
+        children: const ['Plans for the day, written to the margins.'],
+      ),
+      NotebookEntry(children: const []), // one blank ruled row
+      NotebookEntry(
+        indent: 20,
+        firstRowIndent: 0,
+        children: const ['1. A numbered item; wraps align under the text.'],
+      ),
+      NotebookEntry(
+        indent: 40,
+        firstRowIndent: 20,
+        children: const ['- A sub-point, one step deeper.'],
+      ),
+    ],
+  ),
+)
+```
+
+Both margins and indents are direction-aware: under a right-to-left ambient `Directionality`, the leading edge is the right edge and everything mirrors automatically. In `wrap: false` mode, rows still begin at the leading margin plus the indent, while `trailingMargin` has no effect — it is a wrap limit, and nothing wraps.
+
 #### Oversized Content
 
 By default, `NotebookEntry` uses `NotebookFit.scaleDown`: oversized text or widgets are scaled down so each piece fits within one row. Use `NotebookFit.clip` when you want content to keep its natural size and be cropped to the row instead:
@@ -1078,7 +1113,7 @@ SingleChildScrollView(
 
 #### Style Resolution
 
-Notebook ruling comes from the explicit `NotebookEntry(style: ...)`, then the nearest `NotebookScope` — for example one created by `HandDrawnNotebook` — then `const NotebookStyle()`. Plain text takes its base style from the ambient `DefaultTextStyle`; use `NotebookSpan` to override style for a text run.
+Notebook ruling and page margins come from the explicit `NotebookEntry(style: ...)`, then the nearest `NotebookScope` — for example one created by `HandDrawnNotebook` — then `const NotebookStyle()`. Plain text takes its base style from the ambient `DefaultTextStyle`; use `NotebookSpan` to override style for a text run.
 
 #### Layout Notes
 
@@ -1087,6 +1122,8 @@ Notebook ruling comes from the explicit `NotebookEntry(style: ...)`, then the ne
 The entry owns its height: it is always `rowCount * lineHeight`. Do not force it into a fixed height with `SizedBox(height: ...)` or `Expanded`; use `minRows` when you need a taller ruled block.
 
 Inline widget children are laid out with unbounded constraints. Wrap width- or height-hungry widgets in `SizedBox` or `ConstrainedBox`.
+
+When stacking several entries on one notebook, keep them flush: a blank ruled line is an empty entry (`children: const []`), not a `SizedBox` gap, so the ruling stays in phase down the page.
 
 ### Using HandDrawnLinePainter
 
@@ -1114,7 +1151,7 @@ CustomPaint(
 
 4. **Caching** — `HandDrawnLinePainter` caches its generated path and only recomputes when the widget size or numeric generation parameters change. Note that `buildPath` shape changes are not detected automatically; see `HandDrawnLinePainter`'s class docs for the contract.
 
-5. **Notebook layout** — `HandDrawnNotebook` publishes a `NotebookStyle` and optional paper fill. `NotebookEntry` consumes that style, lays mixed content into fixed-height rows, paints one hand-drawn rule per row, exposes painted text to semantics, and keeps inline widget children interactive through ordinary Flutter hit-testing.
+5. **Notebook layout** — `HandDrawnNotebook` publishes a `NotebookStyle` and optional paper fill. `NotebookEntry` consumes that style, lays mixed content into fixed-height rows between the style's margins and the entry's indents, paints one hand-drawn rule per row spanning the entry's full width, exposes painted text to semantics, and keeps inline widget children interactive through ordinary Flutter hit-testing.
 
 6. **Determinism** — All randomness flows through `dart:math.Random(seed)`, so identical parameters always produce identical strokes.
 
@@ -1147,9 +1184,9 @@ ListView.builder(
 
 **Keep segment count reasonable** — 20–30 segments is the sweet spot for most use cases. Going above 50 adds computation without visible improvement at typical widget sizes.
 
-**Recompute chart layouts when size changes** — `computeLayout()` returns a size-bound snapshot. Cache it if size and painter configuration are unchanged, but invalidate when either changes.
+**Recompute chart layouts when size changes** — `computeLayout()` returns a size-bound snapshot. Cache it if size and painter configuration are unchanged, but invalidate when either changes (the same conditions that trigger `shouldRepaint`).
 
-**Use `NotebookEntry` for ruled notebook content.** Plain text, `NotebookSpan`s, and inline widgets flow together on the notebook grid without manually setting `TextStyle.height`. Let entries size themselves to their rows, use `minRows` for extra blank space, and constrain wrapping entries to a finite width.
+**Use `NotebookEntry` for ruled notebook content.** Plain text, `NotebookSpan`s, and inline widgets flow together on the notebook grid without manually setting `TextStyle.height`. Let entries size themselves to their rows, use `minRows` for extra blank space, and constrain wrapping entries to a finite width. Set page margins once on the notebook, give list items an `indent` (with a lower `firstRowIndent` to hang the marker), and compose hierarchies as one entry per item, stacked flush.
 
 **Hoist function-series functions to top-level or static** — `FunctionSeriesData.function` is compared by closure identity. Two inline `(x) => x * x` literals compare unequal, which can defeat memoization and cause unnecessary repaints. Define the function once at top level (`double parabola(double x) => x * x;`) and pass the reference.
 

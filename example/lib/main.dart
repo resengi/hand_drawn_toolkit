@@ -356,7 +356,10 @@ class _JournalPageState extends State<JournalPage> {
               const Text(
                 'A NotebookEntry lays one flowing run of text, styled spans, and '
                 'inline widgets onto the ruled lines. It sizes itself to its '
-                'content, wrapping text across as many lines as it needs.',
+                'content, wrapping text across as many lines as it needs. Page '
+                'margins on the notebook and Word-ruler indents on each entry '
+                'govern where the writing starts; the rules always span the '
+                'full page beneath them.',
                 style: TextStyle(fontSize: 14, height: 1.55, color: _inkLight),
               ),
               const SizedBox(height: 16),
@@ -433,7 +436,139 @@ class _JournalPageState extends State<JournalPage> {
               ),
               const SizedBox(height: 20),
 
-              // 4. scaleDown — oversized widget.
+              // 4. Page margins.
+              _caption(
+                'Margins on the notebook bound where writing goes — the '
+                'rules still run edge to edge beneath them.',
+              ),
+              _notebookCard(
+                seed: 102,
+                ruleSeed: 36,
+                leadingMargin: 24,
+                trailingMargin: 24,
+                entry: NotebookEntry(
+                  children: const [
+                    'Both margins hold the writing in from the page edges, '
+                        'and wrapped lines respect them too, while every '
+                        'rule still spans the full width of the paper.',
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 5. Hanging indent.
+              _caption(
+                'indent moves every row in from the leading margin — '
+                'wrapped rows hold the same indent.',
+              ),
+              _notebookCard(
+                seed: 103,
+                ruleSeed: 38,
+                entry: NotebookEntry(
+                  indent: 28,
+                  children: const [
+                    'An indented entry keeps its edge on every row, so a '
+                        'long wrapping sentence like this one stays aligned '
+                        'while the rules pass beneath the gap.',
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 6. First-row indent: hanging marker.
+              _caption(
+                'firstRowIndent positions row 0 on its own. Below indent, '
+                'it hangs a marker at the margin while wraps align under '
+                'the text.',
+              ),
+              _notebookCard(
+                seed: 104,
+                ruleSeed: 40,
+                entry: NotebookEntry(
+                  indent: 26,
+                  firstRowIndent: 0,
+                  children: const [
+                    HandDrawnStatusSquare(
+                      color: _accent,
+                      isFilled: true,
+                      indicator: StatusIndicator.check,
+                      size: 16,
+                    ),
+                    '  The checkbox hangs at the margin; every wrapped row '
+                        'of this item lines up under the text instead of '
+                        'under the box.',
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 7. First-row indent: paragraph opening.
+              _caption(
+                'Above indent, firstRowIndent gives a classic first-line '
+                'paragraph indent.',
+              ),
+              _notebookCard(
+                seed: 105,
+                ruleSeed: 42,
+                entry: NotebookEntry(
+                  firstRowIndent: 28,
+                  children: const [
+                    'Only the opening line of this paragraph steps in from '
+                        'the margin; every following row returns to the '
+                        'edge, just like a typeset book.',
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 8. Composing a page from flush entries.
+              _caption(
+                'A page composes as a flush stack of entries on one '
+                'notebook: a paragraph, a blank ruled row (an empty '
+                'entry), numbered items with hanging markers, and a '
+                'deeper sub-point.',
+              ),
+              _notebookCard(
+                seed: 106,
+                ruleSeed: 44,
+                leadingMargin: 20,
+                entry: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    NotebookEntry(
+                      children: const [
+                        'Plans for today, in paragraph form, wrapping '
+                            'within the page margins like any note.',
+                      ],
+                    ),
+                    NotebookEntry(children: const []),
+                    NotebookEntry(
+                      indent: 22,
+                      firstRowIndent: 0,
+                      children: const [
+                        '1.  Water the tomatoes before it gets hot, and '
+                            'check on the basil while out there.',
+                      ],
+                    ),
+                    NotebookEntry(
+                      indent: 22,
+                      firstRowIndent: 0,
+                      children: const ['2.  Return the library books.'],
+                    ),
+                    NotebookEntry(
+                      indent: 44,
+                      firstRowIndent: 22,
+                      children: const [
+                        '-  The two novels are due; the atlas can renew '
+                            'online.',
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 9. scaleDown — oversized widget.
               _caption(
                 'Default fit (scaleDown): an oversized inline widget is scaled '
                 'down to one line.',
@@ -455,7 +590,7 @@ class _JournalPageState extends State<JournalPage> {
               ),
               const SizedBox(height: 20),
 
-              // 5. clip — oversized widget.
+              // 10. clip — oversized widget.
               _caption(
                 'fit: clip — the same oversized widget is cropped to the line '
                 'height instead of scaled.',
@@ -478,7 +613,7 @@ class _JournalPageState extends State<JournalPage> {
               ),
               const SizedBox(height: 20),
 
-              // 6. scaleDown — oversized text.
+              // 11. scaleDown — oversized text.
               _caption(
                 'scaleDown also shrinks oversized text to fit the line.',
               ),
@@ -492,7 +627,7 @@ class _JournalPageState extends State<JournalPage> {
               ),
               const SizedBox(height: 20),
 
-              // 7. clip — oversized text.
+              // 12. clip — oversized text.
               _caption(
                 'fit: clip crops oversized text to the line height instead.',
               ),
@@ -507,7 +642,7 @@ class _JournalPageState extends State<JournalPage> {
               ),
               const SizedBox(height: 20),
 
-              // 8. wrap: false — single line, horizontal scroll.
+              // 13. wrap: false — single line, horizontal scroll.
               _caption(
                 'wrap: false keeps everything on one line; place it in a '
                 'horizontal scroll view to scroll the overflow.',
@@ -530,7 +665,7 @@ class _JournalPageState extends State<JournalPage> {
 
               const SizedBox(height: 20),
 
-              // 9–11. Vertical alignment of a short line within its row.
+              // 14–16. Vertical alignment of a short line within its row.
               _caption(
                 'textAlignVertical positions a short line within its taller '
                 'row. (When the line fills the row, there is nothing to '
@@ -2253,6 +2388,8 @@ Widget _notebookCard({
     color: _ink,
   ),
   double irregularity = 2.5,
+  double leadingMargin = 0,
+  double trailingMargin = 0,
 }) {
   return HandDrawnContainer(
     backgroundColor: _cardFill,
@@ -2268,6 +2405,8 @@ Widget _notebookCard({
       lineColor: const Color(0xFFB0AAA0),
       irregularity: irregularity,
       seed: ruleSeed,
+      leadingMargin: leadingMargin,
+      trailingMargin: trailingMargin,
       child: DefaultTextStyle(style: textStyle, child: entry),
     ),
   );

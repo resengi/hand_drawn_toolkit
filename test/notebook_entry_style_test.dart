@@ -13,6 +13,8 @@ void main() {
       expect(style.uniformLines, isTrue);
       expect(style.irregularity, HandDrawnDefaults.notebookIrregularity);
       expect(style.segments, HandDrawnDefaults.notebookSegments);
+      expect(style.leadingMargin, 0.0);
+      expect(style.trailingMargin, 0.0);
     });
 
     group('validation', () {
@@ -31,6 +33,28 @@ void main() {
       test('asserts on negative irregularity', () {
         expect(() => NotebookStyle(irregularity: -1), throwsAssertionError);
       });
+
+      test('asserts on a negative leadingMargin', () {
+        expect(() => NotebookStyle(leadingMargin: -1), throwsAssertionError);
+      });
+
+      test('asserts on a non-finite leadingMargin', () {
+        expect(
+          () => NotebookStyle(leadingMargin: double.infinity),
+          throwsAssertionError,
+        );
+      });
+
+      test('asserts on a negative trailingMargin', () {
+        expect(() => NotebookStyle(trailingMargin: -1), throwsAssertionError);
+      });
+
+      test('asserts on a non-finite trailingMargin', () {
+        expect(
+          () => NotebookStyle(trailingMargin: double.infinity),
+          throwsAssertionError,
+        );
+      });
     });
 
     group('copyWith', () {
@@ -45,6 +69,20 @@ void main() {
         expect(updated.uniformLines, original.uniformLines);
         expect(updated.irregularity, original.irregularity);
         expect(updated.segments, original.segments);
+        expect(updated.leadingMargin, original.leadingMargin);
+        expect(updated.trailingMargin, original.trailingMargin);
+      });
+
+      test('replaces the margins independently', () {
+        const original = NotebookStyle(leadingMargin: 10, trailingMargin: 20);
+
+        final leading = original.copyWith(leadingMargin: 30);
+        expect(leading.leadingMargin, 30);
+        expect(leading.trailingMargin, 20);
+
+        final trailing = original.copyWith(trailingMargin: 40);
+        expect(trailing.leadingMargin, 10);
+        expect(trailing.trailingMargin, 40);
       });
 
       test('with no arguments equals the original', () {
@@ -65,6 +103,17 @@ void main() {
         expect(
           const NotebookStyle(lineHeight: 30),
           isNot(const NotebookStyle(lineHeight: 31)),
+        );
+      });
+
+      test('styles with different margins are not equal', () {
+        expect(
+          const NotebookStyle(leadingMargin: 10),
+          isNot(const NotebookStyle(leadingMargin: 11)),
+        );
+        expect(
+          const NotebookStyle(trailingMargin: 10),
+          isNot(const NotebookStyle(trailingMargin: 11)),
         );
       });
 
@@ -151,6 +200,19 @@ void main() {
       );
       const newScope = NotebookScope(
         style: NotebookStyle(lineHeight: 30),
+        child: SizedBox(),
+      );
+
+      expect(newScope.updateShouldNotify(oldScope), isTrue);
+    });
+
+    test('updateShouldNotify is true when a margin changes', () {
+      const oldScope = NotebookScope(
+        style: NotebookStyle(leadingMargin: 10),
+        child: SizedBox(),
+      );
+      const newScope = NotebookScope(
+        style: NotebookStyle(leadingMargin: 20),
         child: SizedBox(),
       );
 

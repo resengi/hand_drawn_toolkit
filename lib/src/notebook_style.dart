@@ -2,25 +2,28 @@ import 'package:flutter/widgets.dart';
 
 import 'hand_drawn_toolkit_defaults.dart';
 
-/// An immutable description of notebook ruling: how the hand-drawn rules look
-/// and how far apart they sit.
+/// An immutable description of notebook ruling and margins: how the
+/// hand-drawn rules look, how far apart they sit, and where content may be
+/// written between the page edges.
 ///
-/// A [NotebookStyle] carries ruling values only. It performs no painting,
-/// layout, or widget building — it exists to bundle these values, validate
+/// A [NotebookStyle] carries these values only. It performs no painting,
+/// layout, or widget building — it exists to bundle the values, validate
 /// them, and support comparison and overriding via [copyWith] and value
 /// equality.
 ///
 /// [lineHeight] is the row height: the vertical distance from one rule to the
-/// next, and the unit content is laid onto. Every other property describes the
-/// appearance of the hand-drawn rules.
+/// next, and the unit content is laid onto. [leadingMargin] and
+/// [trailingMargin] bound where content is written on each row; the rules are
+/// unaffected by them and span the full width beneath. Every other property
+/// describes the appearance of the hand-drawn rules.
 ///
 /// ```dart
-/// const style = NotebookStyle(lineHeight: 32, lineColor: Color(0xFFBDBDBD));
+/// const style = NotebookStyle(lineHeight: 32, leadingMargin: 24);
 /// final bolder = style.copyWith(strokeWidth: 2.0);
 /// ```
 @immutable
 class NotebookStyle {
-  /// Creates a notebook ruling style.
+  /// Creates a notebook style.
   ///
   /// All properties have defaults, so `const NotebookStyle()` is a valid,
   /// fully-specified style.
@@ -32,10 +35,20 @@ class NotebookStyle {
     this.uniformLines = true,
     this.irregularity = HandDrawnDefaults.notebookIrregularity,
     this.segments = HandDrawnDefaults.notebookSegments,
+    this.leadingMargin = HandDrawnDefaults.notebookLeadingMargin,
+    this.trailingMargin = HandDrawnDefaults.notebookTrailingMargin,
   }) : assert(lineHeight > 0, 'lineHeight must be positive'),
        assert(strokeWidth > 0, 'strokeWidth must be positive'),
        assert(segments > 0, 'segments must be positive'),
-       assert(irregularity >= 0, 'irregularity must be non-negative');
+       assert(irregularity >= 0, 'irregularity must be non-negative'),
+       assert(
+         leadingMargin >= 0 && leadingMargin < double.infinity,
+         'leadingMargin must be non-negative and finite',
+       ),
+       assert(
+         trailingMargin >= 0 && trailingMargin < double.infinity,
+         'trailingMargin must be non-negative and finite',
+       );
 
   /// The row height: the vertical distance between consecutive rules, in
   /// logical pixels.
@@ -65,6 +78,24 @@ class NotebookStyle {
   /// The number of linear segments used to draw each ruled line.
   final int segments;
 
+  /// The distance from the leading edge at which content begins, in logical
+  /// pixels.
+  ///
+  /// Content on every row starts at this offset (an entry's indent is added
+  /// on top of it), while the rules span the full width beneath the margin.
+  /// Direction-aware: under a right-to-left text direction the leading edge
+  /// is the right edge.
+  final double leadingMargin;
+
+  /// The distance from the trailing edge before which content wraps, in
+  /// logical pixels.
+  ///
+  /// Content wraps rather than crossing this margin, while the rules span the
+  /// full width beneath it. It has no effect on an entry laid out on a single
+  /// line (`wrap: false`), where nothing wraps. Direction-aware: under a
+  /// right-to-left text direction the trailing edge is the left edge.
+  final double trailingMargin;
+
   /// Returns a copy of this style with the given fields replaced.
   NotebookStyle copyWith({
     double? lineHeight,
@@ -74,6 +105,8 @@ class NotebookStyle {
     bool? uniformLines,
     double? irregularity,
     int? segments,
+    double? leadingMargin,
+    double? trailingMargin,
   }) {
     return NotebookStyle(
       lineHeight: lineHeight ?? this.lineHeight,
@@ -83,6 +116,8 @@ class NotebookStyle {
       uniformLines: uniformLines ?? this.uniformLines,
       irregularity: irregularity ?? this.irregularity,
       segments: segments ?? this.segments,
+      leadingMargin: leadingMargin ?? this.leadingMargin,
+      trailingMargin: trailingMargin ?? this.trailingMargin,
     );
   }
 
@@ -96,7 +131,9 @@ class NotebookStyle {
         other.seed == seed &&
         other.uniformLines == uniformLines &&
         other.irregularity == irregularity &&
-        other.segments == segments;
+        other.segments == segments &&
+        other.leadingMargin == leadingMargin &&
+        other.trailingMargin == trailingMargin;
   }
 
   @override
@@ -108,13 +145,15 @@ class NotebookStyle {
     uniformLines,
     irregularity,
     segments,
+    leadingMargin,
+    trailingMargin,
   );
 }
 
 /// Publishes a [NotebookStyle] to descendant widgets.
 ///
 /// Descendants read the nearest enclosing style with [maybeOf] or [of], so they
-/// can resolve ruling without being passed a style explicitly. The scope holds
+/// can resolve the style without being passed one explicitly. The scope holds
 /// a single [NotebookStyle] and notifies dependents when that style changes by
 /// value.
 class NotebookScope extends InheritedWidget {

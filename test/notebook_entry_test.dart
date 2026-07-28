@@ -442,6 +442,492 @@ void main() {
     });
   });
 
+  group('indent', () {
+    testWidgets('row 0 starts at the indent', (tester) async {
+      const key = ValueKey('lead');
+      await tester.pumpWidget(
+        _host(child: NotebookEntry(children: [_box(key, 20, 20)], indent: 24)),
+      );
+      final entryRect = tester.getRect(find.byType(NotebookEntry));
+      expect(entryRect.width, 300);
+      expect(entryRect.height, _lineHeight);
+      expect(
+        tester.getTopLeft(find.byKey(key)).dx - entryRect.left,
+        moreOrLessEquals(24, epsilon: 0.01),
+      );
+    });
+
+    testWidgets('a hard-break row starts at the indent', (tester) async {
+      const a = ValueKey('a');
+      const b = ValueKey('b');
+      await tester.pumpWidget(
+        _host(
+          child: NotebookEntry(
+            children: [_box(a, 20, 20), '\n', _box(b, 20, 20)],
+            indent: 24,
+          ),
+        ),
+      );
+      final topLeft = tester.getTopLeft(find.byType(NotebookEntry));
+      expect(
+        tester.getTopLeft(find.byKey(b)).dx - topLeft.dx,
+        moreOrLessEquals(24, epsilon: 0.01),
+      );
+      expect(
+        tester.getTopLeft(find.byKey(b)).dy - topLeft.dy,
+        greaterThanOrEqualTo(_lineHeight),
+      );
+    });
+
+    testWidgets('a row created by widget overflow starts at the indent', (
+      tester,
+    ) async {
+      const a = ValueKey('a');
+      const b = ValueKey('b');
+      await tester.pumpWidget(
+        _host(
+          child: NotebookEntry(
+            children: [_box(a, 200, 20), _box(b, 200, 20)],
+            indent: 24,
+          ),
+        ),
+      );
+      final topLeft = tester.getTopLeft(find.byType(NotebookEntry));
+      expect(
+        tester.getTopLeft(find.byKey(a)).dx - topLeft.dx,
+        moreOrLessEquals(24, epsilon: 0.01),
+      );
+      expect(
+        tester.getTopLeft(find.byKey(b)).dx - topLeft.dx,
+        moreOrLessEquals(24, epsilon: 0.01),
+      );
+      expect(
+        tester.getTopLeft(find.byKey(b)).dy - topLeft.dy,
+        greaterThanOrEqualTo(_lineHeight),
+      );
+    });
+
+    testWidgets('wrapped rows keep the same available width as row 0', (
+      tester,
+    ) async {
+      // A hanging indent shrinks every row's writable span equally, so the
+      // same text breaks identically to an un-indented entry whose width *is*
+      // that span.
+      await tester.pumpWidget(
+        _host(width: 100, child: NotebookEntry(children: const [_mergeText])),
+      );
+      final control = tester.getSize(find.byType(NotebookEntry)).height;
+
+      await tester.pumpWidget(
+        _host(child: NotebookEntry(children: const [_mergeText], indent: 200)),
+      );
+      expect(tester.getSize(find.byType(NotebookEntry)).height, control);
+      expect(tester.getSize(find.byType(NotebookEntry)).width, 300);
+    });
+
+    testWidgets('RTL applies the indent from the right edge', (tester) async {
+      const key = ValueKey('lead');
+      await tester.pumpWidget(
+        _host(
+          direction: TextDirection.rtl,
+          child: NotebookEntry(children: [_box(key, 20, 20), 'x'], indent: 24),
+        ),
+      );
+      // Entry width 300, box width 20, leading offset 24 -> x = 300 - 24 - 20.
+      final dx =
+          tester.getTopLeft(find.byKey(key)).dx -
+          tester.getTopLeft(find.byType(NotebookEntry)).dx;
+      expect(dx, moreOrLessEquals(256, epsilon: 0.01));
+    });
+  });
+
+  group('firstRowIndent', () {
+    testWidgets('positions row 0 independently of later rows', (tester) async {
+      const a = ValueKey('a');
+      const b = ValueKey('b');
+      await tester.pumpWidget(
+        _host(
+          child: NotebookEntry(
+            children: [_box(a, 20, 20), '\n', _box(b, 20, 20)],
+            indent: 10,
+            firstRowIndent: 40,
+          ),
+        ),
+      );
+      final topLeft = tester.getTopLeft(find.byType(NotebookEntry));
+      expect(
+        tester.getTopLeft(find.byKey(a)).dx - topLeft.dx,
+        moreOrLessEquals(40, epsilon: 0.01),
+      );
+      expect(
+        tester.getTopLeft(find.byKey(b)).dx - topLeft.dx,
+        moreOrLessEquals(10, epsilon: 0.01),
+      );
+    });
+
+    testWidgets('hangs a marker while wrapped content aligns deeper', (
+      tester,
+    ) async {
+      const marker = ValueKey('marker');
+      const body = ValueKey('body');
+      await tester.pumpWidget(
+        _host(
+          child: NotebookEntry(
+            children: [_box(marker, 20, 20), _box(body, 290, 20)],
+            indent: 30,
+            firstRowIndent: 0,
+          ),
+        ),
+      );
+      final topLeft = tester.getTopLeft(find.byType(NotebookEntry));
+      // The marker sits on row 0 at the leading edge...
+      expect(
+        tester.getTopLeft(find.byKey(marker)).dx - topLeft.dx,
+        moreOrLessEquals(0, epsilon: 0.01),
+      );
+      expect(
+        tester.getTopLeft(find.byKey(marker)).dy - topLeft.dy,
+        lessThan(_lineHeight),
+      );
+      // ...and the overflowing body wraps to row 1 at the indent.
+      expect(
+        tester.getTopLeft(find.byKey(body)).dx - topLeft.dx,
+        moreOrLessEquals(30, epsilon: 0.01),
+      );
+      expect(
+        tester.getTopLeft(find.byKey(body)).dy - topLeft.dy,
+        greaterThanOrEqualTo(_lineHeight),
+      );
+    });
+
+    testWidgets('an explicit zero differs from leaving it unset', (
+      tester,
+    ) async {
+      const key = ValueKey('lead');
+      await tester.pumpWidget(
+        _host(child: NotebookEntry(children: [_box(key, 20, 20)], indent: 30)),
+      );
+      final unsetDx =
+          tester.getTopLeft(find.byKey(key)).dx -
+          tester.getTopLeft(find.byType(NotebookEntry)).dx;
+      expect(unsetDx, moreOrLessEquals(30, epsilon: 0.01));
+
+      await tester.pumpWidget(
+        _host(
+          child: NotebookEntry(
+            children: [_box(key, 20, 20)],
+            indent: 30,
+            firstRowIndent: 0,
+          ),
+        ),
+      );
+      final explicitDx =
+          tester.getTopLeft(find.byKey(key)).dx -
+          tester.getTopLeft(find.byType(NotebookEntry)).dx;
+      expect(explicitDx, moreOrLessEquals(0, epsilon: 0.01));
+    });
+  });
+
+  group('margins', () {
+    testWidgets('a leading margin from the scope shifts where rows start', (
+      tester,
+    ) async {
+      const key = ValueKey('lead');
+      await tester.pumpWidget(
+        _host(
+          child: NotebookScope(
+            style: const NotebookStyle(leadingMargin: 16),
+            child: NotebookEntry(children: [_box(key, 20, 20)]),
+          ),
+        ),
+      );
+      final entryRect = tester.getRect(find.byType(NotebookEntry));
+      expect(entryRect.width, 300);
+      expect(
+        tester.getTopLeft(find.byKey(key)).dx - entryRect.left,
+        moreOrLessEquals(16, epsilon: 0.01),
+      );
+    });
+
+    testWidgets('an entry indent adds on top of the leading margin', (
+      tester,
+    ) async {
+      const key = ValueKey('lead');
+      await tester.pumpWidget(
+        _host(
+          child: NotebookScope(
+            style: const NotebookStyle(leadingMargin: 16),
+            child: NotebookEntry(children: [_box(key, 20, 20)], indent: 10),
+          ),
+        ),
+      );
+      final dx =
+          tester.getTopLeft(find.byKey(key)).dx -
+          tester.getTopLeft(find.byType(NotebookEntry)).dx;
+      expect(dx, moreOrLessEquals(26, epsilon: 0.01));
+    });
+
+    testWidgets('HandDrawnNotebook margins reach its entries', (tester) async {
+      const key = ValueKey('lead');
+      await tester.pumpWidget(
+        _host(
+          child: HandDrawnNotebook(
+            leadingMargin: 16,
+            child: NotebookEntry(children: [_box(key, 20, 20)]),
+          ),
+        ),
+      );
+      final dx =
+          tester.getTopLeft(find.byKey(key)).dx -
+          tester.getTopLeft(find.byType(NotebookEntry)).dx;
+      expect(dx, moreOrLessEquals(16, epsilon: 0.01));
+    });
+
+    testWidgets('an explicit entry style overrides the scope margins', (
+      tester,
+    ) async {
+      const key = ValueKey('lead');
+      await tester.pumpWidget(
+        _host(
+          child: NotebookScope(
+            style: const NotebookStyle(leadingMargin: 40),
+            child: NotebookEntry(
+              children: [_box(key, 20, 20)],
+              style: const NotebookStyle(leadingMargin: 5),
+            ),
+          ),
+        ),
+      );
+      final dx =
+          tester.getTopLeft(find.byKey(key)).dx -
+          tester.getTopLeft(find.byType(NotebookEntry)).dx;
+      expect(dx, moreOrLessEquals(5, epsilon: 0.01));
+    });
+
+    testWidgets('the trailing margin wraps content that would cross it', (
+      tester,
+    ) async {
+      const a = ValueKey('a');
+      const b = ValueKey('b');
+
+      // Without a trailing margin, both boxes share row 0.
+      await tester.pumpWidget(
+        _host(
+          child: NotebookEntry(children: [_box(a, 250, 20), _box(b, 30, 20)]),
+        ),
+      );
+      expect(tester.getSize(find.byType(NotebookEntry)).height, _lineHeight);
+
+      // With one, the second box wraps to row 1 instead of crossing it.
+      await tester.pumpWidget(
+        _host(
+          child: NotebookEntry(
+            children: [_box(a, 250, 20), _box(b, 30, 20)],
+            style: const NotebookStyle(trailingMargin: 30),
+          ),
+        ),
+      );
+      final entryRect = tester.getRect(find.byType(NotebookEntry));
+      expect(entryRect.width, 300);
+      expect(entryRect.height, 2 * _lineHeight);
+      expect(
+        tester.getTopLeft(find.byKey(b)).dy - entryRect.top,
+        greaterThanOrEqualTo(_lineHeight),
+      );
+    });
+
+    testWidgets('margins shrink the writable span like a narrower entry', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _host(width: 100, child: NotebookEntry(children: const [_mergeText])),
+      );
+      final control = tester.getSize(find.byType(NotebookEntry)).height;
+
+      await tester.pumpWidget(
+        _host(
+          child: NotebookEntry(
+            children: const [_mergeText],
+            style: const NotebookStyle(leadingMargin: 200),
+          ),
+        ),
+      );
+      expect(tester.getSize(find.byType(NotebookEntry)).height, control);
+
+      await tester.pumpWidget(
+        _host(
+          child: NotebookEntry(
+            children: const [_mergeText],
+            style: const NotebookStyle(trailingMargin: 200),
+          ),
+        ),
+      );
+      expect(tester.getSize(find.byType(NotebookEntry)).height, control);
+    });
+
+    testWidgets('minRows padding rows are unaffected by margins', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _host(
+          child: NotebookEntry(
+            children: const [],
+            minRows: 3,
+            style: const NotebookStyle(leadingMargin: 40, trailingMargin: 40),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      expect(
+        tester.getSize(find.byType(NotebookEntry)).height,
+        3 * _lineHeight,
+      );
+    });
+  });
+
+  group('indent interactions', () {
+    testWidgets('a tappable child at an indent receives taps where it '
+        'renders', (tester) async {
+      var tapped = false;
+      await tester.pumpWidget(
+        _host(
+          child: NotebookEntry(
+            indent: 40,
+            children: [
+              HandDrawnStatusSquare(
+                color: const Color(0xFF2E7D32),
+                onTap: () => tapped = true,
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.tap(find.byType(HandDrawnStatusSquare));
+      expect(tapped, isTrue);
+    });
+
+    testWidgets('scaleDown behaves the same at an indented row start', (
+      tester,
+    ) async {
+      const key = ValueKey('tall');
+      await tester.pumpWidget(
+        _host(child: NotebookEntry(children: [_box(key, 56, 56)], indent: 24)),
+      );
+      final entryRect = tester.getRect(find.byType(NotebookEntry));
+      expect(entryRect.height, _lineHeight);
+      final rect = tester.getRect(find.byKey(key));
+      expect(rect.height, moreOrLessEquals(_scaleDownBand, epsilon: 0.01));
+      expect(rect.left - entryRect.left, moreOrLessEquals(24, epsilon: 0.01));
+    });
+
+    testWidgets(
+      'wrap:false rows start at the indent and the trailing margin is inert',
+      (tester) async {
+        const key = ValueKey('lead');
+        await tester.pumpWidget(
+          _host(
+            child: OverflowBox(
+              minWidth: 0,
+              maxWidth: double.infinity,
+              minHeight: 0,
+              maxHeight: double.infinity,
+              alignment: Alignment.topLeft,
+              child: NotebookEntry(
+                wrap: false,
+                indent: 24,
+                style: const NotebookStyle(trailingMargin: 50),
+                children: [_box(key, 20, 20)],
+              ),
+            ),
+          ),
+        );
+        expect(tester.takeException(), isNull);
+        final entryRect = tester.getRect(find.byType(NotebookEntry));
+        expect(entryRect.width, moreOrLessEquals(44, epsilon: 0.01));
+        expect(
+          tester.getTopLeft(find.byKey(key)).dx - entryRect.left,
+          moreOrLessEquals(24, epsilon: 0.01),
+        );
+      },
+    );
+  });
+
+  group('degenerate margins and indents', () {
+    testWidgets('a leading margin consuming the row still lays out', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _host(
+          child: NotebookEntry(
+            children: const ['Hi'],
+            style: const NotebookStyle(leadingMargin: 300),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      final size = tester.getSize(find.byType(NotebookEntry));
+      expect(size.width, 300);
+      expect(size.height, greaterThanOrEqualTo(_lineHeight));
+    });
+
+    testWidgets('a trailing margin consuming the row still lays out', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _host(
+          child: NotebookEntry(
+            children: const ['Hi'],
+            style: const NotebookStyle(trailingMargin: 300),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      final size = tester.getSize(find.byType(NotebookEntry));
+      expect(size.width, 300);
+      expect(size.height, greaterThanOrEqualTo(_lineHeight));
+    });
+
+    testWidgets('an indent past the entry width still lays out', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _host(child: NotebookEntry(children: const ['Hi'], indent: 500)),
+      );
+      expect(tester.takeException(), isNull);
+      expect(tester.getSize(find.byType(NotebookEntry)).width, 300);
+    });
+  });
+
+  group('indent validation', () {
+    test('rejects a negative indent', () {
+      expect(
+        () => NotebookEntry(children: const ['x'], indent: -1),
+        throwsAssertionError,
+      );
+    });
+
+    test('rejects a non-finite indent', () {
+      expect(
+        () => NotebookEntry(children: const ['x'], indent: double.infinity),
+        throwsAssertionError,
+      );
+    });
+
+    test('rejects a negative firstRowIndent', () {
+      expect(
+        () => NotebookEntry(children: const ['x'], firstRowIndent: -1),
+        throwsAssertionError,
+      );
+    });
+
+    test('rejects a non-finite firstRowIndent', () {
+      expect(
+        () => NotebookEntry(children: const ['x'], firstRowIndent: double.nan),
+        throwsAssertionError,
+      );
+    });
+  });
+
   group('horizontal flow (wrap: false)', () {
     testWidgets('unbounded width while wrapping throws', (tester) async {
       await tester.pumpWidget(
