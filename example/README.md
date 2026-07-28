@@ -2,7 +2,8 @@
 
 A demo app showcasing the `hand_drawn_toolkit` package. It renders a journal-style
 page that exercises every major feature: containers, dividers, status squares,
-text fields, notebook entries, charts (bar, line, scatter, function-backed),
+text fields, notebook entries (with page margins and Word-ruler indents),
+charts (bar, line, scatter, function-backed),
 discontinuous functions, tables (including resizable columns), interactive
 hit-testing across every chart variant, plot-area clipping, and custom path
 building.
@@ -29,7 +30,10 @@ flutter run
 - **`HandDrawnTextField`** in single-line and multiline configurations
 - **`HandDrawnNotebook` + `NotebookEntry`** with ruled notebook paper and flowing
   mixed content: plain text, `NotebookSpan`s, inline `HandDrawnStatusSquare`
-  widgets, hard line breaks, wrapping, interactive inline widgets, oversized
+  widgets, hard line breaks, wrapping, page margins with edge-to-edge rules,
+  hanging indents via `indent`, hanging markers and first-line paragraph
+  indents via `firstRowIndent`, blank ruled rows from empty entries, a page
+  composed as a flush stack of entries, interactive inline widgets, oversized
   content handling via `NotebookFit.scaleDown` / `NotebookFit.clip`,
   `wrap: false` horizontal scrolling, and `textAlignVertical` placement
 - **`HandDrawnBarChart`** in five variants:
@@ -115,8 +119,10 @@ package API:
 2. **Notebook composition** — `HandDrawnNotebook` provides the ruled-paper style,
    while `NotebookEntry` lays out one flowing run of strings, `NotebookSpan`s,
    and inline widgets onto ruled rows. The example shows normal wrapping, hard
-   breaks, interactive inline widgets, scale-down vs. clip behavior, horizontal
-   scrolling with `wrap: false`, and vertical row alignment.
+   breaks, page margins, hanging and first-row indents, a page composed from
+   flush stacked entries, interactive inline widgets, scale-down vs. clip
+   behavior, horizontal scrolling with `wrap: false`, and vertical row
+   alignment.
 3. **Painter + interaction** — `HandDrawnBarChartPainter`,
    `HandDrawnLineChartPainter`, and `HandDrawnScatterPlotPainter` are used
    with `CustomPaint` inside `LayoutBuilder` and `GestureDetector` to

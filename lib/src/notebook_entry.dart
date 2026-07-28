@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show listEquals;
+import 'package:flutter/foundation.dart' show clampDouble, listEquals;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
@@ -188,17 +188,38 @@ class _NotebookContent {
 /// supplies a height; the entry sizes itself to the rows it creates, and a
 /// forced external height is unsupported.
 ///
-/// Ruling (line height, color, wobble) comes from a [NotebookStyle], resolved
-/// from the explicit [style], else an enclosing [NotebookScope], else
-/// `const NotebookStyle()`. Plain text takes its base style from the ambient
-/// [DefaultTextStyle].
+/// Ruling (line height, color, wobble) and page margins come from a
+/// [NotebookStyle], resolved from the explicit [style], else an enclosing
+/// [NotebookScope], else `const NotebookStyle()`. Plain text takes its base
+/// style from the ambient [DefaultTextStyle].
+///
+/// Where writing begins on a row follows the Word ruler model. The resolved
+/// style's margins bound the writable span of the page; [indent] moves every
+/// row's start deeper in from the leading margin, and [firstRowIndent]
+/// positions row 0 independently — set it below [indent] to hang a marker
+/// (say, a list number) toward the margin while wrapped rows align under the
+/// text, or above [indent] for a first-line paragraph indent. None of this
+/// affects the rules: they always span the entry's full width, passing
+/// beneath the margins and indents.
 ///
 /// ```dart
 /// HandDrawnNotebook(
-///   child: NotebookEntry(
+///   leadingMargin: 24,
+///   child: Column(
 ///     children: [
-///       HandDrawnStatusSquare(color: Colors.green),
-///       ' Buy eggs, milk, and a very long list of groceries',
+///       NotebookEntry(
+///         children: ['Plans for the day, written to the margins.'],
+///       ),
+///       NotebookEntry(
+///         indent: 20,
+///         firstRowIndent: 0,
+///         children: ['1. A numbered item; wraps align under the text.'],
+///       ),
+///       NotebookEntry(
+///         indent: 40,
+///         firstRowIndent: 20,
+///         children: ['- A sub-point, one step deeper.'],
+///       ),
 ///     ],
 ///   ),
 /// )
@@ -216,7 +237,9 @@ class NotebookEntry extends MultiChildRenderObjectWidget {
   /// Creates a notebook entry from a run of mixed [children].
   ///
   /// Each element must be a `String`, a [NotebookSpan], or a `Widget`; any other
-  /// type throws an [ArgumentError]. [minRows] must be at least 1.
+  /// type throws an [ArgumentError]. [minRows] must be at least 1. [indent]
+  /// and [firstRowIndent] must be non-negative and finite; a null
+  /// [firstRowIndent] follows [indent].
   factory NotebookEntry({
     required List<Object> children,
     Key? key,
@@ -227,10 +250,21 @@ class NotebookEntry extends MultiChildRenderObjectWidget {
     int minRows = 1,
     bool wrap = true,
     TextDirection? direction,
+    double indent = 0,
+    double? firstRowIndent,
   }) {
     assert(
       scaleDownContentFraction > 0 && scaleDownContentFraction <= 1,
       'scaleDownContentFraction must be in the range (0, 1].',
+    );
+    assert(
+      indent >= 0 && indent < double.infinity,
+      'indent must be non-negative and finite.',
+    );
+    assert(
+      firstRowIndent == null ||
+          (firstRowIndent >= 0 && firstRowIndent < double.infinity),
+      'firstRowIndent must be non-negative and finite.',
     );
     final content = _NotebookContent.parse(children);
     return NotebookEntry._(
@@ -243,6 +277,8 @@ class NotebookEntry extends MultiChildRenderObjectWidget {
       minRows: minRows,
       wrap: wrap,
       direction: direction,
+      indent: indent,
+      firstRowIndent: firstRowIndent ?? indent,
       children: content.widgets,
     );
   }
@@ -256,6 +292,8 @@ class NotebookEntry extends MultiChildRenderObjectWidget {
     required this.minRows,
     required this.wrap,
     required this.direction,
+    required this.indent,
+    required this.firstRowIndent,
     required super.children,
     super.key,
   }) : _pieces = pieces,
@@ -289,11 +327,31 @@ class NotebookEntry extends MultiChildRenderObjectWidget {
   /// (`'\n'`) still start new rows. The entry is not itself scrollable — place
   /// it in a horizontal scroll view (e.g. `SingleChildScrollView`) to scroll the
   /// overflow. In this mode the entry is as wide as its content and its rules
-  /// span that width.
+  /// span that width. Rows still begin at the leading margin plus the indent,
+  /// but the trailing margin has no effect, since nothing wraps.
   final bool wrap;
 
   /// The flow direction, or null to use the ambient [Directionality].
   final TextDirection? direction;
+
+  /// The distance from the leading margin at which every row's content begins,
+  /// in logical pixels.
+  ///
+  /// Applies to all rows except row 0 (which uses [firstRowIndent]) —
+  /// wrapped continuations, rows started by a hard `'\n'`, and rows created
+  /// when a widget moves down — producing a hanging indent. The entry's width
+  /// and its rules are unaffected: rules span the full entry beneath the
+  /// indent. Direction-aware: under RTL the indent applies from the right.
+  final double indent;
+
+  /// The distance from the leading margin at which row 0's content begins, in
+  /// logical pixels.
+  ///
+  /// When the factory's `firstRowIndent` argument is null (the default), this
+  /// follows [indent]. Set it below [indent] to hang a marker toward the
+  /// margin while wrapped rows align deeper, or above [indent] for a
+  /// first-line paragraph indent.
+  final double firstRowIndent;
 
   @override
   RenderObject createRenderObject(BuildContext context) {
@@ -308,6 +366,10 @@ class NotebookEntry extends MultiChildRenderObjectWidget {
       textAlignVertical: textAlignVertical,
       minRows: minRows,
       wrap: wrap,
+      indent: indent,
+      firstRowIndent: firstRowIndent,
+      leadingMargin: resolved.leadingMargin,
+      trailingMargin: resolved.trailingMargin,
       lineHeight: resolved.lineHeight,
       lineColor: resolved.lineColor,
       strokeWidth: resolved.strokeWidth,
@@ -333,6 +395,10 @@ class NotebookEntry extends MultiChildRenderObjectWidget {
       ..textAlignVertical = textAlignVertical
       ..minRows = minRows
       ..wrap = wrap
+      ..indent = indent
+      ..firstRowIndent = firstRowIndent
+      ..leadingMargin = resolved.leadingMargin
+      ..trailingMargin = resolved.trailingMargin
       ..lineHeight = resolved.lineHeight
       ..lineColor = resolved.lineColor
       ..strokeWidth = resolved.strokeWidth
@@ -413,6 +479,10 @@ class _RenderNotebookEntry extends RenderBox
     required TextAlignVertical textAlignVertical,
     required int minRows,
     required bool wrap,
+    required double indent,
+    required double firstRowIndent,
+    required double leadingMargin,
+    required double trailingMargin,
     required double lineHeight,
     required Color lineColor,
     required double strokeWidth,
@@ -429,6 +499,10 @@ class _RenderNotebookEntry extends RenderBox
        _textAlignVertical = textAlignVertical,
        _minRows = minRows,
        _wrap = wrap,
+       _indent = indent,
+       _firstRowIndent = firstRowIndent,
+       _leadingMargin = leadingMargin,
+       _trailingMargin = trailingMargin,
        _lineHeight = lineHeight,
        _lineColor = lineColor,
        _strokeWidth = strokeWidth,
@@ -501,6 +575,34 @@ class _RenderNotebookEntry extends RenderBox
   set wrap(bool value) {
     if (value == _wrap) return;
     _wrap = value;
+    markNeedsLayout();
+  }
+
+  double _indent;
+  set indent(double value) {
+    if (value == _indent) return;
+    _indent = value;
+    markNeedsLayout();
+  }
+
+  double _firstRowIndent;
+  set firstRowIndent(double value) {
+    if (value == _firstRowIndent) return;
+    _firstRowIndent = value;
+    markNeedsLayout();
+  }
+
+  double _leadingMargin;
+  set leadingMargin(double value) {
+    if (value == _leadingMargin) return;
+    _leadingMargin = value;
+    markNeedsLayout();
+  }
+
+  double _trailingMargin;
+  set trailingMargin(double value) {
+    if (value == _trailingMargin) return;
+    _trailingMargin = value;
     markNeedsLayout();
   }
 
@@ -611,14 +713,29 @@ class _RenderNotebookEntry extends RenderBox
 
     _disposeFragments();
 
-    double cursor = 0;
+    // Row starts and the wrap limit, Word-ruler style: row 0 begins at the
+    // leading margin plus the first-row indent, every later row at the
+    // leading margin plus the indent, and wrapping happens against the
+    // trailing margin. The clamp keeps a degenerate start within the row, so
+    // oversized values degrade to clipped content; against an unbounded row
+    // it is a no-op.
+    final double startFirst = clampDouble(
+      _leadingMargin + _firstRowIndent,
+      0,
+      rowWidth,
+    );
+    final double startCont = clampDouble(_leadingMargin + _indent, 0, rowWidth);
+    final double limit = rowWidth - _trailingMargin;
+    double rowStart(int r) => r == 0 ? startFirst : startCont;
+
+    double cursor = rowStart(0);
     int row = 0;
 
     for (final piece in _pieces) {
       switch (piece) {
         case _BreakPiece():
-          cursor = 0;
           row += 1;
+          cursor = rowStart(row);
         case _WidgetPiece(:final childIndex):
           final child = children[childIndex];
           child.layout(const BoxConstraints(), parentUsesSize: true);
@@ -637,10 +754,10 @@ class _RenderNotebookEntry extends RenderBox
           final effW = natW * scale;
           final effH = natH * scale;
           if (_wrap &&
-              cursor > 0 &&
-              cursor + effW > rowWidth + _kWidthTolerance) {
-            cursor = 0;
+              cursor > rowStart(row) &&
+              cursor + effW > limit + _kWidthTolerance) {
             row += 1;
+            cursor = rowStart(row);
           }
           _fragments.add(
             _Fragment.widget(
@@ -667,25 +784,27 @@ class _RenderNotebookEntry extends RenderBox
             double avail;
             if (!_wrap) {
               avail = double.infinity;
-            } else if (cursor > 0) {
-              avail = rowWidth - cursor;
+            } else if (cursor > rowStart(row)) {
+              avail = limit - cursor;
               if (avail <= _kWidthTolerance) {
-                cursor = 0;
                 row += 1;
-                avail = rowWidth;
+                cursor = rowStart(row);
+                avail = math.max(0.0, limit - cursor);
               }
             } else {
-              avail = rowWidth;
+              avail = math.max(0.0, limit - cursor);
             }
 
             final line = _layoutLine(remaining, effStyle, scaler, avail);
 
-            if (_wrap && cursor > 0 && line.width > avail + _kWidthTolerance) {
+            if (_wrap &&
+                cursor > rowStart(row) &&
+                line.width > avail + _kWidthTolerance) {
               // Even the minimal chunk overflows the remaining gap; wrap to a
-              // fresh row and lay this text out again from the leading edge.
+              // fresh row and lay this text out again from that row's start.
               line.painter.dispose();
-              cursor = 0;
               row += 1;
+              cursor = rowStart(row);
               continue;
             }
 
@@ -703,8 +822,8 @@ class _RenderNotebookEntry extends RenderBox
             if (remaining.isEmpty) {
               cursor += line.width;
             } else {
-              cursor = 0;
               row += 1;
+              cursor = rowStart(row);
             }
           }
       }

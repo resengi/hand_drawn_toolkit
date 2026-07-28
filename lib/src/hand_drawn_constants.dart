@@ -84,6 +84,8 @@ const double defaultNotebookStrokeWidth = 1.0;
 const double defaultNotebookIrregularity = 1.0;
 const int defaultNotebookSegments = 30;
 const Color defaultNotebookLineColor = Color(0xFFE0E0E0);
+const double defaultNotebookLeadingMargin = 0.0;
+const double defaultNotebookTrailingMargin = 0.0;
 
 // ══════════════════════════════════════════════════════════════════════════
 // CHART DEFAULTS

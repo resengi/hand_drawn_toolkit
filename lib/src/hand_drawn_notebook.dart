@@ -8,16 +8,18 @@ import 'notebook_style.dart';
 ///
 /// [HandDrawnNotebook] does two things. It fills its area with [paperColor]
 /// (pass null for no fill), and it publishes a [NotebookStyle] — assembled from
-/// the ruling parameters below — to its descendants through a [NotebookScope].
-/// The page itself draws no rules; content reads the published style and paints
-/// its own.
+/// the ruling and margin parameters below — to its descendants through a
+/// [NotebookScope]. The page itself draws no rules; content reads the
+/// published style and paints its own.
 ///
-/// Set the ruling once here and it applies to every descendant that reads it:
+/// Set the ruling and margins once here and they apply to every descendant
+/// that reads them:
 ///
 /// ```dart
 /// HandDrawnNotebook(
 ///   lineHeight: 32,
 ///   lineColor: Color(0xFFBDBDBD),
+///   leadingMargin: 24,
 ///   child: myNotebookContent,
 /// )
 /// ```
@@ -36,12 +38,22 @@ class HandDrawnNotebook extends StatelessWidget {
     this.uniformLines = true,
     this.irregularity = HandDrawnDefaults.notebookIrregularity,
     this.segments = HandDrawnDefaults.notebookSegments,
+    this.leadingMargin = HandDrawnDefaults.notebookLeadingMargin,
+    this.trailingMargin = HandDrawnDefaults.notebookTrailingMargin,
     this.paperColor = const Color(0xFFFCFAF5),
     super.key,
   }) : assert(lineHeight > 0, 'lineHeight must be positive'),
        assert(strokeWidth > 0, 'strokeWidth must be positive'),
        assert(segments > 0, 'segments must be positive'),
-       assert(irregularity >= 0, 'irregularity must be non-negative');
+       assert(irregularity >= 0, 'irregularity must be non-negative'),
+       assert(
+         leadingMargin >= 0 && leadingMargin < double.infinity,
+         'leadingMargin must be non-negative and finite',
+       ),
+       assert(
+         trailingMargin >= 0 && trailingMargin < double.infinity,
+         'trailingMargin must be non-negative and finite',
+       );
 
   /// The content placed on the page.
   final Widget child;
@@ -68,6 +80,18 @@ class HandDrawnNotebook extends StatelessWidget {
   /// The number of linear segments used to draw each ruled line.
   final int segments;
 
+  /// The leading content margin published to descendants, in logical pixels.
+  ///
+  /// Content on the page begins this far in from the leading edge; the ruled
+  /// lines are unaffected and span the full width beneath the margin.
+  final double leadingMargin;
+
+  /// The trailing content margin published to descendants, in logical pixels.
+  ///
+  /// Content on the page wraps before crossing this margin; the ruled lines
+  /// are unaffected and span the full width beneath it.
+  final double trailingMargin;
+
   /// The paper fill color. When null, no paper is painted.
   final Color? paperColor;
 
@@ -81,6 +105,8 @@ class HandDrawnNotebook extends StatelessWidget {
       uniformLines: uniformLines,
       irregularity: irregularity,
       segments: segments,
+      leadingMargin: leadingMargin,
+      trailingMargin: trailingMargin,
     );
 
     Widget result = NotebookScope(style: style, child: child);

@@ -154,6 +154,12 @@ abstract final class HandDrawnDefaults {
   /// Default color for notebook ruled lines.
   static const Color notebookLineColor = defaultNotebookLineColor;
 
+  /// Default leading content margin for notebook pages, in logical pixels.
+  static const double notebookLeadingMargin = defaultNotebookLeadingMargin;
+
+  /// Default trailing content margin for notebook pages, in logical pixels.
+  static const double notebookTrailingMargin = defaultNotebookTrailingMargin;
+
   // ── Chart defaults ──────────────────────────────────────────────────
 
   /// Default height for chart widgets.

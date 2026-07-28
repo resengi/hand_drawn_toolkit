@@ -26,6 +26,8 @@ void main() {
               uniformLines: false,
               irregularity: 3,
               segments: 40,
+              leadingMargin: 12,
+              trailingMargin: 8,
               paperColor: Color(0xFFEFEFEF),
               child: SizedBox(height: 80),
             ),
@@ -133,6 +135,8 @@ void main() {
             uniformLines: false,
             irregularity: 3,
             segments: 40,
+            leadingMargin: 12,
+            trailingMargin: 8,
             child: Builder(
               builder: (context) {
                 captured = NotebookScope.maybeOf(context);
@@ -152,6 +156,8 @@ void main() {
             uniformLines: false,
             irregularity: 3,
             segments: 40,
+            leadingMargin: 12,
+            trailingMargin: 8,
           ),
         );
       });
@@ -182,6 +188,20 @@ void main() {
       test('asserts on negative irregularity', () {
         expect(
           () => HandDrawnNotebook(irregularity: -1, child: const SizedBox()),
+          throwsAssertionError,
+        );
+      });
+
+      test('asserts on a negative leadingMargin', () {
+        expect(
+          () => HandDrawnNotebook(leadingMargin: -1, child: const SizedBox()),
+          throwsAssertionError,
+        );
+      });
+
+      test('asserts on a negative trailingMargin', () {
+        expect(
+          () => HandDrawnNotebook(trailingMargin: -1, child: const SizedBox()),
           throwsAssertionError,
         );
       });
