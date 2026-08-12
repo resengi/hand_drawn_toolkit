@@ -38,6 +38,7 @@ class HandDrawnTextField extends StatelessWidget {
     this.hintText,
     this.onChanged,
     this.onSubmitted,
+    this.onTapOutside,
     this.maxLines = 1,
     this.focusNode,
     this.seed = HandDrawnDefaults.seed,
@@ -79,6 +80,20 @@ class HandDrawnTextField extends StatelessWidget {
 
   /// Called when the user submits the field (e.g. presses done).
   final ValueChanged<String>? onSubmitted;
+
+  /// Called when a tap is detected outside this field while it has focus.
+  ///
+  /// Forwarded to [TextField.onTapOutside]; when null, the framework's
+  /// default behavior applies. To dismiss the on-screen keyboard on
+  /// outside taps:
+  ///
+  /// ```dart
+  /// HandDrawnTextField(
+  ///   onTapOutside: (event) =>
+  ///       FocusManager.instance.primaryFocus?.unfocus(),
+  /// )
+  /// ```
+  final TapRegionCallback? onTapOutside;
 
   /// The maximum number of lines for the text field.
   final int maxLines;
@@ -155,6 +170,7 @@ class HandDrawnTextField extends StatelessWidget {
             focusNode: focusNode,
             onChanged: onChanged,
             onSubmitted: onSubmitted,
+            onTapOutside: onTapOutside,
             maxLines: maxLines,
             minLines: minLines,
             autofocus: autofocus,
