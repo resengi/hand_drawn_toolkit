@@ -1,5 +1,33 @@
 # Change Log
 
+
+
+## 2026-08-12
+
+### Changes
+
+---
+
+Packages with breaking changes:
+
+ - There are no breaking changes in this release.
+
+Packages with other changes:
+
+ - [`hand_drawn_toolkit` - `v0.5.2`](#hand_drawn_toolkit---v052)
+
+---
+
+#### `hand_drawn_toolkit` - `v0.5.2`
+
+ - **FIX**: Adding onTapOutside pass through to HandDrawnTextField ([#15](https://github.com/resengi/hand_drawn_toolkit/issues/15)). ([45e0f7da](https://github.com/resengi/hand_drawn_toolkit/commit/45e0f7dae2e6cea5a873d903880bb53810120c94))
+
+## 0.5.2
+
+ - **FIX**: Adding onTapOutside pass through to HandDrawnTextField ([#15](https://github.com/resengi/hand_drawn_toolkit/issues/15)). ([45e0f7da](https://github.com/resengi/hand_drawn_toolkit/commit/45e0f7dae2e6cea5a873d903880bb53810120c94))
+
+# Change Log
+
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
@@ -26,9 +54,6 @@ Packages with other changes:
 ## 0.5.1
 
  - **FEAT**: Adding margins and indents to hand drawn notebooks ([#14](https://github.com/resengi/hand_drawn_toolkit/issues/14)). ([7b35666e](https://github.com/resengi/hand_drawn_toolkit/commit/7b35666e33543136f6ac1a83781341f93ea9dd82))
-
-# Change Log
-
 
 
 ## 2026-06-18
