@@ -285,6 +285,23 @@ void main() {
         await tester.testTextInput.receiveAction(TextInputAction.done);
         expect(submitted, 'done');
       });
+
+      testWidgets('onTapOutside defaults to null', (tester) async {
+        await tester.pumpWidget(testApp(const HandDrawnTextField()));
+
+        final tf = tester.widget<TextField>(find.byType(TextField));
+        expect(tf.onTapOutside, isNull);
+      });
+
+      testWidgets('forwards a custom onTapOutside', (tester) async {
+        void handler(PointerDownEvent event) {}
+        await tester.pumpWidget(
+          testApp(HandDrawnTextField(onTapOutside: handler)),
+        );
+
+        final tf = tester.widget<TextField>(find.byType(TextField));
+        expect(tf.onTapOutside, handler);
+      });
     });
 
     group('padding', () {
@@ -365,6 +382,59 @@ void main() {
       );
       final tf = tester.widget<TextField>(find.byType(TextField));
       expect(tf.keyboardType, TextInputType.number);
+    });
+  });
+
+  // ── onTapOutside forwarding ─────────────────────────────────────────
+
+  group('HandDrawnTextField onTapOutside', () {
+    testWidgets('fires when a tap lands outside the focused field', (
+      tester,
+    ) async {
+      final node = FocusNode();
+      addTearDown(node.dispose);
+      var outsideTaps = 0;
+      await tester.pumpWidget(
+        testApp(
+          HandDrawnTextField(
+            focusNode: node,
+            onTapOutside: (event) => outsideTaps++,
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(TextField));
+      await tester.pump();
+      expect(node.hasFocus, isTrue);
+
+      await tester.tapAt(const Offset(400, 500));
+      await tester.pump();
+      expect(outsideTaps, 1);
+      expect(node.hasFocus, isTrue);
+    });
+
+    testWidgets('an unfocusing callback dismisses the keyboard', (
+      tester,
+    ) async {
+      final node = FocusNode();
+      addTearDown(node.dispose);
+      await tester.pumpWidget(
+        testApp(
+          HandDrawnTextField(
+            focusNode: node,
+            onTapOutside: (event) =>
+                FocusManager.instance.primaryFocus?.unfocus(),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(TextField));
+      await tester.pump();
+      expect(node.hasFocus, isTrue);
+
+      await tester.tapAt(const Offset(400, 500));
+      await tester.pump();
+      expect(node.hasFocus, isFalse);
     });
   });
 }
