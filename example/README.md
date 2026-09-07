@@ -1,9 +1,9 @@
 # Hand Drawn Toolkit — Example
 
 A demo app showcasing the `hand_drawn_toolkit` package. It renders a journal-style
-page that exercises every major feature: containers, dividers, status squares,
-text fields, notebook entries (with page margins and Word-ruler indents),
-charts (bar, line, scatter, function-backed),
+page that exercises every major feature: containers, fill extents, dividers,
+status squares, text fields, notebook entries (with page margins and
+Word-ruler indents), charts (bar, line, scatter, function-backed),
 discontinuous functions, tables (including resizable columns), interactive
 hit-testing across every chart variant, plot-area clipping, and custom path
 building.
@@ -21,6 +21,10 @@ flutter run
 
 - **`HandDrawnContainer`** with default and customized parameters (stroke color,
   irregularity, background fill, padding)
+- **`HandDrawnFillExtent`** — a 2×2 grid of containers with a thick,
+  translucent border showing `standardShape`, `strokeCenter`,
+  `strokeOuterEdge`, and `strokeInnerEdge` side by side on the same wobble,
+  followed by the same four modes on a translucent `HandDrawnStatusSquare`
 - **`HandDrawnDivider`** as a drop-in replacement for Flutter's `Divider`,
   including `indent` / `endIndent` support
 - **`HandDrawnLinePainter`** used directly with `CustomPaint` for a title

@@ -6,6 +6,7 @@ import 'hand_drawn_constants.dart';
 import 'hand_drawn_container.dart';
 import 'hand_drawn_divider.dart';
 import 'hand_drawn_toolkit_defaults.dart';
+import 'hand_drawn_toolkit_helpers.dart';
 
 /// Definition of a single table column.
 class HandDrawnTableColumn {
@@ -152,6 +153,7 @@ class HandDrawnTable extends StatelessWidget {
     this.strokeWidth = HandDrawnDefaults.strokeWidth,
     this.strokeColor = HandDrawnDefaults.containerStrokeColor,
     this.backgroundColor = HandDrawnDefaults.containerBackgroundColor,
+    this.fillExtent = HandDrawnDefaults.containerFillExtent,
     super.key,
   });
 
@@ -250,6 +252,10 @@ class HandDrawnTable extends StatelessWidget {
   /// Background fill color for the outer container.
   final Color backgroundColor;
 
+  /// How far [backgroundColor] extends relative to the outer container's
+  /// border. See [HandDrawnContainer.fillExtent].
+  final HandDrawnFillExtent fillExtent;
+
   /// Returns a copy of this widget with the given fields replaced.
   /// Fields not specified retain their current value. Nullable fields
   /// cannot be cleared via [copyWith] — construct a new
@@ -280,6 +286,7 @@ class HandDrawnTable extends StatelessWidget {
     double? strokeWidth,
     Color? strokeColor,
     Color? backgroundColor,
+    HandDrawnFillExtent? fillExtent,
     Key? key,
   }) {
     return HandDrawnTable(
@@ -307,6 +314,7 @@ class HandDrawnTable extends StatelessWidget {
       strokeWidth: strokeWidth ?? this.strokeWidth,
       strokeColor: strokeColor ?? this.strokeColor,
       backgroundColor: backgroundColor ?? this.backgroundColor,
+      fillExtent: fillExtent ?? this.fillExtent,
       key: key ?? this.key,
     );
   }
@@ -446,6 +454,7 @@ class HandDrawnTable extends StatelessWidget {
       strokeWidth: strokeWidth,
       strokeColor: strokeColor,
       backgroundColor: backgroundColor,
+      fillExtent: fillExtent,
       child: child,
     );
   }

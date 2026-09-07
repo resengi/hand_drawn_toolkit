@@ -28,6 +28,11 @@ import 'status_indicator.dart';
 ///
 /// The border shape is fully determined by [seed], [segments], and
 /// [irregularity]. Identical parameters always produce the same border.
+///
+/// When [isFilled] is true, [fillExtent] selects how far the fill extends
+/// relative to the border; see [HandDrawnFillExtent]. Its standard shape is
+/// the inset square the border is generated from. The [indicator] is drawn
+/// whether or not the square is filled.
 class HandDrawnStatusSquare extends StatelessWidget {
   /// Creates a hand-drawn status square.
   const HandDrawnStatusSquare({
@@ -45,6 +50,7 @@ class HandDrawnStatusSquare extends StatelessWidget {
     this.strokeWidth = HandDrawnDefaults.statusSquareStrokeWidth,
     this.indicatorStrokeWidth =
         HandDrawnDefaults.statusSquareIndicatorStrokeWidth,
+    this.fillExtent = HandDrawnDefaults.shapeFillExtent,
     super.key,
   }) : assert(size > 0),
        assert(scaleFactor > 0),
@@ -61,7 +67,7 @@ class HandDrawnStatusSquare extends StatelessWidget {
   /// When false, only the outline is drawn.
   final bool isFilled;
 
-  /// The indicator drawn on top of the filled square.
+  /// The indicator drawn over the square.
   final StatusIndicator indicator;
 
   /// The color of the [indicator] stroke.
@@ -99,6 +105,10 @@ class HandDrawnStatusSquare extends StatelessWidget {
   /// The width of the indicator (check / dash) stroke in logical pixels.
   final double indicatorStrokeWidth;
 
+  /// How far the fill extends relative to the border stroke when
+  /// [isFilled] is true. See [HandDrawnFillExtent].
+  final HandDrawnFillExtent fillExtent;
+
   @override
   Widget build(BuildContext context) {
     final scaledSize = size * scaleFactor;
@@ -116,6 +126,7 @@ class HandDrawnStatusSquare extends StatelessWidget {
           segments: segments,
           strokeWidth: strokeWidth,
           indicatorStrokeWidth: indicatorStrokeWidth,
+          fillExtent: fillExtent,
         ),
       ),
     );
@@ -143,7 +154,11 @@ class _StatusSquarePainter extends CustomPainter {
     required this.segments,
     required this.strokeWidth,
     required this.indicatorStrokeWidth,
-  });
+    required this.fillExtent,
+  }) {
+    checkStrokeWidth(strokeWidth);
+    HandDrawnHelpers.checkGenerationParameters(segments, irregularity);
+  }
 
   final Color color;
   final bool isFilled;
@@ -154,6 +169,7 @@ class _StatusSquarePainter extends CustomPainter {
   final int segments;
   final double strokeWidth;
   final double indicatorStrokeWidth;
+  final HandDrawnFillExtent fillExtent;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -163,33 +179,38 @@ class _StatusSquarePainter extends CustomPainter {
       segments: segments,
     );
 
-    // Inset the drawing area so the stroke doesn't clip at the edges.
+    // Inset by half the stroke width so the stroke's un-jittered outer
+    // edge sits at or just inside the square's bounds.
     final inset = (strokeWidth / 2).ceilToDouble();
+    final w = size.width - inset * 2;
+    final h = size.height - inset * 2;
     canvas.save();
     canvas.translate(inset, inset);
-    final boxPath = helper.rectBorder(
-      Size(size.width - inset * 2, size.height - inset * 2),
-    );
+    final boxPath = helper.rectBorder(Size(w, h));
 
-    // Fill first so the outline draws on top, preserving the hand-drawn
-    // silhouette.
+    // The border has sharp (miter) corners; the fill's band must match.
     if (isFilled) {
-      final fillPaint = Paint()
-        ..color = color
-        ..style = PaintingStyle.fill;
-      canvas.drawPath(boxPath, fillPaint);
+      paintHandDrawnFill(
+        canvas,
+        border: () => boxPath,
+        standardShape: () => Path()..addRect(Rect.fromLTWH(0, 0, w, h)),
+        color: color,
+        extent: fillExtent,
+        strokeWidth: strokeWidth,
+        join: StrokeJoin.miter,
+      );
     }
 
-    final borderPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-    canvas.drawPath(boxPath, borderPaint);
+    canvas.drawPath(
+      boxPath,
+      handDrawnStrokePaint(
+        color: color,
+        width: strokeWidth,
+        join: StrokeJoin.miter,
+      ),
+    );
 
-    // Draw the status indicator on top of the filled square.
     if (indicator != StatusIndicator.none) {
-      final w = size.width - inset * 2;
-      final h = size.height - inset * 2;
       final indicatorPaint = Paint()
         ..color = indicatorColor
         ..style = PaintingStyle.stroke
@@ -224,5 +245,6 @@ class _StatusSquarePainter extends CustomPainter {
       irregularity != old.irregularity ||
       segments != old.segments ||
       strokeWidth != old.strokeWidth ||
-      indicatorStrokeWidth != old.indicatorStrokeWidth;
+      indicatorStrokeWidth != old.indicatorStrokeWidth ||
+      fillExtent != old.fillExtent;
 }

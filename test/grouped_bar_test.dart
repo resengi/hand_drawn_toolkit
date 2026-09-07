@@ -38,9 +38,9 @@ HandDrawnBarChartPainter _painter(BarChartData data) =>
     HandDrawnBarChartPainter(data: data);
 
 void main() {
-  // ── Backward-compat ──────────────────────────────────────────────────
+  // ── Ungrouped input ──────────────────────────────────────────────────
 
-  group('Ungrouped bars input — backward compat', () {
+  group('Ungrouped bars input projects to single-bar categories', () {
     test('every layout segment has innerBarIndex == 0', () {
       final layout = _painter(_ungrouped(n: 4)).computeLayout(kChartTestSize);
       for (final s in layout.segments) {

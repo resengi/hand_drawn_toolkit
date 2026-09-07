@@ -1,4 +1,4 @@
-/// The indicator drawn on top of a [HandDrawnStatusSquare].
+/// The indicator drawn over a [HandDrawnStatusSquare].
 ///
 /// Consumers map their own domain-specific status type to one of these
 /// values at the call site:
@@ -14,9 +14,9 @@ enum StatusIndicator {
   /// No indicator — only the outline (and optional fill) is shown.
   none,
 
-  /// A small checkmark drawn over the filled square.
+  /// A small checkmark drawn over the square.
   check,
 
-  /// A horizontal dash drawn over the filled square.
+  /// A horizontal dash drawn over the square.
   dash,
 }

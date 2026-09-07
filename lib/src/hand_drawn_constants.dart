@@ -12,6 +12,8 @@ import 'dart:ui' show Color, FontWeight;
 
 import 'package:flutter/painting.dart' show EdgeInsets, TextStyle;
 
+import 'hand_drawn_toolkit_helpers.dart';
+
 // ══════════════════════════════════════════════════════════════════════════
 // CORE WIDGET DEFAULTS
 // These are the underlying values for HandDrawnDefaults. Every value in
@@ -29,11 +31,18 @@ const double defaultIrregularity = 3.5;
 const int defaultSegments = 24;
 const int defaultSeed = 42;
 
+/// Fill extent for the shapes that fill their jittered path: the status
+/// square, bar segments, and scatter dots.
+const HandDrawnFillExtent defaultShapeFillExtent =
+    HandDrawnFillExtent.strokeCenter;
+
 // ── Container ──────────────────────────────────────────────────────────────
 
 const double defaultContainerPadding = 20.0;
 const Color defaultContainerBackgroundColor = Color(0xFFFFFFFF);
 const Color defaultContainerStrokeColor = Color(0xFF000000);
+const HandDrawnFillExtent defaultContainerFillExtent =
+    HandDrawnFillExtent.standardShape;
 
 // ── Divider ────────────────────────────────────────────────────────────────
 
@@ -196,18 +205,14 @@ const int barSegmentSeedStep = 10;
 /// stacked segments still get distinct wobble via the segment-index
 /// term.
 ///
-/// **Practical limit:** the seed scheme uses
-/// `categoryIndex*100 + innerBarIndex*1 + segmentIndex*10`. Because
-/// `barInnerSeedMultiplier` (1) divides into `barSegmentSeedStep` (10),
-/// distinct `(innerBarIndex, segmentIndex)` pairs collide once
-/// `innerBarIndex >= 10` (e.g. innerBarIndex=10, segmentIndex=0 collides
-/// with innerBarIndex=0, segmentIndex=1). The scheme already implies a
-/// "≤9 segments per bar" limit from the same multiplier choice, so
-/// this just extends the same constraint to "≤9 inner bars per
-/// category" — well above any realistic grouped-bar UX. If you ever
-/// need more, rework the multipliers as a coherent set rather than
-/// tweaking just this one (which would silently change wobble for
-/// existing charts).
+/// A segment's seed is
+/// `seed + barChartSeedOffset + categoryIndex * barSegmentSeedMultiplier +
+/// innerBarIndex * barInnerSeedMultiplier + segmentIndex * barSegmentSeedStep`.
+/// Index combinations whose terms sum to the same value (for example
+/// `innerBarIndex: 10, segmentIndex: 0` and `innerBarIndex: 0,
+/// segmentIndex: 1`) share a wobble phase. That repetition is visual
+/// only: it does not affect segment geometry, ordering, layout, or hit
+/// testing, and nothing in the package enforces a limit on either index.
 const int barInnerSeedMultiplier = 1;
 const int lineChartSeedOffset = 4000;
 const int lineDotSeedOffset = 5000;

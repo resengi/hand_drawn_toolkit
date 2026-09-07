@@ -1,6 +1,34 @@
+import 'dart:typed_data';
+import 'dart:ui' show ImageByteFormat, PictureRecorder;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
+
+// ── Rasterizing ───────────────────────────────────────────────────────────
+
+/// Runs [draw] against a fresh canvas, rasterizes it at [width]×[height],
+/// and returns the image's RGBA bytes. Inside `testWidgets`, call from
+/// `tester.runAsync`.
+Future<ByteData> rasterize(
+  void Function(Canvas canvas) draw,
+  int width,
+  int height,
+) async {
+  final recorder = PictureRecorder();
+  draw(Canvas(recorder));
+  final image = await recorder.endRecording().toImage(width, height);
+  return (await image.toByteData(format: ImageByteFormat.rawRgba))!;
+}
+
+/// Reads one channel (0 = red … 3 = alpha) of the pixel at ([x], [y]) from
+/// [pixels] produced by [rasterize] at [width].
+int channelAt(ByteData pixels, int width, int x, int y, int channel) =>
+    pixels.getUint8((y * width + x) * 4 + channel);
+
+/// The alpha of the pixel at ([x], [y]), in `0…1`.
+double alphaAt(ByteData pixels, int width, int x, int y) =>
+    channelAt(pixels, width, x, y, 3) / 255;
 
 // ── Wrappers ──────────────────────────────────────────────────────────────
 

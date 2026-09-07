@@ -62,6 +62,7 @@ abstract class HandDrawnChartPainter extends CustomPainter {
     this.legendConfig = ChartLegendConfig.inlineBottom,
     this.clipToChartArea = false,
   }) {
+    HandDrawnHelpers.checkGenerationParameters(segments, irregularity);
     if (yDivisions <= 0) {
       throw ArgumentError.value(yDivisions, 'yDivisions', 'must be positive');
     }
@@ -872,13 +873,10 @@ abstract class HandDrawnChartPainter extends CustomPainter {
         _cachedLegendBox = helpers.rectBorder(rect.size).shift(rect.topLeft);
         _cachedLegendRect = rect;
       }
-      final boxPaint = Paint()
-        ..color = axisColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = chartTickStrokeWidth
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round;
-      canvas.drawPath(_cachedLegendBox!, boxPaint);
+      canvas.drawPath(
+        _cachedLegendBox!,
+        handDrawnStrokePaint(color: axisColor, width: chartTickStrokeWidth),
+      );
     }
 
     // Clip only the entry painting to the reserved rect so neither

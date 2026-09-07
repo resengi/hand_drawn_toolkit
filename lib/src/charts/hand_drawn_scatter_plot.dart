@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../hand_drawn_constants.dart';
 import '../hand_drawn_toolkit_defaults.dart';
+import '../hand_drawn_toolkit_helpers.dart';
 import 'chart_data.dart';
 import 'chart_interaction.dart';
 import 'chart_widget_helpers.dart';
@@ -16,6 +17,7 @@ class HandDrawnScatterPlotPainter extends HandDrawnChartPainter {
     required this.data,
     super.clipToChartArea,
     this.dotColor = HandDrawnDefaults.scatterDotColor,
+    this.fillExtent = HandDrawnDefaults.shapeFillExtent,
     super.seed,
     super.axisColor,
     super.grid,
@@ -65,28 +67,39 @@ class HandDrawnScatterPlotPainter extends HandDrawnChartPainter {
   final ScatterPlotData data;
   final Color dotColor;
 
+  /// How far each dot's fill extends relative to its ring. See
+  /// [HandDrawnFillExtent].
+  final HandDrawnFillExtent fillExtent;
+
   @override
   void paintData(Canvas canvas, Size size) {
     if (data.points.isEmpty) return;
 
-    final dotPaint = Paint()
-      ..color = dotColor
-      ..style = PaintingStyle.fill;
-    final strokePaint = Paint()
-      ..color = dotColor.withValues(alpha: scatterStrokeAlpha)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = scatterStrokeWidth;
+    // The ring has miter joins; the fill's band must match.
+    final ringPaint = handDrawnStrokePaint(
+      color: dotColor.withValues(alpha: scatterStrokeAlpha),
+      width: scatterStrokeWidth,
+      join: StrokeJoin.miter,
+    );
 
     for (int i = 0; i < data.points.length; i++) {
       final p = data.points[i];
-      final x = xToCanvasValue(p.x);
-      final y = yToCanvas(p.y);
+      final center = Offset(xToCanvasValue(p.x), yToCanvas(p.y));
       final radius = p.size ?? scatterDefaultDotRadius;
 
       final dotSeed = seed + scatterSeedOffset + i * scatterPointSeedStep;
-      final circle = wobblyCircle(Offset(x, y), radius, dotSeed);
-      canvas.drawPath(circle, dotPaint);
-      canvas.drawPath(circle, strokePaint);
+      final circle = wobblyCircle(center, radius, dotSeed);
+      paintHandDrawnFill(
+        canvas,
+        border: () => circle,
+        standardShape: () =>
+            Path()..addOval(Rect.fromCircle(center: center, radius: radius)),
+        color: dotColor,
+        extent: fillExtent,
+        strokeWidth: scatterStrokeWidth,
+        join: StrokeJoin.miter,
+      );
+      canvas.drawPath(circle, ringPaint);
     }
   }
 
@@ -133,6 +146,7 @@ class HandDrawnScatterPlotPainter extends HandDrawnChartPainter {
   bool shouldRepaint(covariant HandDrawnScatterPlotPainter oldDelegate) {
     return oldDelegate.data != data ||
         oldDelegate.dotColor != dotColor ||
+        oldDelegate.fillExtent != fillExtent ||
         super.shouldRepaint(oldDelegate);
   }
 }
@@ -160,6 +174,7 @@ class HandDrawnScatterPlot extends StatelessWidget {
     this.xLabelConfig = ChartLabelConfig.horizontal,
     this.legendConfig = ChartLegendConfig.inlineBottom,
     this.legendStyle,
+    this.fillExtent = HandDrawnDefaults.shapeFillExtent,
     super.key,
   });
 
@@ -205,6 +220,12 @@ class HandDrawnScatterPlot extends StatelessWidget {
   /// derives from [labelStyle] at the chart's legend font size.
   final TextStyle? legendStyle;
 
+  /// How far each dot's fill extends relative to its ring; see
+  /// [HandDrawnFillExtent]. The standard shape is the dot's exact circle.
+  /// Because the ring is translucent, the stroke-relative modes are visibly
+  /// different here.
+  final HandDrawnFillExtent fillExtent;
+
   /// Returns a copy of this widget with the given fields replaced.
   /// Fields not specified retain their current value. Nullable fields
   /// cannot be cleared via [copyWith] — construct a new
@@ -231,6 +252,7 @@ class HandDrawnScatterPlot extends StatelessWidget {
     ChartLabelConfig? xLabelConfig,
     ChartLegendConfig? legendConfig,
     TextStyle? legendStyle,
+    HandDrawnFillExtent? fillExtent,
     Key? key,
   }) {
     return HandDrawnScatterPlot(
@@ -254,6 +276,7 @@ class HandDrawnScatterPlot extends StatelessWidget {
       xLabelConfig: xLabelConfig ?? this.xLabelConfig,
       legendConfig: legendConfig ?? this.legendConfig,
       legendStyle: legendStyle ?? this.legendStyle,
+      fillExtent: fillExtent ?? this.fillExtent,
       key: key ?? this.key,
     );
   }
@@ -286,6 +309,7 @@ class HandDrawnScatterPlot extends StatelessWidget {
           xLabelConfig: xLabelConfig,
           legendConfig: legendConfig,
           legendStyle: legendStyle,
+          fillExtent: fillExtent,
         ),
       ),
     );
