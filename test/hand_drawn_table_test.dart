@@ -527,6 +527,7 @@ void main() {
             strokeWidth: 3.0,
             strokeColor: Color(0xFFFF0000),
             backgroundColor: Color(0xFF00FF00),
+            fillExtent: HandDrawnFillExtent.strokeOuterEdge,
           ),
         ),
       );
@@ -538,6 +539,17 @@ void main() {
       expect(container.strokeWidth, 3.0);
       expect(container.strokeColor, const Color(0xFFFF0000));
       expect(container.backgroundColor, const Color(0xFF00FF00));
+      expect(container.fillExtent, HandDrawnFillExtent.strokeOuterEdge);
+    });
+
+    testWidgets('defaults to the container fill extent', (tester) async {
+      await tester.pumpWidget(
+        testApp(const HandDrawnTable(columns: _columns, rows: _rows)),
+      );
+      final container = tester.widget<HandDrawnContainer>(
+        find.byType(HandDrawnContainer),
+      );
+      expect(container.fillExtent, HandDrawnDefaults.containerFillExtent);
     });
   });
 
@@ -551,22 +563,18 @@ void main() {
         testApp(const HandDrawnTable(columns: _columns, rows: _rows)),
       );
 
-      // Find Container widgets that are descendants of HandDrawnTable.
-      // The highlighted row (Carol) should have a Container with a color.
-      final containers = find.descendant(
-        of: find.byType(HandDrawnTable),
-        matching: find.byType(Container),
+      // The highlighted row (Carol) is wrapped in a Container tinted with
+      // the highlight color at the highlight alpha.
+      final tint = HandDrawnDefaults.tableHighlightColor.withValues(
+        alpha: HandDrawnDefaults.tableHighlightAlpha,
       );
-
-      bool foundTintedContainer = false;
-      for (final element in containers.evaluate()) {
-        final container = element.widget as Container;
-        if (container.color != null && container.color!.a > 0) {
-          foundTintedContainer = true;
-          break;
-        }
-      }
-      expect(foundTintedContainer, isTrue);
+      final tinted = find.descendant(
+        of: find.byType(HandDrawnTable),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Container && widget.color == tint,
+        ),
+      );
+      expect(tinted, findsOneWidget);
     });
 
     testWidgets('highlighted row text uses highlight color', (tester) async {
@@ -969,6 +977,7 @@ void main() {
         seed: 7,
         horizontalScroll: true,
         cellMaxLines: 2,
+        fillExtent: HandDrawnFillExtent.strokeInnerEdge,
       );
 
       // Round trip: no args preserves every field. The widget doesn't
@@ -998,6 +1007,7 @@ void main() {
       expect(copy.strokeWidth, original.strokeWidth);
       expect(copy.strokeColor, original.strokeColor);
       expect(copy.backgroundColor, original.backgroundColor);
+      expect(copy.fillExtent, original.fillExtent);
       expect(copy.key, original.key);
 
       // Single-field override leaves the rest untouched.

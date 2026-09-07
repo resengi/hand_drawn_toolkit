@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'hand_drawn_constants.dart';
 import 'hand_drawn_line_painter.dart';
 import 'hand_drawn_toolkit_defaults.dart';
+import 'hand_drawn_toolkit_helpers.dart';
 
 /// A horizontal or vertical divider rendered with a hand-drawn, sketchy stroke.
 ///
@@ -117,11 +118,17 @@ class HandDrawnDivider extends StatelessWidget {
             irregularity: irregularity,
             segments: segments,
             seed: seed,
-            buildPath: (size, h) =>
-                isHorizontal ? h.lineHorizontal(size) : h.lineVertical(size),
+            buildPath: isHorizontal ? _horizontalPath : _verticalPath,
           ),
         ),
       ),
     );
   }
+
+  // Static so the painter receives a stable reference across rebuilds.
+  static Path _horizontalPath(Size size, HandDrawnHelpers h) =>
+      h.lineHorizontal(size);
+
+  static Path _verticalPath(Size size, HandDrawnHelpers h) =>
+      h.lineVertical(size);
 }

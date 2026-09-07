@@ -27,6 +27,7 @@ A lightweight Flutter package for rendering hand-drawn, sketchy UI elements: con
 - **Notebook entries** — `HandDrawnNotebook` publishes paper, ruling, and page-margin style, while `NotebookEntry` lays out flowing text, styled spans, and inline widgets onto ruled rows with wrapping, hard breaks, Word-ruler indents (hanging indents, hanging markers, first-line paragraph indents), fit modes, min rows, and interactive children
 - Smooth, organic wobble via 3-point moving average smoothing
 - Fully customizable styling (irregularity, segments, stroke width)
+- Configurable fill extent — every filled hand-drawn shape can fill its standard shape or fill to the stroke's centerline, outer edge, or inner edge via `HandDrawnFillExtent`
 - Deterministic seed-based generation — identical parameters always produce the same output
 - Path caching in the low-level painter for efficient repaints
 - Zero external dependencies — only the Flutter SDK
@@ -233,6 +234,15 @@ BarGroup(label: 'Mon', segments: [
 ])
 ```
 
+How far each fill extends relative to the segment's wobbly outline is a chart-level setting, `fillExtent` on `HandDrawnBarChart`. The default, `HandDrawnFillExtent.strokeCenter`, fills the jittered path so the fill meets the outline at its centerline. `standardShape` fills the un-jittered rectangle instead, and `strokeOuterEdge` / `strokeInnerEdge` extend or trim the fill to the outline's edges (each of those composites the segment through an offscreen layer). With the opaque default outline the three stroke-relative modes look the same; see `HandDrawnFillExtent` for when they differ.
+
+```dart
+HandDrawnBarChart(
+  data: data,
+  fillExtent: HandDrawnFillExtent.strokeOuterEdge,
+)
+```
+
 #### BarGroup Properties
 
 | Parameter | Type | Default | Description |
@@ -424,6 +434,15 @@ HandDrawnScatterPlot(data: data, height: 240)
 
 Each `ScatterPoint` can specify an optional `size` (dot radius in logical pixels). When omitted, the default radius of 5.0 is used.
 
+Each dot is a filled wobbly circle with a translucent ring in the same color. Because the ring is translucent, the `fillExtent` setting on `HandDrawnScatterPlot` is visible at the defaults: `strokeCenter` (the default) leaves the ring half over the fill and half over the background, `strokeOuterEdge` merges the ring into the dot, `strokeInnerEdge` gives a uniform halo, and `standardShape` fills the exact circle under the wobbly ring.
+
+```dart
+HandDrawnScatterPlot(
+  data: data,
+  fillExtent: HandDrawnFillExtent.strokeInnerEdge,
+)
+```
+
 #### ScatterPoint Properties
 
 | Parameter | Type | Default | Description |
@@ -491,10 +510,10 @@ The X tick label band's reserved height grows automatically with rotation, so ro
 
 ### Legend layout
 
-Legend rendering is controlled by `ChartLegendConfig`. The default preserves the historical inline-bottom behavior; opt into external boxed legends or suppress the chart-managed legend entirely:
+Legend rendering is controlled by `ChartLegendConfig`. The default is the inline-bottom layout; opt into external boxed legends or suppress the chart-managed legend entirely:
 
 ```dart
-// Inline single row at the bottom (default — historical behavior).
+// Inline single row at the bottom (default).
 HandDrawnLineChart(data: data)
 
 // External boxed legend below the chart, wrapping as needed.
@@ -544,6 +563,21 @@ HandDrawnLegend(entries: ChartLegendEntries.fromLineChartData(lineData))
 ```
 
 `HandDrawnLegend` accepts the same `ChartLegendConfig` to control its layout (boxed/unboxed, wrap, position, padding). Defaults to `ChartLegendConfig.externalBottomBoxed` since standalone legends are most often placed in their own boxed container.
+
+The box around a standalone legend is a `HandDrawnContainer` and uses the container's defaults: `HandDrawnDefaults.strokeWidth`, an opaque white `backgroundColor`, and `HandDrawnFillExtent.standardShape`. The box a chart draws around its own legend uses its tick stroke width (`1.0`) and no fill. To match that box's styling, aside from its intentional seed offset:
+
+```dart
+HandDrawnLegend(
+  entries: barData.legend,
+  strokeWidth: 1.0,
+  backgroundColor: Colors.transparent,
+  borderColor: chart.axisColor,
+  irregularity: chart.irregularity,
+  segments: chart.segments,
+)
+```
+
+The wobble pattern itself still differs, because the chart offsets its legend seed and the standalone widget uses `seed` directly. `fillExtent` is also available on `HandDrawnLegend` and applies to the boxed background.
 
 ### Shared Chart Widget Properties
 
@@ -826,6 +860,7 @@ HandDrawnTable(
 | `strokeWidth` | `double` | `2.0` | Stroke width for the outer container border |
 | `strokeColor` | `Color` | `Color(0xFF000000)` | Stroke color for the outer container border |
 | `backgroundColor` | `Color` | `Colors.white` | Background fill color |
+| `fillExtent` | `HandDrawnFillExtent` | `standardShape` | How far the background extends relative to the outer container border. See `HandDrawnContainer` |
 | `highlightColor` | `Color` | green | Highlighted row tint and text color |
 | `highlightAlpha` | `double` | `0.08` | Background tint opacity |
 | `headerStyle` | `TextStyle?` | `null` | Column header text style |
@@ -874,7 +909,7 @@ HandDrawnTable(
 
 ### HandDrawnContainer
 
-Wraps a child widget with a hand-drawn rectangular border and solid background fill:
+Wraps a child widget with a background fill and a hand-drawn rectangular border drawn on top of it:
 
 ```dart
 HandDrawnContainer(
@@ -888,6 +923,28 @@ HandDrawnContainer(
 )
 ```
 
+### Background fill extent
+
+`fillExtent` selects how the background relates to the wobbly border. The same `HandDrawnFillExtent` enum is used by every filled hand-drawn shape in the package (`HandDrawnTable`, boxed `HandDrawnLegend`, `HandDrawnStatusSquare`, bar segments, and scatter dots), each with its own default.
+
+| Mode | Fill region |
+|------|-------------|
+| `standardShape` | The shape's un-jittered geometry, ignoring the wobble. For the container that is its full layout box, so where the border wobbles inward a sliver of background shows outside it. Container default. |
+| `strokeCenter` | The interior of the wobbly path; the fill meets the stroke at its centerline. Default for the status square, bars, and scatter dots. |
+| `strokeOuterEdge` | The interior plus the full stroke band; the fill reaches the stroke's outer edge. |
+| `strokeInnerEdge` | The interior minus the full stroke band; the fill stops at the stroke's inner edge. |
+
+With an opaque stroke, the three stroke-relative modes look the same wherever the stroke covers a pixel; they differ when the stroke is translucent or hidden. `strokeOuterEdge` and `strokeInnerEdge` composite the shape through an offscreen layer.
+
+```dart
+HandDrawnContainer(
+  backgroundColor: Colors.amber.shade100,
+  strokeColor: Colors.black54,
+  fillExtent: HandDrawnFillExtent.strokeOuterEdge,
+  child: Text('No bleed'),
+)
+```
+
 ### Animating the Border
 
 Use `borderOpacity` to fade the border in or out — it multiplies the strokeColor's alpha, so values between `0.0` and `1.0` smoothly fade the existing stroke without changing its hue. Useful for entrance animations or interactive states:
@@ -898,6 +955,8 @@ HandDrawnContainer(
   child: MyContent(),
 )
 ```
+
+With the default `fillExtent`, the background stays a crisp rectangle as the border fades. With a stroke-relative `fillExtent`, the background silhouette follows the wobble, so a fully faded border leaves a wobbly-edged shape.
 
 ### Varying the Wobble Pattern
 
@@ -972,6 +1031,8 @@ HandDrawnStatusSquare(
 ```
 
 When `onTap` is provided, the square gets an enlarged tap target (controlled by `tapPadding`) for comfortable touch input. When null, the widget is display-only.
+
+The indicator is drawn whether or not the square is filled. When it is filled, `fillExtent` selects how far the fill extends relative to the border (default `HandDrawnFillExtent.strokeCenter`; `standardShape` fills the inset square the border is generated from). See "Background fill extent" above for the modes.
 
 ### HandDrawnTextField
 
@@ -1125,13 +1186,20 @@ Inline widget children are laid out with unbounded constraints. Wrap width- or h
 
 When stacking several entries on one notebook, keep them flush: a blank ruled line is an empty entry (`children: const []`), not a `SizedBox` gap, so the ruling stays in phase down the page.
 
-### Using HandDrawnLinePainter
+### Using the painters directly
 
-For full control, use the painter directly with `CustomPaint`. The `buildPath` callback receives a `HandDrawnHelpers` instance with methods for generating jittered paths:
+For full control, use the painters with `CustomPaint`. Both extend `HandDrawnPathPainter`, which owns path generation and caching; the `buildPath` callback receives a `HandDrawnHelpers` instance with methods for generating jittered paths. `HandDrawnLinePainter` strokes the path; `HandDrawnFillPainter` fills the region it encloses according to a `HandDrawnFillExtent` and draws no stroke. Pair them with the same `buildPath`, generation parameters, and stroke width to fill under a matching outline:
 
 ```dart
 CustomPaint(
-  painter: HandDrawnLinePainter(
+  painter: HandDrawnFillPainter(
+    color: Colors.yellow,
+    strokeWidth: 2.0,
+    irregularity: 3.5,
+    extent: HandDrawnFillExtent.strokeOuterEdge,
+    buildPath: (size, helpers) => helpers.rectBorder(size),
+  ),
+  foregroundPainter: HandDrawnLinePainter(
     color: Colors.black,
     strokeWidth: 2.0,
     irregularity: 3.5,
@@ -1141,6 +1209,10 @@ CustomPaint(
 )
 ```
 
+`buildPath` must produce a closed path when used with `HandDrawnFillPainter`; for `standardShape`, the fill painter fills its full canvas rectangle.
+
+`shouldRepaint` on both painters compares `buildPath` along with the numeric parameters. An inline closure like the ones above is a new object on every build and so repaints on every rebuild; pass a static method, a top-level function, or a tear-off from the same instance when you want a rebuilt painter with unchanged inputs to skip repainting.
+
 ## How It Works
 
 1. **Offset generation** — `smoothedOffsets()` creates random perpendicular offsets for each segment point. First and last points are pinned to zero so strokes start and end cleanly.
@@ -1149,7 +1221,7 @@ CustomPaint(
 
 3. **Path assembly** — Built-in helpers (`lineHorizontal`, `lineVertical`, `rectBorder`) stitch smoothed offsets into Flutter `Path` objects. `rectBorder` uses four independent offset sets so irregularity varies around the perimeter.
 
-4. **Caching** — `HandDrawnLinePainter` caches its generated path and only recomputes when the widget size or numeric generation parameters change. Note that `buildPath` shape changes are not detected automatically; see `HandDrawnLinePainter`'s class docs for the contract.
+4. **Caching** — `HandDrawnPathPainter` (the base of `HandDrawnLinePainter` and `HandDrawnFillPainter`) caches its generated path per painter instance and reuses it for repeated paints at the same size. A rebuilt painter repaints when any input changes, including `buildPath`; a stable function reference lets a rebuilt painter with unchanged inputs skip the repaint.
 
 5. **Notebook layout** — `HandDrawnNotebook` publishes a `NotebookStyle` and optional paper fill. `NotebookEntry` consumes that style, lays mixed content into fixed-height rows between the style's margins and the entry's indents, paints one hand-drawn rule per row spanning the entry's full width, exposes painted text to semantics, and keeps inline widget children interactive through ordinary Flutter hit-testing.
 
@@ -1190,7 +1262,7 @@ ListView.builder(
 
 **Hoist function-series functions to top-level or static** — `FunctionSeriesData.function` is compared by closure identity. Two inline `(x) => x * x` literals compare unequal, which can defeat memoization and cause unnecessary repaints. Define the function once at top level (`double parabola(double x) => x * x;`) and pass the reference.
 
-**Reach for `clipToChartArea` when data can leave the plot** — function series with asymptotes, scatter outliers, and any chart whose values can exceed the declared axis range benefit from `clipToChartArea: true`. The flag defaults to `false` so existing charts are unaffected; it's an opt-in safety net for the cases that need it.
+**Reach for `clipToChartArea` when data can leave the plot** — function series with asymptotes, scatter outliers, and any chart whose values can exceed the declared axis range benefit from `clipToChartArea: true`. The flag is off by default; enable it for the cases that need it.
 
 **Rotate long category labels rather than crowding them.** For 8+ categories with multi-word labels, `ChartLabelConfig.diagonalLeft` (-45°) or `ChartLabelConfig.vertical` (-90°) keeps every label readable without thinning. The X tick band's reserved height adjusts automatically.
 

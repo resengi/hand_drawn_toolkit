@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import '../hand_drawn_constants.dart';
 import '../hand_drawn_container.dart';
 import '../hand_drawn_toolkit_defaults.dart';
+import '../hand_drawn_toolkit_helpers.dart';
 import 'chart_data.dart';
 
 /// A standalone hand-drawn legend widget.
@@ -29,18 +30,34 @@ import 'chart_data.dart';
 ///
 /// For line charts, use [ChartLegendEntries.fromLineChartData] (the
 /// same helper the chart calls internally when no explicit entries
-/// are supplied) so the standalone legend matches what the chart
-/// would have rendered:
+/// are supplied) so the standalone legend lists the same entries the
+/// chart would have:
 ///
 /// ```dart
 /// HandDrawnLegend(entries: ChartLegendEntries.fromLineChartData(lineData));
 /// ```
+///
+/// ## Matching a chart's boxed legend
+///
+/// The box around a standalone legend is a [HandDrawnContainer], and its
+/// defaults are the container's: [HandDrawnDefaults.strokeWidth],
+/// [HandDrawnDefaults.containerBackgroundColor], and
+/// [HandDrawnDefaults.containerFillExtent]. The box a chart draws around its
+/// own legend uses its tick stroke width (1.0) and no fill. To match that
+/// styling, pass `strokeWidth: 1.0`, a fully transparent [backgroundColor]
+/// such as `Color(0x00000000)`, and the chart's `axisColor`, `irregularity`,
+/// and `segments`. The wobble pattern still differs, because the chart
+/// offsets its legend seed by [chartLegendBoxSeedOffset] and the standalone
+/// legend uses [seed] directly.
 class HandDrawnLegend extends StatelessWidget {
   const HandDrawnLegend({
     required this.entries,
     this.config = ChartLegendConfig.externalBottomBoxed,
     this.textStyle,
     this.borderColor = HandDrawnDefaults.chartAxisColor,
+    this.strokeWidth = HandDrawnDefaults.strokeWidth,
+    this.backgroundColor = HandDrawnDefaults.containerBackgroundColor,
+    this.fillExtent = HandDrawnDefaults.containerFillExtent,
     this.seed = HandDrawnDefaults.seed,
     this.irregularity = HandDrawnDefaults.chartIrregularity,
     this.segments = HandDrawnDefaults.wobblyRectSegments,
@@ -66,6 +83,22 @@ class HandDrawnLegend extends StatelessWidget {
   /// Defaults to [HandDrawnDefaults.chartAxisColor] so a standalone
   /// legend matches its chart's axis tone.
   final Color borderColor;
+
+  /// Width of the wobbly border stroke when [config.boxed] is true.
+  ///
+  /// Defaults to [HandDrawnDefaults.strokeWidth]. A chart's own boxed legend
+  /// uses its tick stroke width, 1.0.
+  final double strokeWidth;
+
+  /// Fill color of the box when [config.boxed] is true.
+  ///
+  /// Defaults to [HandDrawnDefaults.containerBackgroundColor]. A chart's own
+  /// boxed legend has no fill.
+  final Color backgroundColor;
+
+  /// How far [backgroundColor] extends relative to the border when
+  /// [config.boxed] is true. See [HandDrawnContainer.fillExtent].
+  final HandDrawnFillExtent fillExtent;
 
   /// Seed for the wobbly border's deterministic stroke jitter.
   final int seed;
@@ -97,12 +130,14 @@ class HandDrawnLegend extends StatelessWidget {
       return _maybeBound(layout);
     }
 
-    // Boxed — wrap in HandDrawnContainer. Forward every parameter
-    // explicitly so default-mismatches between the two widgets don't
-    // silently change rendering.
+    // Boxed — wrap in HandDrawnContainer, forwarding every rendering
+    // parameter this widget exposes.
     return _maybeBound(
       HandDrawnContainer(
         strokeColor: borderColor,
+        strokeWidth: strokeWidth,
+        backgroundColor: backgroundColor,
+        fillExtent: fillExtent,
         irregularity: irregularity,
         segments: segments,
         seed: seed,

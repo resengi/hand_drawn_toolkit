@@ -190,6 +190,34 @@ class _JournalPageState extends State<JournalPage> {
                 color: _inkLight,
                 indent: 32,
                 endIndent: 32,
+                seed: 45,
+              ),
+              const SizedBox(height: 28),
+
+              const Text(
+                'Fill Extent',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: _ink,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'HandDrawnFillExtent controls how far a fill extends relative '
+                'to the wobbly stroke. A thick, translucent border makes the '
+                'four modes easy to tell apart; with an opaque stroke the '
+                'three stroke-relative modes look the same.',
+                style: TextStyle(fontSize: 14, height: 1.55, color: _inkLight),
+              ),
+              const SizedBox(height: 16),
+              const _FillExtentDemo(),
+
+              const SizedBox(height: 28),
+              const HandDrawnDivider(
+                color: _inkLight,
+                indent: 32,
+                endIndent: 32,
                 seed: 40,
               ),
               const SizedBox(height: 28),
@@ -2419,6 +2447,67 @@ Widget _caption(String text) => Padding(
     style: const TextStyle(fontSize: 13, height: 1.5, color: _inkLight),
   ),
 );
+
+class _FillExtentDemo extends StatelessWidget {
+  const _FillExtentDemo();
+
+  @override
+  Widget build(BuildContext context) {
+    const modes = HandDrawnFillExtent.values;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < modes.length; i += 2) ...[
+          Row(
+            children: [
+              Expanded(child: _FillExtentCard(modes[i])),
+              const SizedBox(width: 12),
+              Expanded(child: _FillExtentCard(modes[i + 1])),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
+        _caption(
+          'standardShape lets teal bleed past the border where it wobbles '
+          'inward. strokeCenter gives a two-tone border: dark where it sits '
+          'over the fill, light where it sits over the page. strokeOuterEdge '
+          'puts the whole border over the fill; strokeInnerEdge puts it all '
+          'over the page.',
+        ),
+      ],
+    );
+  }
+}
+
+class _FillExtentCard extends StatelessWidget {
+  const _FillExtentCard(this.extent);
+
+  final HandDrawnFillExtent extent;
+
+  @override
+  Widget build(BuildContext context) {
+    return HandDrawnContainer(
+      backgroundColor: _accent,
+      strokeColor: const Color(0xFF000000),
+      borderOpacity: 0.45,
+      strokeWidth: 10,
+      irregularity: 7,
+      seed: 5,
+      fillExtent: extent,
+      padding: const EdgeInsets.symmetric(vertical: 26),
+      child: Center(
+        child: Text(
+          extent.name,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFFFFFFFF),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 // ══ STATUS SQUARE DEMO HELPERS ═════════════════════════════════════════════
 

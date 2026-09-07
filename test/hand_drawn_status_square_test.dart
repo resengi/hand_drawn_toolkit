@@ -1,8 +1,29 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
 
 import 'test_utils.dart';
+
+/// The square's own painter, from the pumped widget.
+CustomPainter _painter(WidgetTester tester) {
+  return tester
+      .widget<CustomPaint>(
+        find.descendant(
+          of: find.byType(HandDrawnStatusSquare),
+          matching: find.byType(CustomPaint),
+        ),
+      )
+      .painter!;
+}
+
+/// Rasterizes the square's painter at [size]×[size].
+Future<ByteData> _rasterizeSquare(WidgetTester tester, int size) {
+  final painter = _painter(tester);
+  final canvasSize = Size(size.toDouble(), size.toDouble());
+  return rasterize((canvas) => painter.paint(canvas, canvasSize), size, size);
+}
 
 void main() {
   group('HandDrawnStatusSquare', () {
@@ -147,6 +168,148 @@ void main() {
         );
         final padding = tester.widget<Padding>(paddingFinder);
         expect(padding.padding, const EdgeInsets.all(12.0));
+      });
+    });
+
+    group('fill extent', () {
+      // A 40px square with an 8px stroke: the border is inset by 4, so the
+      // stroke band spans 0…8 from each edge with its centerline at 4.
+      // Pixel (6, 20) lies in the band's inner half.
+      const size = 40;
+      const translucentRed = Color(0x80FF0000);
+
+      testWidgets('defaults to strokeCenter', (tester) async {
+        await tester.pumpWidget(
+          testApp(const HandDrawnStatusSquare(color: Colors.black)),
+        );
+
+        final square = tester.widget<HandDrawnStatusSquare>(
+          find.byType(HandDrawnStatusSquare),
+        );
+        expect(square.fillExtent, HandDrawnFillExtent.strokeCenter);
+      });
+
+      testWidgets('strokeCenter fills under the inner half of the stroke', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          testApp(
+            const HandDrawnStatusSquare(
+              color: translucentRed,
+              isFilled: true,
+              irregularity: 0,
+              size: 40,
+              strokeWidth: 8,
+            ),
+          ),
+        );
+
+        await tester.runAsync(() async {
+          final pixels = await _rasterizeSquare(tester, size);
+          // Half-alpha fill under a half-alpha stroke.
+          expect(alphaAt(pixels, size, 6, 20), closeTo(0.75, 0.03));
+        });
+      });
+
+      testWidgets('strokeInnerEdge stops the fill at the inner edge', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          testApp(
+            const HandDrawnStatusSquare(
+              color: translucentRed,
+              isFilled: true,
+              irregularity: 0,
+              size: 40,
+              strokeWidth: 8,
+              fillExtent: HandDrawnFillExtent.strokeInnerEdge,
+            ),
+          ),
+        );
+
+        await tester.runAsync(() async {
+          final pixels = await _rasterizeSquare(tester, size);
+          // Only the half-alpha stroke covers the band.
+          expect(alphaAt(pixels, size, 6, 20), closeTo(0.5, 0.03));
+        });
+      });
+
+      testWidgets('a change to fillExtent alone triggers a repaint', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          testApp(
+            const HandDrawnStatusSquare(
+              color: Colors.black,
+              fillExtent: HandDrawnFillExtent.strokeCenter,
+            ),
+          ),
+        );
+        final before = _painter(tester);
+
+        await tester.pumpWidget(
+          testApp(
+            const HandDrawnStatusSquare(
+              color: Colors.black,
+              fillExtent: HandDrawnFillExtent.strokeOuterEdge,
+            ),
+          ),
+        );
+        final after = _painter(tester);
+
+        expect(after.shouldRepaint(before), isTrue);
+      });
+
+      testWidgets('the painter rejects invalid rendering parameters', (
+        tester,
+      ) async {
+        // The widget's own checks are debug asserts that these values pass;
+        // the painter's constructor is the release-safe boundary.
+        await tester.pumpWidget(
+          testApp(
+            const HandDrawnStatusSquare(
+              color: Colors.black,
+              strokeWidth: double.infinity,
+            ),
+          ),
+        );
+        expect(tester.takeException(), isArgumentError);
+
+        await tester.pumpWidget(
+          testApp(
+            const HandDrawnStatusSquare(
+              color: Colors.black,
+              irregularity: double.infinity,
+            ),
+          ),
+        );
+        expect(tester.takeException(), isArgumentError);
+      });
+
+      testWidgets('the indicator renders on an unfilled square', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          testApp(
+            const HandDrawnStatusSquare(
+              color: Colors.red,
+              isFilled: false,
+              indicator: StatusIndicator.dash,
+              indicatorColor: Color(0xFF00FF00),
+              irregularity: 0,
+              size: 40,
+              strokeWidth: 8,
+            ),
+          ),
+        );
+
+        await tester.runAsync(() async {
+          final pixels = await _rasterizeSquare(tester, size);
+          // The dash runs horizontally through the square's center.
+          expect(channelAt(pixels, size, 20, 20, 0), 0);
+          expect(channelAt(pixels, size, 20, 20, 1), 255);
+          expect(channelAt(pixels, size, 20, 20, 3), 255);
+        });
       });
     });
 

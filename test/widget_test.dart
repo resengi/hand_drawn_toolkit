@@ -28,13 +28,75 @@ void main() {
         ),
       );
 
-      // Find the Container that is a descendant of HandDrawnContainer.
-      final containerFinder = find.descendant(
-        of: find.byType(HandDrawnContainer),
-        matching: find.byType(Container),
+      final customPaint = tester.widget<CustomPaint>(findHandDrawnPaint());
+      final painter = customPaint.painter! as HandDrawnFillPainter;
+      expect(painter.color, Colors.red);
+    });
+
+    testWidgets('fills the layout box by default', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: HandDrawnContainer(child: SizedBox(width: 100, height: 100)),
+          ),
+        ),
       );
-      final container = tester.widget<Container>(containerFinder);
-      expect(container.color, Colors.red);
+
+      final customPaint = tester.widget<CustomPaint>(findHandDrawnPaint());
+      final painter = customPaint.painter! as HandDrawnFillPainter;
+      expect(painter.extent, HandDrawnFillExtent.standardShape);
+    });
+
+    testWidgets('passes fill parameters to the fill painter', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: HandDrawnContainer(
+              fillExtent: HandDrawnFillExtent.strokeInnerEdge,
+              strokeWidth: 4.0,
+              irregularity: 5.0,
+              segments: 30,
+              seed: 99,
+              child: SizedBox(width: 100, height: 100),
+            ),
+          ),
+        ),
+      );
+
+      final customPaint = tester.widget<CustomPaint>(findHandDrawnPaint());
+      final painter = customPaint.painter! as HandDrawnFillPainter;
+      expect(painter.extent, HandDrawnFillExtent.strokeInnerEdge);
+      expect(painter.strokeWidth, 4.0);
+      expect(painter.irregularity, 5.0);
+      expect(painter.segments, 30);
+      expect(painter.seed, 99);
+    });
+
+    testWidgets('fill and border painters share one path definition', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: HandDrawnContainer(
+              fillExtent: HandDrawnFillExtent.strokeCenter,
+              irregularity: 5.0,
+              segments: 30,
+              seed: 99,
+              child: SizedBox(width: 100, height: 100),
+            ),
+          ),
+        ),
+      );
+
+      final customPaint = tester.widget<CustomPaint>(findHandDrawnPaint());
+      final fill = customPaint.painter! as HandDrawnFillPainter;
+      final border = customPaint.foregroundPainter! as HandDrawnLinePainter;
+      expect(fill.buildPath, border.buildPath);
+      expect(fill.inset, border.inset);
+      expect(fill.seed, border.seed);
+      expect(fill.segments, border.segments);
+      expect(fill.irregularity, border.irregularity);
     });
 
     testWidgets('uses a CustomPaint with foregroundPainter', (tester) async {
@@ -64,12 +126,12 @@ void main() {
         ),
       );
 
-      final containerFinder = find.descendant(
+      final paddingFinder = find.descendant(
         of: find.byType(HandDrawnContainer),
-        matching: find.byType(Container),
+        matching: find.byType(Padding),
       );
-      final container = tester.widget<Container>(containerFinder);
-      expect(container.padding, customPadding);
+      final padding = tester.widget<Padding>(paddingFinder);
+      expect(padding.padding, customPadding);
     });
 
     testWidgets('passes parameters to painter', (tester) async {
@@ -114,6 +176,35 @@ void main() {
       final painter = customPaint.foregroundPainter! as HandDrawnLinePainter;
       // 0.5 (strokeColor alpha) * 0.5 (borderOpacity) = 0.25
       expect(painter.color.a, closeTo(0.25, 0.01));
+    });
+
+    testWidgets('equivalent rebuilds do not repaint either painter', (
+      tester,
+    ) async {
+      // A runtime value keeps the container non-const, so each build below
+      // constructs a distinct instance with equal fields.
+      final seed = tester.binding.hashCode & 0xff;
+      Widget container() => MaterialApp(
+        home: Scaffold(
+          body: HandDrawnContainer(
+            seed: seed,
+            child: const SizedBox(width: 100, height: 100),
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(container());
+      var paint = tester.widget<CustomPaint>(findHandDrawnPaint());
+      final oldFill = paint.painter! as HandDrawnFillPainter;
+      final oldBorder = paint.foregroundPainter! as HandDrawnLinePainter;
+
+      await tester.pumpWidget(container());
+      paint = tester.widget<CustomPaint>(findHandDrawnPaint());
+      final newFill = paint.painter! as HandDrawnFillPainter;
+      final newBorder = paint.foregroundPainter! as HandDrawnLinePainter;
+
+      expect(newFill.shouldRepaint(oldFill), isFalse);
+      expect(newBorder.shouldRepaint(oldBorder), isFalse);
     });
   });
 

@@ -1,9 +1,61 @@
+import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
 
+import 'test_utils.dart';
+
+/// The fixture: a 100×100 canvas, a zero-jitter 80×80 square border inset by
+/// 10 on every side, and a 10-wide stroke. The stroke band therefore spans
+/// 5…15 from each edge with its centerline at 10.
+const int _size = 100;
+const double _strokeWidth = 10;
+const Color _opaque = Color(0xFFFF0000);
+const Color _half = Color(0x80FF0000);
+
+Path _border() => Path()..addRect(const Rect.fromLTWH(10, 10, 80, 80));
+
+Path _standardShape() => Path()..addRect(const Rect.fromLTWH(0, 0, 100, 100));
+
+Future<ByteData> _renderFill(
+  HandDrawnFillExtent extent, {
+  Color color = _opaque,
+  Path Function() border = _border,
+  Path Function() standardShape = _standardShape,
+  StrokeJoin join = StrokeJoin.round,
+}) {
+  return rasterize(
+    (canvas) => paintHandDrawnFill(
+      canvas,
+      border: border,
+      standardShape: standardShape,
+      color: color,
+      extent: extent,
+      strokeWidth: _strokeWidth,
+      join: join,
+    ),
+    _size,
+    _size,
+  );
+}
+
+Future<ByteData> _renderStroke(StrokeJoin join) {
+  return rasterize(
+    (canvas) => canvas.drawPath(
+      _border(),
+      handDrawnStrokePaint(color: _opaque, width: _strokeWidth, join: join),
+    ),
+    _size,
+    _size,
+  );
+}
+
+double _alpha(ByteData pixels, int x, int y) => alphaAt(pixels, _size, x, y);
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('HandDrawnHelpers', () {
     group('smooth (static)', () {
       test('preserves first and last values', () {
@@ -250,6 +302,31 @@ void main() {
         );
       });
 
+      test('throws ArgumentError when irregularity is not finite', () {
+        expect(
+          () =>
+              HandDrawnHelpers(seed: 0, segments: 10, irregularity: double.nan),
+          throwsA(isA<ArgumentError>()),
+        );
+        expect(
+          () => HandDrawnHelpers(
+            seed: 0,
+            segments: 10,
+            irregularity: double.infinity,
+          ),
+          throwsA(isA<ArgumentError>()),
+        );
+      });
+
+      test('checkGenerationParameters applies the same rules', () {
+        const check = HandDrawnHelpers.checkGenerationParameters;
+
+        expect(() => check(0, 1.0), throwsA(isA<ArgumentError>()));
+        expect(() => check(10, -1.0), throwsA(isA<ArgumentError>()));
+        expect(() => check(10, double.nan), throwsA(isA<ArgumentError>()));
+        expect(() => check(10, 0.0), returnsNormally);
+      });
+
       test('accepts irregularity of zero', () {
         expect(
           () => HandDrawnHelpers(seed: 0, segments: 10, irregularity: 0.0),
@@ -287,6 +364,145 @@ void main() {
           );
         }
       });
+    });
+  });
+
+  group('paintHandDrawnFill', () {
+    // Sample points, all at least 2px from any edge so antialiasing does not
+    // affect them: outside the border, in the outer half of the stroke band,
+    // in the inner half of the band, and in the interior.
+    const samples = [(2, 50), (7, 50), (13, 50), (50, 50)];
+    const expected = {
+      HandDrawnFillExtent.standardShape: [1, 1, 1, 1],
+      HandDrawnFillExtent.strokeCenter: [0, 0, 1, 1],
+      HandDrawnFillExtent.strokeOuterEdge: [0, 1, 1, 1],
+      HandDrawnFillExtent.strokeInnerEdge: [0, 0, 0, 1],
+    };
+
+    test('fills the region each mode defines', () async {
+      for (final entry in expected.entries) {
+        final pixels = await _renderFill(entry.key);
+        for (var i = 0; i < samples.length; i++) {
+          final (x, y) = samples[i];
+          expect(_alpha(pixels, x, y), entry.value[i], reason: '${entry.key}');
+        }
+      }
+    });
+
+    test('strokeOuterEdge gives a translucent fill single coverage', () async {
+      final pixels = await _renderFill(
+        HandDrawnFillExtent.strokeOuterEdge,
+        color: _half,
+      );
+
+      // The band's inner half is covered by both the fill and the band; a
+      // second blend there would read close to 0.75.
+      expect(_alpha(pixels, 13, 50), closeTo(0.5, 0.03));
+      expect(_alpha(pixels, 7, 50), closeTo(0.5, 0.03));
+      expect(_alpha(pixels, 50, 50), closeTo(0.5, 0.03));
+    });
+
+    test('strokeInnerEdge removes the band from a translucent fill', () async {
+      final pixels = await _renderFill(
+        HandDrawnFillExtent.strokeInnerEdge,
+        color: _half,
+      );
+
+      expect(_alpha(pixels, 13, 50), 0);
+      expect(_alpha(pixels, 50, 50), closeTo(0.5, 0.03));
+    });
+
+    test('a transparent color draws nothing and builds no geometry', () async {
+      var builds = 0;
+      Path counted() {
+        builds++;
+        return _border();
+      }
+
+      final pixels = await _renderFill(
+        HandDrawnFillExtent.strokeOuterEdge,
+        color: const Color(0x00FF0000),
+        border: counted,
+        standardShape: counted,
+      );
+
+      expect(builds, 0);
+      expect(_alpha(pixels, 50, 50), 0);
+    });
+
+    test('each mode builds only the geometry it uses', () {
+      for (final extent in HandDrawnFillExtent.values) {
+        var borderBuilds = 0;
+        var standardBuilds = 0;
+        paintHandDrawnFill(
+          Canvas(PictureRecorder()),
+          border: () {
+            borderBuilds++;
+            return _border();
+          },
+          standardShape: () {
+            standardBuilds++;
+            return _standardShape();
+          },
+          color: _opaque,
+          extent: extent,
+          strokeWidth: _strokeWidth,
+        );
+
+        final usesStandard = extent == HandDrawnFillExtent.standardShape;
+        expect(standardBuilds, usesStandard ? 1 : 0, reason: '$extent');
+        expect(borderBuilds, usesStandard ? 0 : 1, reason: '$extent');
+      }
+    });
+
+    test('the band uses the same join as the visible stroke', () async {
+      // Pixel (5, 6) has its center at (5.5, 6.5), which is 5.70 from the
+      // corner's centerline point (10, 10): outside a radius-5 round join
+      // but inside the square a miter join draws. Its corner at (6, 7)
+      // touches the round join exactly, so under a round join it may carry
+      // a sliver of coverage rather than being exactly clear.
+      const outer = HandDrawnFillExtent.strokeOuterEdge;
+      final roundBand = await _renderFill(outer);
+      final roundStroke = await _renderStroke(StrokeJoin.round);
+      final miterBand = await _renderFill(outer, join: StrokeJoin.miter);
+      final miterStroke = await _renderStroke(StrokeJoin.miter);
+
+      expect(_alpha(roundBand, 5, 6), lessThan(0.1));
+      expect(_alpha(roundStroke, 5, 6), lessThan(0.1));
+      expect(_alpha(miterBand, 5, 6), 1);
+      expect(_alpha(miterStroke, 5, 6), 1);
+    });
+  });
+
+  group('handDrawnStrokePaint', () {
+    test('configures a stroke of the given color, width, and join', () {
+      final paint = handDrawnStrokePaint(color: _opaque, width: 3);
+
+      expect(paint.style, PaintingStyle.stroke);
+      expect(paint.color, _opaque);
+      expect(paint.strokeWidth, 3);
+      expect(paint.strokeCap, StrokeCap.round);
+      expect(paint.strokeJoin, StrokeJoin.round);
+
+      final mitered = handDrawnStrokePaint(
+        color: _opaque,
+        width: 3,
+        join: StrokeJoin.miter,
+      );
+      expect(mitered.strokeJoin, StrokeJoin.miter);
+    });
+  });
+
+  group('checkStrokeWidth', () {
+    test('rejects zero, negative, and non-finite widths', () {
+      expect(() => checkStrokeWidth(0), throwsArgumentError);
+      expect(() => checkStrokeWidth(-1), throwsArgumentError);
+      expect(() => checkStrokeWidth(double.nan), throwsArgumentError);
+      expect(() => checkStrokeWidth(double.infinity), throwsArgumentError);
+    });
+
+    test('accepts a finite positive width', () {
+      expect(() => checkStrokeWidth(0.5), returnsNormally);
     });
   });
 }

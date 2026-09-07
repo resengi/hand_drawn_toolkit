@@ -4,6 +4,44 @@ import 'dart:ui';
 import 'package:flutter/painting.dart'
     show TextDirection, TextPainter, TextSpan, TextStyle;
 
+/// How far a shape's fill extends relative to its hand-drawn stroke.
+///
+/// Used by every closed hand-drawn shape that has both a stroke and an inner
+/// fill: [HandDrawnContainer] (and through it [HandDrawnTable] and a boxed
+/// [HandDrawnLegend]), [HandDrawnStatusSquare], bar segments, and scatter
+/// dots. Let *P* be the jittered path the stroke follows and *S* the shape's
+/// un-jittered geometry.
+///
+/// | Mode              | Fill region                        | Cost            |
+/// |-------------------|------------------------------------|-----------------|
+/// | [standardShape]   | *S*; ignores the wobble            | one draw        |
+/// | [strokeCenter]    | interior of *P*, to the centerline | one draw        |
+/// | [strokeOuterEdge] | interior of *P* plus the band      | layer + 2 draws |
+/// | [strokeInnerEdge] | interior of *P* minus the band     | layer + 2 draws |
+///
+/// *S* is the layout box for the container family, the inset square for the
+/// status square, the segment rectangle for bars, and the exact circle for
+/// scatter dots. With an opaque stroke the three stroke-relative modes look
+/// the same wherever the stroke covers a pixel; they differ when the stroke
+/// is translucent or hidden.
+enum HandDrawnFillExtent {
+  /// Fills the un-jittered geometry. Where the stroke wobbles inward, the
+  /// fill shows outside it.
+  standardShape,
+
+  /// Fills the interior of the jittered path; the fill meets the stroke at
+  /// its centerline.
+  strokeCenter,
+
+  /// Fills the interior plus the full stroke band; a translucent stroke
+  /// blends uniformly over the fill color.
+  strokeOuterEdge,
+
+  /// Fills the interior minus the full stroke band; a translucent stroke
+  /// blends uniformly over whatever is behind the shape.
+  strokeInnerEdge,
+}
+
 /// Generates jittered [Path] objects that simulate hand-drawn strokes.
 ///
 /// Each helper method produces a [Path] sized to a given [Size]. The jitter is
@@ -37,14 +75,26 @@ class HandDrawnHelpers {
     required this.segments,
     required this.irregularity,
   }) : _rand = math.Random(seed) {
+    checkGenerationParameters(segments, irregularity);
+  }
+
+  /// Validates the path-generation parameters shared by every hand-drawn
+  /// shape in the package.
+  ///
+  /// Throws [ArgumentError] when [segments] is not positive or when
+  /// [irregularity] is negative or not finite. This is the single
+  /// authoritative check for these two parameters; the constructor and the
+  /// painters that generate wobbly geometry all call it rather than
+  /// restating the rules.
+  static void checkGenerationParameters(int segments, double irregularity) {
     if (segments <= 0) {
       throw ArgumentError.value(segments, 'segments', 'must be positive');
     }
-    if (irregularity < 0) {
+    if (!irregularity.isFinite || irregularity < 0) {
       throw ArgumentError.value(
         irregularity,
         'irregularity',
-        'must be non-negative',
+        'must be finite and non-negative',
       );
     }
   }
@@ -168,6 +218,88 @@ class HandDrawnHelpers {
 }
 
 // ── Shared free helpers ─────────────────────────────────────────────────────
+
+/// Validates a stroke width for the hand-drawn painters.
+///
+/// Throws [ArgumentError] when [strokeWidth] is not a finite, positive number.
+/// This is the single authoritative check for stroke widths; every painter
+/// that strokes or erases a hand-drawn band calls it at construction.
+void checkStrokeWidth(double strokeWidth) {
+  if (!strokeWidth.isFinite || strokeWidth <= 0) {
+    throw ArgumentError.value(strokeWidth, 'strokeWidth', 'must be positive');
+  }
+}
+
+/// The stroke [Paint] shared by hand-drawn paths.
+///
+/// [join] is how the stroke turns at each jittered vertex; round by default.
+/// The fill routine reuses this exact configuration to add or remove the
+/// stroke band, so a shape must pass the same [join] to [paintHandDrawnFill]
+/// and to its visible stroke.
+///
+/// Returns a fresh mutable [Paint] so callers can set a blend mode.
+Paint handDrawnStrokePaint({
+  required Color color,
+  required double width,
+  StrokeJoin join = StrokeJoin.round,
+}) {
+  return Paint()
+    ..color = color
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = width
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = join;
+}
+
+/// Fills a closed hand-drawn shape according to [extent].
+///
+/// [border] builds the jittered closed path the visible stroke follows;
+/// [standardShape] builds the shape's un-jittered geometry. Each mode builds
+/// only the geometry it uses, and a fully transparent [color] builds none.
+///
+/// [strokeWidth] and [join] describe the visible stroke; the edge modes use
+/// them to reproduce the stroke band exactly. The visible stroke itself is
+/// not drawn here.
+void paintHandDrawnFill(
+  Canvas canvas, {
+  required Path Function() border,
+  required Path Function() standardShape,
+  required Color color,
+  required HandDrawnFillExtent extent,
+  required double strokeWidth,
+  StrokeJoin join = StrokeJoin.round,
+}) {
+  if (color.a == 0) return;
+  final fill = Paint()
+    ..color = color
+    ..style = PaintingStyle.fill;
+
+  if (extent == HandDrawnFillExtent.standardShape) {
+    canvas.drawPath(standardShape(), fill);
+    return;
+  }
+  final path = border();
+  if (extent == HandDrawnFillExtent.strokeCenter) {
+    canvas.drawPath(path, fill);
+    return;
+  }
+
+  // Edge modes: fill inside a layer, then either replace the stroke band
+  // with the fill color (outer edge) or erase it (inner edge). Inside the
+  // layer, `src` replaces rather than blends, so a translucent color has
+  // single coverage across the whole region; `clear` ignores the color.
+  final band = extent == HandDrawnFillExtent.strokeOuterEdge
+      ? BlendMode.src
+      : BlendMode.clear;
+  canvas.saveLayer(path.getBounds().inflate(strokeWidth), Paint());
+  canvas.drawPath(path, fill);
+  canvas.drawPath(
+    path,
+    handDrawnStrokePaint(color: color, width: strokeWidth, join: join)
+      ..blendMode = band,
+  );
+  canvas.restore();
+}
 
 /// Lays out [text] in [style] with default LTR direction and returns
 /// the resulting [TextPainter], ready for measurement or paint.

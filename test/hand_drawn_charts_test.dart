@@ -1,5 +1,6 @@
 import 'dart:ui' show PictureRecorder;
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hand_drawn_toolkit/hand_drawn_toolkit.dart';
@@ -13,6 +14,16 @@ Finder _findChartPaint<T extends CustomPainter>() {
   return find.byWidgetPredicate(
     (widget) => widget is CustomPaint && widget.painter is T,
   );
+}
+
+/// Rasterizes [painter] at [kChartTestSize] and returns its RGBA bytes.
+Future<List<int>> _rasterizeChart(CustomPainter painter) async {
+  final pixels = await rasterize(
+    (canvas) => painter.paint(canvas, kChartTestSize),
+    kChartTestSize.width.toInt(),
+    kChartTestSize.height.toInt(),
+  );
+  return pixels.buffer.asUint8List();
 }
 
 void main() {
@@ -99,8 +110,8 @@ void main() {
     });
 
     testWidgets('normal density bar chart renders correctly', (tester) async {
-      // 5 bars — a typical use case that should be unaffected by the
-      // dense-bar fix.
+      // 5 bars — a typical density, well below the point where bars
+      // narrow toward barMinWidth.
       await tester.pumpWidget(
         testApp(HandDrawnBarChart(data: barTestData(barCount: 5))),
       );
@@ -737,7 +748,8 @@ void main() {
 
     test('does NOT treat fractional values as percentages', () {
       final painter = HandDrawnBarChartPainter(data: barTestData());
-      // This was the old bug: 0.5 should NOT become "50%"
+      // Fractional values are formatted as plain numbers, never as
+      // percentages.
       final result = painter.formatYValue(0.5);
       expect(result, isNot(contains('%')));
       expect(result, '0.5');
@@ -955,8 +967,7 @@ void main() {
     });
 
     test('default yMin stays at 0 when no negative segments are present', () {
-      // Backward-compat: an all-positive bar chart must keep its
-      // historical default of yMin == 0.
+      // With no negative segment, the default Y-axis minimum is 0.
       final painter = HandDrawnBarChartPainter(
         data: const BarChartData(
           bars: [
@@ -1414,11 +1425,9 @@ void main() {
   // CHART PAINTER — wobbly circle primitive
   // ════════════════════════════════════════════════════════════════════════
 
-  // The wobbly-circle helper previously sampled the wrap-around angle
-  // twice, producing two separately-jittered points at the same angular
-  // position. When the path closed, the two points left a visible notch.
-  // The fix samples the circle exactly once per angular position and
-  // lets path.close() connect the last segment back to the first.
+  // The wobbly-circle helper samples each angular position exactly once
+  // and lets path.close() connect the last segment back to the first, so
+  // the closing point is never jittered twice.
   group('wobblyCircle primitive', () {
     HandDrawnScatterPlotPainter makePainter({int seed = 42}) {
       return HandDrawnScatterPlotPainter(
@@ -1559,10 +1568,9 @@ void main() {
       legend: [],
     );
 
-    test('default (horizontal) preserves the historical layout', () {
+    test('default (horizontal) reserves chartXTickBandHeight', () {
       // The unrotated fast path reserves exactly the
-      // chartXTickBandHeight constant so existing charts get the same
-      // bottom band they always have.
+      // chartXTickBandHeight constant for the bottom band.
       final painter = HandDrawnBarChartPainter(data: longLabelBarData());
       final defaultLayout = painter.computeLayout(kChartTestSize);
 
@@ -2016,10 +2024,9 @@ void main() {
       expect(layout.chartArea, equals(hiddenLayout.chartArea));
     });
 
-    test('default inline legend reserves the historical bottom band', () {
-      // Backward-compat hard guarantee: a chart with non-empty legend
-      // entries and no explicit legendConfig override must reserve
-      // the same number of pixels at the bottom as it always has.
+    test('default inline legend reserves chartLegendBandHeight', () {
+      // A chart with non-empty legend entries and no explicit
+      // legendConfig reserves chartLegendBandHeight at the bottom.
       final withLegend = HandDrawnBarChartPainter(
         data: barWithLegend(),
       ).computeLayout(kChartTestSize);
@@ -2035,8 +2042,8 @@ void main() {
 
     test('external bottom boxed reserves more space than inline', () {
       // The boxed preset adds padding around the entries, which
-      // should produce a taller reserved band than the historical
-      // floor of chartLegendBandHeight.
+      // produces a taller reserved band than the inline floor of
+      // chartLegendBandHeight.
       final inline = HandDrawnBarChartPainter(
         data: barWithLegend(entryCount: 5),
       ).computeLayout(kChartTestSize);
@@ -2152,10 +2159,9 @@ void main() {
     });
 
     test('long legends wrap instead of disappearing', () {
-      // 12 entries with long labels would silently overflow and
-      // truncate under the historical inline behavior. With wrap
-      // enabled, every entry must be measured and accounted for in
-      // the reserved band.
+      // 12 entries with long labels overflow and truncate under the
+      // inline preset. With wrap enabled, every entry must be measured
+      // and accounted for in the reserved band.
       final manyEntries = [
         for (int i = 0; i < 12; i++)
           LegendEntry(
@@ -2576,6 +2582,187 @@ void main() {
       );
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('HandDrawnLegend boxed defaults match the container', (
+      tester,
+    ) async {
+      const entries = [LegendEntry(label: 'Apples', color: Color(0xFFFF0000))];
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 300,
+              child: HandDrawnLegend(entries: entries),
+            ),
+          ),
+        ),
+      );
+
+      final container = tester.widget<HandDrawnContainer>(
+        find.byType(HandDrawnContainer),
+      );
+      expect(container.strokeWidth, HandDrawnDefaults.strokeWidth);
+      expect(
+        container.backgroundColor,
+        HandDrawnDefaults.containerBackgroundColor,
+      );
+      expect(container.fillExtent, HandDrawnDefaults.containerFillExtent);
+    });
+
+    testWidgets('HandDrawnLegend forwards box styling to the container', (
+      tester,
+    ) async {
+      const entries = [LegendEntry(label: 'Apples', color: Color(0xFFFF0000))];
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 300,
+              child: HandDrawnLegend(
+                entries: entries,
+                strokeWidth: 1.0,
+                backgroundColor: Color(0x00000000),
+                fillExtent: HandDrawnFillExtent.strokeInnerEdge,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final container = tester.widget<HandDrawnContainer>(
+        find.byType(HandDrawnContainer),
+      );
+      expect(container.strokeWidth, 1.0);
+      expect(container.backgroundColor, const Color(0x00000000));
+      expect(container.fillExtent, HandDrawnFillExtent.strokeInnerEdge);
+    });
+  });
+
+  // ── Fill extent ───────────────────────────────────────────────────────
+
+  group('Chart fill extent', () {
+    testWidgets('bar chart forwards fillExtent to its painter', (tester) async {
+      await tester.pumpWidget(
+        testApp(
+          HandDrawnBarChart(
+            data: barTestData(),
+            fillExtent: HandDrawnFillExtent.strokeOuterEdge,
+          ),
+        ),
+      );
+      final paint = tester.widget<CustomPaint>(
+        _findChartPaint<HandDrawnBarChartPainter>(),
+      );
+      final painter = paint.painter! as HandDrawnBarChartPainter;
+      expect(painter.fillExtent, HandDrawnFillExtent.strokeOuterEdge);
+    });
+
+    testWidgets('scatter plot forwards fillExtent to its painter', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        testApp(
+          HandDrawnScatterPlot(
+            data: scatterTestData(),
+            fillExtent: HandDrawnFillExtent.strokeInnerEdge,
+          ),
+        ),
+      );
+      final paint = tester.widget<CustomPaint>(
+        _findChartPaint<HandDrawnScatterPlotPainter>(),
+      );
+      final painter = paint.painter! as HandDrawnScatterPlotPainter;
+      expect(painter.fillExtent, HandDrawnFillExtent.strokeInnerEdge);
+    });
+
+    test('painters default to strokeCenter', () {
+      expect(
+        HandDrawnBarChartPainter(data: barTestData()).fillExtent,
+        HandDrawnFillExtent.strokeCenter,
+      );
+      expect(
+        HandDrawnScatterPlotPainter(data: scatterTestData()).fillExtent,
+        HandDrawnFillExtent.strokeCenter,
+      );
+    });
+
+    test('shouldRepaint propagates fillExtent changes', () {
+      final bar1 = HandDrawnBarChartPainter(data: barTestData());
+      final bar2 = HandDrawnBarChartPainter(
+        data: barTestData(),
+        fillExtent: HandDrawnFillExtent.strokeOuterEdge,
+      );
+      expect(bar2.shouldRepaint(bar1), isTrue);
+
+      final s1 = HandDrawnScatterPlotPainter(data: scatterTestData());
+      final s2 = HandDrawnScatterPlotPainter(
+        data: scatterTestData(),
+        fillExtent: HandDrawnFillExtent.strokeInnerEdge,
+      );
+      expect(s2.shouldRepaint(s1), isTrue);
+    });
+
+    testWidgets('bar chart renders differently across fill extents', (
+      tester,
+    ) async {
+      await tester.runAsync(() async {
+        final standard = await _rasterizeChart(
+          HandDrawnBarChartPainter(
+            data: barTestData(),
+            irregularity: 6.0,
+            fillExtent: HandDrawnFillExtent.standardShape,
+          ),
+        );
+        final center = await _rasterizeChart(
+          HandDrawnBarChartPainter(
+            data: barTestData(),
+            irregularity: 6.0,
+            fillExtent: HandDrawnFillExtent.strokeCenter,
+          ),
+        );
+        expect(listEquals(standard, center), isFalse);
+      });
+    });
+
+    testWidgets('scatter plot renders differently across fill extents', (
+      tester,
+    ) async {
+      await tester.runAsync(() async {
+        final standard = await _rasterizeChart(
+          HandDrawnScatterPlotPainter(
+            data: scatterTestData(),
+            irregularity: 6.0,
+            fillExtent: HandDrawnFillExtent.standardShape,
+          ),
+        );
+        final center = await _rasterizeChart(
+          HandDrawnScatterPlotPainter(
+            data: scatterTestData(),
+            irregularity: 6.0,
+            fillExtent: HandDrawnFillExtent.strokeCenter,
+          ),
+        );
+        expect(listEquals(standard, center), isFalse);
+      });
+    });
+
+    test('chart painters reject invalid generation parameters', () {
+      expect(
+        () => HandDrawnBarChartPainter(data: barTestData(), segments: 0),
+        throwsArgumentError,
+      );
+      expect(
+        () => HandDrawnScatterPlotPainter(
+          data: scatterTestData(),
+          irregularity: double.nan,
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => HandDrawnLineChartPainter(data: lineTestData(), irregularity: -1),
+        throwsArgumentError,
+      );
+    });
   });
 
   // ── copyWith ─────────────────────────────────────────────────────────
@@ -2587,6 +2774,7 @@ void main() {
         height: 250,
         seed: 7,
         clipToChartArea: true,
+        fillExtent: HandDrawnFillExtent.strokeOuterEdge,
       );
 
       // Round trip: no args preserves every field. Widgets don't
@@ -2610,6 +2798,7 @@ void main() {
       expect(copy.clipToChartArea, original.clipToChartArea);
       expect(copy.xLabelConfig, original.xLabelConfig);
       expect(copy.legendConfig, original.legendConfig);
+      expect(copy.fillExtent, original.fillExtent);
       expect(copy.key, original.key);
 
       // Single-field override leaves the rest untouched.
@@ -2663,6 +2852,7 @@ void main() {
         data: scatterTestData(),
         dotColor: const Color(0xFF112233),
         seed: 7,
+        fillExtent: HandDrawnFillExtent.strokeInnerEdge,
       );
 
       final copy = original.copyWith();
@@ -2686,6 +2876,7 @@ void main() {
       expect(copy.xLabelConfig, original.xLabelConfig);
       expect(copy.legendConfig, original.legendConfig);
       expect(copy.legendStyle, original.legendStyle);
+      expect(copy.fillExtent, original.fillExtent);
       expect(copy.key, original.key);
 
       // Override the scatter-specific field; confirm siblings hold.

@@ -303,8 +303,7 @@ void main() {
       'mixed-sign line (multiple zero crossings) paints without throwing',
       () {
         // Exercises the sign-split fill path on a series that crosses
-        // zero four times. A bug in the split logic would likely
-        // surface here as a throw or degenerate path.
+        // zero four times.
         const data = LineChartData(
           minX: 0,
           maxX: 7,
@@ -519,11 +518,9 @@ void main() {
   // ── Sign-flip crossing detection (fill contract) ─────────────────────
   //
   // The zero-crossing fill splits its polygon at every strict sign flip
-  // (y0*y1 < 0), inserting an interpolated crossing X. We can't assert
-  // on raw Path contents without Canvas mocking, but we CAN lock in the
-  // math that drives the split — any change in how crossings are
-  // detected or interpolated will show up here before it surfaces as a
-  // rendering bug.
+  // (y0*y1 < 0), inserting an interpolated crossing X. These cases pin
+  // the crossing-detection and interpolation math used by sign-split
+  // fill rendering.
 
   group('Sign-flip crossing detection (fill contract)', () {
     double crossingX(LinePoint a, LinePoint b) {

@@ -13,6 +13,7 @@ import 'dart:ui' show Color;
 import 'package:flutter/painting.dart' show EdgeInsets, TextStyle;
 
 import 'hand_drawn_constants.dart';
+import 'hand_drawn_toolkit_helpers.dart';
 
 /// Default configuration values for hand-drawn rendering.
 ///
@@ -47,6 +48,12 @@ abstract final class HandDrawnDefaults {
   /// or hot-reloads.
   static const int seed = defaultSeed;
 
+  /// Default fill extent for the shapes that fill their jittered path
+  /// ([HandDrawnStatusSquare], [HandDrawnBarChart] segments,
+  /// [HandDrawnScatterPlot] dots). [HandDrawnContainer] and the widgets that
+  /// wrap it use [containerFillExtent].
+  static const HandDrawnFillExtent shapeFillExtent = defaultShapeFillExtent;
+
   // ── Container defaults ─────────────────────────────────────────────────
 
   /// Default inner padding for [HandDrawnContainer].
@@ -57,6 +64,11 @@ abstract final class HandDrawnDefaults {
 
   /// Default stroke color for [HandDrawnContainer].
   static const Color containerStrokeColor = defaultContainerStrokeColor;
+
+  /// Default fill extent for [HandDrawnContainer] and the widgets that wrap
+  /// it ([HandDrawnTable], a boxed [HandDrawnLegend]).
+  static const HandDrawnFillExtent containerFillExtent =
+      defaultContainerFillExtent;
 
   // ── Divider defaults ───────────────────────────────────────────────────
 
@@ -80,8 +92,8 @@ abstract final class HandDrawnDefaults {
   /// Default border stroke width for [HandDrawnStatusSquare].
   static const double statusSquareStrokeWidth = defaultStatusSquareStrokeWidth;
 
-  /// Default stroke width for the check / dash indicator drawn on top of
-  /// the filled square.
+  /// Default stroke width for the check / dash indicator drawn over the
+  /// square.
   static const double statusSquareIndicatorStrokeWidth =
       defaultStatusSquareIndicatorStrokeWidth;
 
@@ -98,8 +110,7 @@ abstract final class HandDrawnDefaults {
   /// the container default for a chunkier feel at small sizes.
   static const int statusSquareSegments = defaultStatusSquareSegments;
 
-  /// Default color for the indicator (check / dash) drawn on top of
-  /// the filled square.
+  /// Default color for the indicator (check / dash) drawn over the square.
   static const Color statusSquareIndicatorColor =
       defaultStatusSquareIndicatorColor;
 
@@ -208,8 +219,8 @@ abstract final class HandDrawnDefaults {
   /// Default horizontal gap between legend entries.
   static const double chartLegendEntryGap = defaultChartLegendEntryGap;
 
-  /// Default segment count for wobbly rectangle borders (legend boxes,
-  /// inline label backgrounds).
+  /// Default segment count for wobbly rectangles (legend boxes, bar
+  /// segments).
   static const int wobblyRectSegments = defaultWobblyRectSegments;
 
   /// Default number of samples used by [FunctionSeriesData].

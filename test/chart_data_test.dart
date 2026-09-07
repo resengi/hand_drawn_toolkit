@@ -731,7 +731,7 @@ void main() {
   });
 
   group('ChartLegendConfig', () {
-    test('default constructor matches inline-bottom historical behavior', () {
+    test('default constructor is an unboxed bottom row', () {
       const c = ChartLegendConfig();
       expect(c.visible, isTrue);
       expect(c.position, ChartLegendPosition.bottom);
@@ -740,7 +740,7 @@ void main() {
       expect(c.wrap, isFalse);
     });
 
-    test('inlineBottom preset is the historical default exactly', () {
+    test('inlineBottom preset equals the default constructor', () {
       const a = ChartLegendConfig.inlineBottom;
       expect(a.visible, isTrue);
       expect(a.position, ChartLegendPosition.bottom);

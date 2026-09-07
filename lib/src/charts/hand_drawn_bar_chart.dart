@@ -19,6 +19,7 @@ import 'hand_drawn_chart_painter.dart';
 class HandDrawnBarChartPainter extends HandDrawnChartPainter {
   HandDrawnBarChartPainter({
     required this.data,
+    this.fillExtent = HandDrawnDefaults.shapeFillExtent,
     super.clipToChartArea,
     super.seed,
     super.axisColor,
@@ -57,11 +58,9 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
     // resolvedCategories so grouped and ungrouped inputs are both
     // validated.
     //
-    // Note: the fillAlpha guard cannot be exercised from `flutter test`
-    // because tests run with asserts enabled — the BarSegment const
-    // assert fires first. This is defense-in-depth for production
-    // builds; covered by code review and the companion debug-assert
-    // test in chart_data_test.dart.
+    // The fillAlpha guard cannot be exercised from `flutter test` because
+    // tests run with asserts enabled and the BarSegment const assert fires
+    // first; it exists for release builds.
     for (final category in data.resolvedCategories) {
       for (final bar in category.bars) {
         for (final segment in bar.segments) {
@@ -84,6 +83,10 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
   }
 
   final BarChartData data;
+
+  /// How far each segment's fill extends relative to its outline. See
+  /// [HandDrawnFillExtent].
+  final HandDrawnFillExtent fillExtent;
 
   /// Computes the default Y-axis maximum from inner-bar **positive**
   /// stack totals across every category.
@@ -252,26 +255,28 @@ class HandDrawnBarChartPainter extends HandDrawnChartPainter {
       final path = helpers.rectBorder(s.rect.size).shift(s.rect.topLeft);
 
       final segment = s.segment;
-      final fillPaint = Paint()
-        ..color = (segment.fillColor ?? segment.color).withValues(
+      paintHandDrawnFill(
+        canvas,
+        border: () => path,
+        standardShape: () => Path()..addRect(s.rect),
+        color: (segment.fillColor ?? segment.color).withValues(
           alpha: segment.fillAlpha ?? barFillAlpha,
-        )
-        ..style = PaintingStyle.fill;
-      canvas.drawPath(path, fillPaint);
-
-      final strokePaint = Paint()
-        ..color = segment.color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = barStrokeWidth
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round;
-      canvas.drawPath(path, strokePaint);
+        ),
+        extent: fillExtent,
+        strokeWidth: barStrokeWidth,
+      );
+      canvas.drawPath(
+        path,
+        handDrawnStrokePaint(color: segment.color, width: barStrokeWidth),
+      );
     }
   }
 
   @override
   bool shouldRepaint(covariant HandDrawnBarChartPainter oldDelegate) {
-    return oldDelegate.data != data || super.shouldRepaint(oldDelegate);
+    return oldDelegate.data != data ||
+        oldDelegate.fillExtent != fillExtent ||
+        super.shouldRepaint(oldDelegate);
   }
 }
 
@@ -296,6 +301,7 @@ class HandDrawnBarChart extends StatelessWidget {
     this.clipToChartArea = false,
     this.xLabelConfig = ChartLabelConfig.horizontal,
     this.legendConfig = ChartLegendConfig.inlineBottom,
+    this.fillExtent = HandDrawnDefaults.shapeFillExtent,
     super.key,
   });
 
@@ -336,6 +342,12 @@ class HandDrawnBarChart extends StatelessWidget {
   /// standalone-widget composition pattern.
   final ChartLegendConfig legendConfig;
 
+  /// How far each segment's fill extends relative to its outline; see
+  /// [HandDrawnFillExtent]. The standard shape is the segment's rectangle.
+  /// Per-segment color and opacity come from [BarSegment.fillColor] and
+  /// [BarSegment.fillAlpha].
+  final HandDrawnFillExtent fillExtent;
+
   /// Returns a copy of this widget with the given fields replaced.
   /// Fields not specified retain their current value. Nullable fields
   /// cannot be cleared via [copyWith] — construct a new
@@ -360,6 +372,7 @@ class HandDrawnBarChart extends StatelessWidget {
     bool? clipToChartArea,
     ChartLabelConfig? xLabelConfig,
     ChartLegendConfig? legendConfig,
+    HandDrawnFillExtent? fillExtent,
     Key? key,
   }) {
     return HandDrawnBarChart(
@@ -381,6 +394,7 @@ class HandDrawnBarChart extends StatelessWidget {
       clipToChartArea: clipToChartArea ?? this.clipToChartArea,
       xLabelConfig: xLabelConfig ?? this.xLabelConfig,
       legendConfig: legendConfig ?? this.legendConfig,
+      fillExtent: fillExtent ?? this.fillExtent,
       key: key ?? this.key,
     );
   }
@@ -411,6 +425,7 @@ class HandDrawnBarChart extends StatelessWidget {
           clipToChartArea: clipToChartArea,
           xLabelConfig: xLabelConfig,
           legendConfig: legendConfig,
+          fillExtent: fillExtent,
         ),
       ),
     );
