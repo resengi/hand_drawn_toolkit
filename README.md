@@ -38,7 +38,7 @@ Add the package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  hand_drawn_toolkit: ^0.5.2
+  hand_drawn_toolkit: ^0.5.3
 ```
 
 Then run:

@@ -1,5 +1,34 @@
 # Change Log
 
+All notable changes to this project will be documented in this file.
+See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
+
+## 2026-09-07
+
+### Changes
+
+---
+
+Packages with breaking changes:
+
+ - There are no breaking changes in this release.
+
+Packages with other changes:
+
+ - [`hand_drawn_toolkit` - `v0.5.3`](#hand_drawn_toolkit---v053)
+
+---
+
+#### `hand_drawn_toolkit` - `v0.5.3`
+
+ - **FIX**: Addressing Container fill issue ([#16](https://github.com/resengi/hand_drawn_toolkit/issues/16)). ([3db8778c](https://github.com/resengi/hand_drawn_toolkit/commit/3db8778c16e8a40594a779212050ac714e48dfa4))
+
+## 0.5.3
+
+ - **FIX**: Addressing Container fill issue ([#16](https://github.com/resengi/hand_drawn_toolkit/issues/16)). ([3db8778c](https://github.com/resengi/hand_drawn_toolkit/commit/3db8778c16e8a40594a779212050ac714e48dfa4))
+
+# Change Log
+
 
 
 ## 2026-08-12
@@ -26,10 +55,6 @@ Packages with other changes:
 
  - **FIX**: Adding onTapOutside pass through to HandDrawnTextField ([#15](https://github.com/resengi/hand_drawn_toolkit/issues/15)). ([45e0f7da](https://github.com/resengi/hand_drawn_toolkit/commit/45e0f7dae2e6cea5a873d903880bb53810120c94))
 
-# Change Log
-
-All notable changes to this project will be documented in this file.
-See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
 ## 2026-07-28
 
